@@ -67,6 +67,7 @@ export function TransactionEditor({
   allAnimals: AnimalOption[];
 }) {
   const [editing, setEditing] = useState<EditableTransaction | null>(null);
+  const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -76,6 +77,7 @@ export function TransactionEditor({
   }
 
   function onDelete(tx: EditableTransaction) {
+    setMenuOpenId(null);
     const ok = window.confirm(
       `Delete ${tx.category} · ${formatPkr(Math.abs(tx.amount))} on ${tx.date}? This cannot be undone.`
     );
@@ -115,28 +117,51 @@ export function TransactionEditor({
                 <p className="text-xs text-stone-500 line-clamp-1">{tx.notes}</p>
               )}
             </div>
-            <div className="flex shrink-0 flex-col items-end gap-1">
-              <p className="font-semibold">{formatPkr(tx.amount)}</p>
-              <div className="flex gap-1">
+            <div className="flex shrink-0 items-start gap-1">
+              <p className="pt-0.5 font-semibold">{formatPkr(tx.amount)}</p>
+              <div className="relative">
                 <button
                   type="button"
-                  onClick={() => {
-                    setError(null);
-                    setEditing(tx);
-                  }}
-                  className="rounded-lg px-2 py-0.5 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-200"
+                  aria-label="Transaction actions"
+                  aria-expanded={menuOpenId === tx.id}
                   disabled={pending}
+                  onClick={() =>
+                    setMenuOpenId((id) => (id === tx.id ? null : tx.id))
+                  }
+                  className="flex h-8 w-8 items-center justify-center rounded-lg text-stone-500 hover:bg-stone-100 hover:text-stone-800"
                 >
-                  Edit
+                  <MoreVerticalIcon />
                 </button>
-                <button
-                  type="button"
-                  onClick={() => onDelete(tx)}
-                  className="rounded-lg px-2 py-0.5 text-xs font-semibold text-red-700 ring-1 ring-red-200"
-                  disabled={pending}
-                >
-                  Delete
-                </button>
+                {menuOpenId === tx.id && (
+                  <>
+                    <button
+                      type="button"
+                      aria-label="Close menu"
+                      className="fixed inset-0 z-10 cursor-default"
+                      onClick={() => setMenuOpenId(null)}
+                    />
+                    <div className="absolute right-0 z-20 mt-1 w-36 overflow-hidden rounded-xl bg-white py-1 shadow-lg ring-1 ring-stone-200">
+                      <button
+                        type="button"
+                        className="block w-full px-3 py-2 text-left text-sm font-medium text-stone-800 hover:bg-stone-50"
+                        onClick={() => {
+                          setMenuOpenId(null);
+                          setError(null);
+                          setEditing(tx);
+                        }}
+                      >
+                        Edit
+                      </button>
+                      <button
+                        type="button"
+                        className="block w-full px-3 py-2 text-left text-sm font-medium text-red-700 hover:bg-red-50"
+                        onClick={() => onDelete(tx)}
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
           </li>
@@ -458,5 +483,21 @@ function SaleForm({
       </div>
       <Field label="Notes" name="notes" defaultValue={tx.notes ?? ""} />
     </>
+  );
+}
+
+function MoreVerticalIcon() {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      className="h-5 w-5"
+      aria-hidden
+    >
+      <circle cx="12" cy="5" r="1.75" />
+      <circle cx="12" cy="12" r="1.75" />
+      <circle cx="12" cy="19" r="1.75" />
+    </svg>
   );
 }
