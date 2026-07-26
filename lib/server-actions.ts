@@ -1,0 +1,132 @@
+"use server";
+
+import {
+  buyGoat,
+  changeStatus,
+  logExpense,
+  logMedical,
+  partnerTransfer,
+  recordBreeding,
+  recordLivestockSale,
+  recordPalai,
+} from "@/lib/actions";
+import { revalidatePath } from "next/cache";
+import type { AnimalBreed, AnimalSex, AnimalStatus, LedgerCategory, MedicalEventType } from "@/lib/types";
+import { uploadAnimalMedia } from "@/lib/media/upload";
+
+export async function actionLogExpense(formData: FormData) {
+  await logExpense({
+    date: String(formData.get("date")),
+    amount: Number(formData.get("amount")),
+    category: String(formData.get("category")) as LedgerCategory,
+    paidBy: String(formData.get("paidBy")) as "Monis" | "Saad",
+    animalId: formData.get("animalId") ? Number(formData.get("animalId")) : null,
+    notes: String(formData.get("notes") || ""),
+  });
+  revalidatePath("/");
+  revalidatePath("/animals");
+  revalidatePath("/transactions");
+}
+
+export async function actionRecordPalai(formData: FormData) {
+  await recordPalai({
+    date: String(formData.get("date")),
+    customerName: String(formData.get("customerName")),
+    ratePerGoat: Number(formData.get("ratePerGoat")),
+    goatCount: Number(formData.get("goatCount")),
+    paymentMethod: String(formData.get("paymentMethod") || ""),
+    notes: String(formData.get("notes") || ""),
+  });
+  revalidatePath("/");
+}
+
+export async function actionBuyGoat(formData: FormData) {
+  await buyGoat({
+    date: String(formData.get("date")),
+    price: Number(formData.get("price")),
+    breed: String(formData.get("breed")) as AnimalBreed,
+    sex: String(formData.get("sex")) as AnimalSex,
+    description: String(formData.get("description")),
+    name: String(formData.get("name") || "") || undefined,
+    ownerName: String(formData.get("ownerName")),
+    vendorName: String(formData.get("vendorName") || "") || undefined,
+    paidBy: String(formData.get("paidBy")) as "Monis" | "Saad",
+  });
+  revalidatePath("/");
+  revalidatePath("/animals");
+}
+
+export async function actionLogMedical(formData: FormData) {
+  await logMedical({
+    animalId: Number(formData.get("animalId")),
+    eventType: String(formData.get("eventType")) as MedicalEventType,
+    date: String(formData.get("date")),
+    notes: String(formData.get("notes") || ""),
+  });
+  revalidatePath("/animals");
+}
+
+export async function actionRecordBreeding(formData: FormData) {
+  await recordBreeding({
+    femaleId: Number(formData.get("femaleId")),
+    buckName: String(formData.get("buckName")),
+    dateCrossed: String(formData.get("dateCrossed")),
+    notes: String(formData.get("notes") || ""),
+  });
+  revalidatePath("/animals");
+}
+
+export async function actionChangeStatus(formData: FormData) {
+  await changeStatus({
+    animalId: Number(formData.get("animalId")),
+    status: String(formData.get("status")) as AnimalStatus,
+    outDate: String(formData.get("outDate") || "") || undefined,
+  });
+  revalidatePath("/");
+  revalidatePath("/animals");
+}
+
+export async function actionRecordLivestockSale(formData: FormData) {
+  const additional = String(formData.get("additionalAnimalId") || "").trim();
+  await recordLivestockSale({
+    date: String(formData.get("date")),
+    animalId: Number(formData.get("animalId")),
+    additionalAnimalIds: additional ? [Number(additional)] : undefined,
+    grossSalePrice: Number(formData.get("grossSalePrice")),
+    deliveryCost: formData.get("deliveryCost") ? Number(formData.get("deliveryCost")) : undefined,
+    receivedBy: String(formData.get("receivedBy")) as "Monis" | "Saad",
+    notes: String(formData.get("notes") || "") || undefined,
+  });
+  revalidatePath("/");
+  revalidatePath("/animals");
+  revalidatePath("/transactions");
+}
+
+export async function actionPartnerTransfer(formData: FormData) {
+  await partnerTransfer({
+    date: String(formData.get("date")),
+    amount: Number(formData.get("amount")),
+    direction: String(formData.get("direction")) as "from_monis" | "to_monis",
+    notes: String(formData.get("notes") || ""),
+  });
+  revalidatePath("/");
+}
+
+export async function actionUploadAnimalMedia(formData: FormData) {
+  const animalId = Number(formData.get("animalId"));
+  const file = formData.get("file");
+  const caption = String(formData.get("caption") || "") || null;
+  if (!(file instanceof File) || !file.size) {
+    throw new Error("File is required");
+  }
+  await uploadAnimalMedia({ animalId, file, caption });
+  revalidatePath(`/animals/${animalId}`);
+  revalidatePath("/animals");
+}
+
+export async function actionSignOut() {
+  const { createClient } = await import("@/lib/supabase/server");
+  const supabase = await createClient();
+  await supabase.auth.signOut();
+  revalidatePath("/", "layout");
+}

@@ -1,0 +1,42 @@
+{
+  "name": "farm-web",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint",
+    "audit:data": "node scripts/audit-data.mjs",
+    "import": "node scripts/import-all.mjs",
+    "verify": "node scripts/verify-v1.mjs && npx tsx scripts/verify-live.mts",
+    "db:reset": "node scripts/audit-data.mjs && node scripts/import-all.mjs && npm run verify",
+    "seed:supabase": "npx tsx --env-file=.env.local scripts/seed-supabase.mts"
+  },
+  "dependencies": {
+    "@supabase/ssr": "^0.8.0",
+    "@supabase/supabase-js": "^2.110.8",
+    "date-fns": "^4.4.0",
+    "next": "15.5.22",
+    "pg": "^8.22.0",
+    "react": "19.1.0",
+    "react-dom": "19.1.0",
+    "sql.js": "^1.14.1",
+    "uuid": "^14.0.1",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@eslint/eslintrc": "^3",
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20",
+    "@types/pg": "^8.20.0",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "@types/uuid": "^10.0.0",
+    "eslint": "^9",
+    "eslint-config-next": "15.5.22",
+    "tailwindcss": "^4",
+    "tsx": "^4.23.1",
+    "typescript": "^5"
+  }
+}

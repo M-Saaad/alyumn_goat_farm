@@ -1,0 +1,83 @@
+import { fetchDb, persistDb, isSupabaseDb } from "../db";
+import { createServiceClient } from "../supabase/admin";
+import type { MediaType } from "../types";
+
+const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
+const MAX_VIDEO_BYTES = 50 * 1024 * 1024;
+
+function mediaTypeFromMime(mime: string): MediaType {
+  if (mime.startsWith("video/")) return "video";
+  if (mime.startsWith("image/")) return "image";
+  throw new Error("Only image and video uploads are supported");
+}
+
+function extFromName(name: string, mime: string): string {
+  const fromName = name.includes(".") ? name.split(".").pop()!.toLowerCase() : "";
+  if (fromName && /^[a-z0-9]+$/.test(fromName)) return fromName;
+  if (mime === "image/jpeg") return "jpg";
+  if (mime === "image/png") return "png";
+  if (mime === "image/webp") return "webp";
+  if (mime === "video/mp4") return "mp4";
+  if (mime === "video/webm") return "webm";
+  if (mime === "video/quicktime") return "mov";
+  return "bin";
+}
+
+export async function uploadAnimalMedia(input: {
+  animalId: number;
+  file: File;
+  caption?: string | null;
+}) {
+  if (!isSupabaseDb()) {
+    throw new Error("Media uploads require Supabase. Set NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY.");
+  }
+
+  const mime = input.file.type || "application/octet-stream";
+  const mediaType = mediaTypeFromMime(mime);
+  const max = mediaType === "video" ? MAX_VIDEO_BYTES : MAX_IMAGE_BYTES;
+  if (input.file.size > max) {
+    throw new Error(
+      mediaType === "video"
+        ? "Video must be 50MB or smaller"
+        : "Image must be 10MB or smaller"
+    );
+  }
+
+  const db = await fetchDb();
+  const animal = db.animals.find((a) => a.id === input.animalId);
+  if (!animal) throw new Error("Animal not found");
+
+  const ext = extFromName(input.file.name, mime);
+  const id = crypto.randomUUID();
+  const storagePath = `${input.animalId}/${id}.${ext}`;
+  const client = createServiceClient();
+  const buffer = Buffer.from(await input.file.arrayBuffer());
+
+  const { error: uploadError } = await client.storage
+    .from("animal-media")
+    .upload(storagePath, buffer, { contentType: mime, upsert: false });
+  if (uploadError) throw new Error(`Upload failed: ${uploadError.message}`);
+
+  const now = new Date().toISOString();
+  if (!db.animal_media) db.animal_media = [];
+  db.animal_media.push({
+    id,
+    animal_id: input.animalId,
+    storage_path: storagePath,
+    media_type: mediaType,
+    caption: input.caption ?? null,
+    created_at: now,
+  });
+
+  return persistDb(db);
+}
+
+export async function signedMediaUrl(storagePath: string, expiresIn = 3600): Promise<string | null> {
+  if (!isSupabaseDb()) return null;
+  const client = createServiceClient();
+  const { data, error } = await client.storage
+    .from("animal-media")
+    .createSignedUrl(storagePath, expiresIn);
+  if (error) return null;
+  return data.signedUrl;
+}
