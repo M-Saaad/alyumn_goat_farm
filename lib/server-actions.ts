@@ -3,16 +3,25 @@
 import {
   buyGoat,
   changeStatus,
+  deleteTransaction,
   logExpense,
   logMedical,
   partnerTransfer,
   recordBreeding,
   recordLivestockSale,
   recordPalai,
+  updateTransaction,
 } from "@/lib/actions";
 import { revalidatePath } from "next/cache";
 import type { AnimalBreed, AnimalSex, AnimalStatus, LedgerCategory, MedicalEventType } from "@/lib/types";
 import { uploadAnimalMedia } from "@/lib/media/upload";
+import type { TransactionEditVariant } from "@/lib/transactions/mutate";
+
+function revalidateTxnPaths() {
+  revalidatePath("/");
+  revalidatePath("/transactions");
+  revalidatePath("/animals");
+}
 
 export async function actionLogExpense(formData: FormData) {
   await logExpense({
@@ -110,6 +119,78 @@ export async function actionPartnerTransfer(formData: FormData) {
     notes: String(formData.get("notes") || ""),
   });
   revalidatePath("/");
+}
+
+export async function actionUpdateTransaction(formData: FormData) {
+  const id = String(formData.get("id"));
+  const variant = String(formData.get("variant")) as TransactionEditVariant;
+
+  if (variant === "expense") {
+    const animalRaw = String(formData.get("animalId") || "").trim();
+    await updateTransaction({
+      id,
+      variant: "expense",
+      date: String(formData.get("date")),
+      amount: Number(formData.get("amount")),
+      category: String(formData.get("category")) as LedgerCategory,
+      paidBy: String(formData.get("paidBy")) as "Monis" | "Saad",
+      animalId: animalRaw ? Number(animalRaw) : null,
+      notes: String(formData.get("notes") || "") || null,
+    });
+  } else if (variant === "livestock_purchase") {
+    await updateTransaction({
+      id,
+      variant: "livestock_purchase",
+      date: String(formData.get("date")),
+      amount: Number(formData.get("amount")),
+      paidBy: String(formData.get("paidBy")) as "Monis" | "Saad",
+      vendorName: String(formData.get("vendorName") || ""),
+      notes: String(formData.get("notes") || "") || null,
+    });
+  } else if (variant === "partner_transfer") {
+    await updateTransaction({
+      id,
+      variant: "partner_transfer",
+      date: String(formData.get("date")),
+      amount: Number(formData.get("amount")),
+      direction: String(formData.get("direction")) as "from_monis" | "to_monis",
+      notes: String(formData.get("notes") || "") || null,
+    });
+  } else if (variant === "palai_income") {
+    await updateTransaction({
+      id,
+      variant: "palai_income",
+      date: String(formData.get("date")),
+      customerName: String(formData.get("customerName")),
+      ratePerGoat: Number(formData.get("ratePerGoat")),
+      goatCount: Number(formData.get("goatCount")),
+      paymentMethod: String(formData.get("paymentMethod") || "") || null,
+      notes: String(formData.get("notes") || "") || null,
+    });
+  } else if (variant === "livestock_sale") {
+    const additional = String(formData.get("additionalAnimalId") || "").trim();
+    await updateTransaction({
+      id,
+      variant: "livestock_sale",
+      date: String(formData.get("date")),
+      animalId: Number(formData.get("animalId")),
+      additionalAnimalIds: additional ? [Number(additional)] : undefined,
+      grossSalePrice: Number(formData.get("grossSalePrice")),
+      deliveryCost: formData.get("deliveryCost") ? Number(formData.get("deliveryCost")) : 0,
+      receivedBy: String(formData.get("receivedBy")) as "Monis" | "Saad",
+      notes: String(formData.get("notes") || "") || null,
+    });
+  } else {
+    throw new Error(`Unknown edit variant: ${variant}`);
+  }
+
+  revalidateTxnPaths();
+}
+
+export async function actionDeleteTransaction(formData: FormData) {
+  const id = String(formData.get("id"));
+  await deleteTransaction(id);
+  revalidateTxnPaths();
 }
 
 export async function actionUploadAnimalMedia(formData: FormData) {

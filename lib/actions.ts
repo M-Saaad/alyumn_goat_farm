@@ -8,6 +8,11 @@ import {
 } from "./partner-equity/settlement";
 import { recognizePalaiPayment, applyPalaiToDb } from "./palai/recognize-payment";
 import { applyLivestockSaleToDb } from "./livestock/record-sale";
+import {
+  applyDeleteTransaction,
+  applyUpdateTransaction,
+  type UpdateTransactionInput,
+} from "./transactions/mutate";
 import type { LedgerCategory, AnimalStatus, AnimalBreed, AnimalSex, MedicalEventType } from "./types";
 
 export async function getDb(): Promise<FarmDatabase> {
@@ -254,4 +259,14 @@ export async function partnerTransfer(input: {
     db.partner_ledger_entries.push({ ...l, id: crypto.randomUUID(), created_at: now });
   }
   return persistDb(db);
+}
+
+export async function updateTransaction(input: UpdateTransactionInput) {
+  const db = await fetchDb();
+  return persistDb(applyUpdateTransaction(db, input));
+}
+
+export async function deleteTransaction(id: string) {
+  const db = await fetchDb();
+  return persistDb(applyDeleteTransaction(db, id));
 }

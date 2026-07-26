@@ -1,10 +1,15 @@
 import { Suspense } from "react";
 import { getDb, contactName, animalLabel } from "@/lib/actions";
-import { formatPkr } from "@/lib/format";
 import { LEDGER_CATEGORIES, slugToCategory } from "@/lib/constants";
 import { BottomNav } from "@/components/BottomNav";
 import { QuickEntry } from "@/components/QuickEntry";
 import { TransactionsFilters } from "@/components/TransactionsFilters";
+import {
+  TransactionEditor,
+  type EditableTransaction,
+} from "@/components/TransactionEditor";
+import { resolveTransactionKind } from "@/lib/transactions/mutate";
+import { getPartnerIds } from "@/lib/partner-equity/settlement";
 
 export const dynamic = "force-dynamic";
 
@@ -17,6 +22,7 @@ export default async function TransactionsPage({
   const db = await getDb();
   const q = (sp.q || "").toLowerCase().trim();
   const filter = sp.filter || "all";
+  const { monisId, saadId } = getPartnerIds(db);
 
   let txs = [...db.transactions].sort((a, b) => {
     const byDate = b.date.localeCompare(a.date);
@@ -29,7 +35,6 @@ export default async function TransactionsPage({
   } else if (filter === "adjustment") {
     txs = txs.filter((t) => t.kind === "partner_adjustment");
   } else {
-    // Support both slug (vet-medicine) and legacy raw category (Vet/Medicine)
     const fromSlug = slugToCategory(filter);
     const category =
       fromSlug ||
@@ -50,6 +55,107 @@ export default async function TransactionsPage({
     .filter((a) => a.status === "Active")
     .map((a) => ({ id: a.id, label: animalLabel(a) }));
 
+  const allAnimals = db.animals.map((a) => ({ id: a.id, label: animalLabel(a) }));
+
+  const editable: EditableTransaction[] = txs.map((tx) => {
+    const variant = resolveTransactionKind(tx);
+    const paidBy =
+      tx.paid_by_partner_id === monisId
+        ? ("Monis" as const)
+        : tx.paid_by_partner_id === saadId
+          ? ("Saad" as const)
+          : null;
+
+    const animal = tx.animal_id != null ? db.animals.find((a) => a.id === tx.animal_id) : null;
+    const palaiPayment = db.palai_payments.find((p) => p.transaction_id === tx.id);
+    const sale = (db.livestock_sales ?? []).find((s) => s.transaction_id === tx.id);
+
+    let transferAbsAmount: number | null = null;
+    let transferDirection: "from_monis" | "to_monis" | null = null;
+    if (variant === "partner_transfer") {
+      transferAbsAmount = Math.abs(tx.amount);
+      transferDirection = tx.amount >= 0 ? "from_monis" : "to_monis";
+    }
+
+    let palai: EditableTransaction["palai"] = null;
+    if (variant === "palai_income") {
+      if (palaiPayment) {
+        palai = {
+          ratePerGoat: palaiPayment.rate_per_goat ?? Math.abs(tx.amount),
+          goatCount: palaiPayment.goat_count ?? 1,
+          paymentMethod: palaiPayment.payment_method ?? "",
+          totalAmount: palaiPayment.total_amount,
+        };
+      } else {
+        // Legacy import: infer total from adjustment half
+        const total = Math.abs(tx.amount) * 2;
+        palai = {
+          ratePerGoat: total,
+          goatCount: 1,
+          paymentMethod: "",
+          totalAmount: total,
+        };
+      }
+    }
+
+    let saleMeta: EditableTransaction["sale"] = null;
+    if (variant === "livestock_sale") {
+      if (sale) {
+        const receivedBy =
+          sale.received_by_partner_id === monisId
+            ? ("Monis" as const)
+            : ("Saad" as const);
+        saleMeta = {
+          animalIds: sale.animal_ids,
+          grossSalePrice: sale.gross_sale_price,
+          deliveryCost: sale.delivery_cost,
+          receivedBy,
+        };
+      } else {
+        saleMeta = {
+          animalIds: tx.animal_id != null ? [tx.animal_id] : [],
+          grossSalePrice: Math.abs(tx.amount) * 2,
+          deliveryCost: 0,
+          receivedBy: tx.amount < 0 ? "Monis" : "Saad",
+        };
+      }
+    }
+
+    const vendor = contactName(db, tx.vendor_id);
+    const customerFromTx = contactName(db, tx.customer_id);
+    const customerFromPalai = palaiPayment
+      ? contactName(db, palaiPayment.customer_id)
+      : "—";
+
+    return {
+      id: tx.id,
+      date: tx.date,
+      amount: tx.amount,
+      kind: tx.kind,
+      category: tx.category,
+      variant,
+      notes: tx.notes,
+      paidBy,
+      animalId: tx.animal_id,
+      animalLabel: animal
+        ? animalLabel(animal)
+        : tx.animal_id != null
+          ? `goat #${tx.animal_id}`
+          : null,
+      vendorName: vendor !== "—" ? vendor : null,
+      customerName:
+        customerFromTx !== "—"
+          ? customerFromTx
+          : customerFromPalai !== "—"
+            ? customerFromPalai
+            : null,
+      transferAbsAmount,
+      transferDirection,
+      palai,
+      sale: saleMeta,
+    };
+  });
+
   return (
     <main className="px-4 pt-6">
       <header className="mb-4">
@@ -65,26 +171,11 @@ export default async function TransactionsPage({
         {txs.length === 0 ? (
           <p className="text-sm text-stone-500">No transactions match.</p>
         ) : (
-          <ul className="divide-y divide-stone-100">
-            {txs.map((tx) => (
-              <li key={tx.id} className="flex items-start justify-between gap-2 py-2 text-sm">
-                <div className="min-w-0">
-                  <p className="font-medium text-stone-800">{tx.category}</p>
-                  <p className="text-xs text-stone-500">
-                    {tx.date} ·{" "}
-                    {tx.kind === "cost"
-                      ? `paid by ${contactName(db, tx.paid_by_partner_id)}`
-                      : "adjustment"}
-                    {tx.animal_id != null ? ` · goat #${tx.animal_id}` : ""}
-                  </p>
-                  {tx.notes && (
-                    <p className="text-xs text-stone-500 line-clamp-1">{tx.notes}</p>
-                  )}
-                </div>
-                <p className="shrink-0 font-semibold">{formatPkr(tx.amount)}</p>
-              </li>
-            ))}
-          </ul>
+          <TransactionEditor
+            transactions={editable}
+            animals={animals}
+            allAnimals={allAnimals}
+          />
         )}
       </section>
 
