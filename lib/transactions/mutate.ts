@@ -151,7 +151,7 @@ export function applyUpdateTransaction(
         animal_id: input.animalId ?? null,
         notes: input.notes || null,
       };
-      let next = {
+      const next = {
         ...db,
         transactions: db.transactions.map((t) => (t.id === tx.id ? updated : t)),
       };
@@ -208,7 +208,7 @@ export function applyUpdateTransaction(
           (input.direction === "from_monis" ? "Received from Monis" : "Sent to Monis"),
         adjustment_partner_id: monisId,
       };
-      let next = {
+      const next = {
         ...db,
         transactions: db.transactions.map((t) => (t.id === tx.id ? updated : t)),
       };
@@ -316,7 +316,7 @@ export function applyUpdateTransaction(
       const newAnimalIds = new Set(animalIds);
 
       // Revert animals no longer on this sale
-      let animals = db.animals.map((a) => {
+      const animals = db.animals.map((a) => {
         if (prevAnimalIds.has(a.id) && !newAnimalIds.has(a.id)) {
           return { ...a, status: "Active" as const, sold_price: null, out_date: null };
         }
@@ -360,7 +360,7 @@ export function applyUpdateTransaction(
         ? (db.livestock_sales ?? []).map((s) => (s.id === existingSale.id ? sale : s))
         : [...(db.livestock_sales ?? []), sale];
 
-      let next = {
+      const next = {
         ...db,
         animals,
         transactions: db.transactions.map((t) => (t.id === tx.id ? updated : t)),
@@ -383,7 +383,7 @@ export function applyDeleteTransaction(db: FarmDatabase, id: string): FarmDataba
     }
 
     case "palai_income": {
-      let next = removeTxAndLedger(db, id);
+      const next = removeTxAndLedger(db, id);
       return {
         ...next,
         palai_payments: next.palai_payments.filter((p) => p.transaction_id !== id),
@@ -399,7 +399,7 @@ export function applyDeleteTransaction(db: FarmDatabase, id: string): FarmDataba
         if (!animalIds.has(a.id)) return a;
         return { ...a, status: "Active" as const, sold_price: null, out_date: null };
       });
-      let next = removeTxAndLedger(db, id);
+      const next = removeTxAndLedger(db, id);
       return {
         ...next,
         animals,
@@ -434,7 +434,7 @@ export function applyDeleteTransaction(db: FarmDatabase, id: string): FarmDataba
           );
         }
 
-        let next = removeTxAndLedger(db, id);
+        const next = removeTxAndLedger(db, id);
         return {
           ...next,
           animals: next.animals.filter((a) => a.id !== animalId),
