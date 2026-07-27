@@ -10,6 +10,7 @@ import {
   recordBreeding,
   recordLivestockSale,
   recordPalai,
+  updateAnimal,
   updateTransaction,
 } from "@/lib/actions";
 import { revalidatePath } from "next/cache";
@@ -32,9 +33,7 @@ export async function actionLogExpense(formData: FormData) {
     animalId: formData.get("animalId") ? Number(formData.get("animalId")) : null,
     notes: String(formData.get("notes") || ""),
   });
-  revalidatePath("/");
-  revalidatePath("/animals");
-  revalidatePath("/transactions");
+  revalidateTxnPaths();
 }
 
 export async function actionRecordPalai(formData: FormData) {
@@ -46,10 +45,11 @@ export async function actionRecordPalai(formData: FormData) {
     paymentMethod: String(formData.get("paymentMethod") || ""),
     notes: String(formData.get("notes") || ""),
   });
-  revalidatePath("/");
+  revalidateTxnPaths();
 }
 
 export async function actionBuyGoat(formData: FormData) {
+  const palaiRaw = String(formData.get("palaiRate") || "").trim();
   await buyGoat({
     date: String(formData.get("date")),
     price: Number(formData.get("price")),
@@ -60,9 +60,9 @@ export async function actionBuyGoat(formData: FormData) {
     ownerName: String(formData.get("ownerName")),
     vendorName: String(formData.get("vendorName") || "") || undefined,
     paidBy: String(formData.get("paidBy")) as "Monis" | "Saad",
+    palaiRate: palaiRaw ? Number(palaiRaw) : null,
   });
-  revalidatePath("/");
-  revalidatePath("/animals");
+  revalidateTxnPaths();
 }
 
 export async function actionLogMedical(formData: FormData) {
@@ -72,17 +72,19 @@ export async function actionLogMedical(formData: FormData) {
     date: String(formData.get("date")),
     notes: String(formData.get("notes") || ""),
   });
-  revalidatePath("/animals");
+  revalidateTxnPaths();
 }
 
 export async function actionRecordBreeding(formData: FormData) {
+  const maleRaw = String(formData.get("maleAnimalId") || "").trim();
   await recordBreeding({
     femaleId: Number(formData.get("femaleId")),
     buckName: String(formData.get("buckName")),
+    maleAnimalId: maleRaw ? Number(maleRaw) : null,
     dateCrossed: String(formData.get("dateCrossed")),
     notes: String(formData.get("notes") || ""),
   });
-  revalidatePath("/animals");
+  revalidateTxnPaths();
 }
 
 export async function actionChangeStatus(formData: FormData) {
@@ -91,8 +93,7 @@ export async function actionChangeStatus(formData: FormData) {
     status: String(formData.get("status")) as AnimalStatus,
     outDate: String(formData.get("outDate") || "") || undefined,
   });
-  revalidatePath("/");
-  revalidatePath("/animals");
+  revalidateTxnPaths();
 }
 
 export async function actionRecordLivestockSale(formData: FormData) {
@@ -106,9 +107,7 @@ export async function actionRecordLivestockSale(formData: FormData) {
     receivedBy: String(formData.get("receivedBy")) as "Monis" | "Saad",
     notes: String(formData.get("notes") || "") || undefined,
   });
-  revalidatePath("/");
-  revalidatePath("/animals");
-  revalidatePath("/transactions");
+  revalidateTxnPaths();
 }
 
 export async function actionPartnerTransfer(formData: FormData) {
@@ -118,7 +117,7 @@ export async function actionPartnerTransfer(formData: FormData) {
     direction: String(formData.get("direction")) as "from_monis" | "to_monis",
     notes: String(formData.get("notes") || ""),
   });
-  revalidatePath("/");
+  revalidateTxnPaths();
 }
 
 export async function actionUpdateTransaction(formData: FormData) {
@@ -190,6 +189,28 @@ export async function actionUpdateTransaction(formData: FormData) {
 export async function actionDeleteTransaction(formData: FormData) {
   const id = String(formData.get("id"));
   await deleteTransaction(id);
+  revalidateTxnPaths();
+}
+
+export async function actionUpdateAnimal(formData: FormData) {
+  const id = Number(formData.get("id"));
+  const palaiRaw = String(formData.get("palaiRate") || "").trim();
+  const breedRaw = String(formData.get("breed") || "").trim();
+  const sexRaw = String(formData.get("sex") || "").trim();
+  await updateAnimal({
+    id,
+    name: String(formData.get("name") || "") || null,
+    breed: breedRaw ? (breedRaw as AnimalBreed) : null,
+    sex: sexRaw ? (sexRaw as AnimalSex) : null,
+    description: String(formData.get("description") || "") || null,
+    comment: String(formData.get("comment") || "") || null,
+    ownerName: String(formData.get("ownerName")),
+    vendorName: String(formData.get("vendorName") || "") || null,
+    palai_rate: palaiRaw ? Number(palaiRaw) : null,
+    age_at_purchase: String(formData.get("ageAtPurchase") || "") || null,
+    home_bred: formData.get("homeBred") === "on" || formData.get("homeBred") === "true",
+  });
+  revalidatePath(`/animals/${id}`);
   revalidateTxnPaths();
 }
 

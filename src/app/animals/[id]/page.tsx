@@ -7,6 +7,8 @@ import { isSupabaseDb } from "@/lib/db";
 import { BottomNav } from "@/components/BottomNav";
 import { QuickEntry } from "@/components/QuickEntry";
 import { AnimalMediaUpload } from "@/components/AnimalMediaUpload";
+import { AnimalEditor } from "@/components/AnimalEditor";
+import { quickEntryPropsFromDb } from "@/lib/quick-entry-props";
 
 export const dynamic = "force-dynamic";
 
@@ -45,10 +47,11 @@ export default async function AnimalProfilePage({
     }))
   );
   const supabaseEnabled = isSupabaseDb();
-
-  const options = db.animals
-    .filter((a) => a.status === "Active")
-    .map((a) => ({ id: a.id, label: animalLabel(a) }));
+  const quickEntry = quickEntryPropsFromDb(db);
+  const ownerName = contactName(db, animal.owner_id);
+  const vendorName = animal.purchased_from
+    ? contactName(db, animal.purchased_from)
+    : null;
 
   return (
     <main className="px-4 pt-6">
@@ -59,11 +62,29 @@ export default async function AnimalProfilePage({
       <header className="mt-2 mb-4">
         <h1 className="text-2xl font-bold">{animalLabel(animal)}</h1>
         <p className="text-stone-500">
-          {[animal.breed, animal.sex, animal.status, contactName(db, animal.owner_id)]
+          {[animal.breed, animal.sex, animal.status, ownerName]
             .filter(Boolean)
             .join(" · ")}
         </p>
       </header>
+
+      <AnimalEditor
+        animal={{
+          id: animal.id,
+          name: animal.name,
+          breed: animal.breed,
+          sex: animal.sex,
+          description: animal.description,
+          comment: animal.comment,
+          ownerName: ownerName === "—" ? "Farm" : ownerName,
+          vendorName: vendorName === "—" ? null : vendorName,
+          palai_rate: animal.palai_rate,
+          age_at_purchase: animal.age_at_purchase,
+          home_bred: animal.home_bred,
+        }}
+        vendors={quickEntry.vendors}
+        ownerOptions={quickEntry.ownerOptions}
+      />
 
       <section className="mb-3 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-stone-200">
         <h2 className="mb-2 text-sm font-bold">Photos &amp; videos ({mediaWithUrls.length})</h2>
@@ -122,6 +143,12 @@ export default async function AnimalProfilePage({
             <dt className="text-stone-500">From</dt>
             <dd>{contactName(db, animal.purchased_from)}</dd>
           </div>
+          {animal.palai_rate != null && (
+            <div>
+              <dt className="text-stone-500">Palai rate</dt>
+              <dd className="font-semibold">{formatPkr(animal.palai_rate)}</dd>
+            </div>
+          )}
           <div className="col-span-2">
             <dt className="text-stone-500">Description</dt>
             <dd>{animal.description || "—"}</dd>
@@ -215,7 +242,7 @@ export default async function AnimalProfilePage({
         </section>
       )}
 
-      <QuickEntry animals={options} />
+      <QuickEntry {...quickEntry} />
       <BottomNav active="goats" />
     </main>
   );

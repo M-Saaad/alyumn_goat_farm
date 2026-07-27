@@ -10,6 +10,7 @@ import {
 } from "@/components/TransactionEditor";
 import { resolveTransactionKind } from "@/lib/transactions/mutate";
 import { getPartnerIds } from "@/lib/partner-equity/settlement";
+import { quickEntryPropsFromDb } from "@/lib/quick-entry-props";
 
 export const dynamic = "force-dynamic";
 
@@ -56,6 +57,7 @@ export default async function TransactionsPage({
     .map((a) => ({ id: a.id, label: animalLabel(a) }));
 
   const allAnimals = db.animals.map((a) => ({ id: a.id, label: animalLabel(a) }));
+  const quickEntry = quickEntryPropsFromDb(db);
 
   const editable: EditableTransaction[] = txs.map((tx) => {
     const variant = resolveTransactionKind(tx);
@@ -175,11 +177,13 @@ export default async function TransactionsPage({
             transactions={editable}
             animals={animals}
             allAnimals={allAnimals}
+            vendors={quickEntry.vendors}
+            customers={quickEntry.customers}
           />
         )}
       </section>
 
-      <QuickEntry animals={animals} />
+      <QuickEntry {...quickEntry} />
       <BottomNav active="txns" />
     </main>
   );

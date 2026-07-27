@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import {
   actionDeleteTransaction,
   actionUpdateTransaction,
@@ -8,6 +9,8 @@ import {
 import { LEDGER_CATEGORIES } from "@/lib/constants";
 import { formatPkr } from "@/lib/format";
 import type { TransactionEditVariant } from "@/lib/transactions/mutate";
+import { ActionForm, SubmitButton } from "@/components/ActionForm";
+import { ContactSelect, type ContactOption } from "@/components/ContactSelect";
 
 export type AnimalOption = { id: number; label: string };
 
@@ -59,17 +62,23 @@ export function TransactionEditor({
   transactions,
   animals,
   allAnimals,
+  vendors,
+  customers,
 }: {
   transactions: EditableTransaction[];
   /** Active animals for expense linking. */
   animals: AnimalOption[];
   /** All animals (incl. sold) for sale forms. */
   allAnimals: AnimalOption[];
+  vendors: ContactOption[];
+  customers: ContactOption[];
 }) {
+  const router = useRouter();
   const [editing, setEditing] = useState<EditableTransaction | null>(null);
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   function close() {
     setEditing(null);
@@ -83,13 +92,17 @@ export function TransactionEditor({
     );
     if (!ok) return;
     setError(null);
+    setDeletingId(tx.id);
     startTransition(async () => {
       try {
         const fd = new FormData();
         fd.set("id", tx.id);
         await actionDeleteTransaction(fd);
+        router.refresh();
       } catch (e) {
         setError(e instanceof Error ? e.message : "Delete failed");
+      } finally {
+        setDeletingId(null);
       }
     });
   }
@@ -101,7 +114,12 @@ export function TransactionEditor({
           {error}
         </p>
       )}
-      <ul className="divide-y divide-stone-100">
+      {pending && deletingId && (
+        <p className="mb-2 rounded-xl bg-stone-100 px-3 py-2 text-sm text-stone-600">
+          Deleting…
+        </p>
+      )}
+      <ul className={`divide-y divide-stone-100 ${pending ? "pointer-events-none opacity-70" : ""}`}>
         {transactions.map((tx) => (
           <li key={tx.id} className="flex items-start justify-between gap-2 py-2 text-sm">
             <div className="min-w-0 flex-1">
@@ -128,7 +146,7 @@ export function TransactionEditor({
                   onClick={() =>
                     setMenuOpenId((id) => (id === tx.id ? null : tx.id))
                   }
-                  className="flex h-8 w-8 items-center justify-center rounded-lg text-stone-500 hover:bg-stone-100 hover:text-stone-800"
+                  className="flex h-8 w-8 items-center justify-center rounded-lg text-stone-500 hover:bg-stone-100 hover:text-stone-800 disabled:opacity-50"
                 >
                   <MoreVerticalIcon />
                 </button>
@@ -178,18 +196,7 @@ export function TransactionEditor({
               </button>
             </div>
 
-            <form
-              action={async (fd) => {
-                setError(null);
-                try {
-                  await actionUpdateTransaction(fd);
-                  close();
-                } catch (e) {
-                  setError(e instanceof Error ? e.message : "Update failed");
-                }
-              }}
-              className="space-y-3"
-            >
+            <ActionForm action={actionUpdateTransaction} onSuccess={close}>
               <input type="hidden" name="id" value={editing.id} />
               <input type="hidden" name="variant" value={editing.variant} />
 
@@ -197,21 +204,18 @@ export function TransactionEditor({
                 <ExpenseForm tx={editing} animals={animals} />
               )}
               {editing.variant === "livestock_purchase" && (
-                <PurchaseForm tx={editing} />
+                <PurchaseForm tx={editing} vendors={vendors} />
               )}
               {editing.variant === "partner_transfer" && <TransferForm tx={editing} />}
-              {editing.variant === "palai_income" && <PalaiForm tx={editing} />}
+              {editing.variant === "palai_income" && (
+                <PalaiForm tx={editing} customers={customers} />
+              )}
               {editing.variant === "livestock_sale" && (
                 <SaleForm tx={editing} animals={allAnimals} />
               )}
 
-              <button
-                type="submit"
-                className="w-full rounded-xl bg-emerald-700 py-3 text-base font-semibold text-white"
-              >
-                Save changes
-              </button>
-            </form>
+              <SubmitButton label="Save changes" />
+            </ActionForm>
           </div>
         </div>
       )}
@@ -310,7 +314,13 @@ function ExpenseForm({
   );
 }
 
-function PurchaseForm({ tx }: { tx: EditableTransaction }) {
+function PurchaseForm({
+  tx,
+  vendors,
+}: {
+  tx: EditableTransaction;
+  vendors: ContactOption[];
+}) {
   return (
     <>
       {tx.animalLabel && (
@@ -334,7 +344,15 @@ function PurchaseForm({ tx }: { tx: EditableTransaction }) {
           <option value="Monis">Monis</option>
         </select>
       </div>
-      <Field label="Vendor" name="vendorName" defaultValue={tx.vendorName ?? ""} />
+      <ContactSelect
+        label="Vendor"
+        name="vendorName"
+        options={vendors}
+        defaultValue={tx.vendorName ?? undefined}
+        allowEmpty
+        emptyLabel="—"
+        addNewLabel="+ Add new vendor"
+      />
       <Field label="Notes" name="notes" defaultValue={tx.notes ?? ""} />
     </>
   );
@@ -369,18 +387,26 @@ function TransferForm({ tx }: { tx: EditableTransaction }) {
   );
 }
 
-function PalaiForm({ tx }: { tx: EditableTransaction }) {
+function PalaiForm({
+  tx,
+  customers,
+}: {
+  tx: EditableTransaction;
+  customers: ContactOption[];
+}) {
   const palai = tx.palai;
   const rate = palai?.ratePerGoat ?? Math.abs(tx.amount);
   const count = palai?.goatCount ?? 2;
   return (
     <>
       <Field label="Date" name="date" type="date" defaultValue={tx.date} required />
-      <Field
+      <ContactSelect
         label="Customer"
         name="customerName"
+        options={customers}
         defaultValue={tx.customerName ?? "Awais"}
         required
+        addNewLabel="+ Add new customer"
       />
       <Field
         label="Rate / goat"

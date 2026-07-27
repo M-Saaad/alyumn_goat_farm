@@ -13,6 +13,8 @@ import {
 } from "@/lib/server-actions";
 import { LEDGER_CATEGORIES } from "@/lib/constants";
 import { todayIso } from "@/lib/format";
+import { ActionForm, SubmitButton } from "@/components/ActionForm";
+import { BuckSelect, ContactSelect, type ContactOption } from "@/components/ContactSelect";
 
 type AnimalOption = { id: number; label: string };
 type Mode =
@@ -30,9 +32,28 @@ const field =
   "mt-1 w-full rounded-xl border border-stone-300 bg-white px-3 py-2 text-base text-stone-900 outline-none focus:border-emerald-600";
 const label = "block text-sm font-medium text-stone-700";
 
-export function QuickEntry({ animals }: { animals: AnimalOption[] }) {
+export type QuickEntryProps = {
+  animals: AnimalOption[];
+  femaleAnimals?: AnimalOption[];
+  vendors: ContactOption[];
+  customers: ContactOption[];
+  ownerOptions: ContactOption[];
+  maleAnimals: AnimalOption[];
+  pastBuckNames: string[];
+};
+
+export function QuickEntry({
+  animals,
+  femaleAnimals,
+  vendors,
+  customers,
+  ownerOptions,
+  maleAnimals,
+  pastBuckNames,
+}: QuickEntryProps) {
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<Mode>(null);
+  const females = femaleAnimals ?? animals;
 
   function pick(m: Mode) {
     setMode(m);
@@ -93,7 +114,7 @@ export function QuickEntry({ animals }: { animals: AnimalOption[] }) {
             )}
 
             {mode === "expense" && (
-              <form action={actionLogExpense} onSubmit={close} className="space-y-3">
+              <ActionForm action={actionLogExpense} onSuccess={close}>
                 <Field label="Date" name="date" type="date" defaultValue={todayIso()} required />
                 <Field label="Amount (PKR)" name="amount" type="number" required />
                 <div>
@@ -111,53 +132,36 @@ export function QuickEntry({ animals }: { animals: AnimalOption[] }) {
                 <PartnerSelect />
                 <AnimalSelect animals={animals} optional />
                 <Field label="Notes" name="notes" />
-                <Submit />
-              </form>
+                <SubmitButton />
+              </ActionForm>
             )}
 
             {mode === "palai" && (
-              <form action={actionRecordPalai} onSubmit={close} className="space-y-3">
+              <ActionForm action={actionRecordPalai} onSuccess={close}>
                 <Field label="Date" name="date" type="date" defaultValue={todayIso()} required />
-                <Field label="Customer" name="customerName" defaultValue="Awais" required />
+                <ContactSelect
+                  label="Customer"
+                  name="customerName"
+                  options={customers}
+                  defaultValue={customers.find((c) => c.name === "Awais")?.name ?? customers[0]?.name}
+                  required
+                  addNewLabel="+ Add new customer"
+                />
                 <Field label="Rate / goat" name="ratePerGoat" type="number" defaultValue="7000" required />
                 <Field label="Goat count" name="goatCount" type="number" defaultValue="2" required />
                 <Field label="Payment method" name="paymentMethod" defaultValue="Online Transfer" />
                 <Field label="Notes" name="notes" />
                 <p className="text-xs text-stone-500">Splits 50/50 to Monis and Saad automatically.</p>
-                <Submit />
-              </form>
+                <SubmitButton />
+              </ActionForm>
             )}
 
             {mode === "buy" && (
-              <form action={actionBuyGoat} onSubmit={close} className="space-y-3">
-                <Field label="Date" name="date" type="date" defaultValue={todayIso()} required />
-                <Field label="Price" name="price" type="number" required />
-                <Field label="Name (optional)" name="name" />
-                <Field label="Description" name="description" required />
-                <div>
-                  <label className={label}>Breed</label>
-                  <select name="breed" className={field} required>
-                    {["Teddy", "Gulabi", "Bissar", "Tapra"].map((b) => (
-                      <option key={b}>{b}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className={label}>Sex</label>
-                  <select name="sex" className={field} required>
-                    <option>Female</option>
-                    <option>Male</option>
-                  </select>
-                </div>
-                <Field label="Owner" name="ownerName" defaultValue="Farm" required />
-                <Field label="Vendor" name="vendorName" />
-                <PartnerSelect />
-                <Submit />
-              </form>
+              <BuyGoatForm vendors={vendors} ownerOptions={ownerOptions} onSuccess={close} />
             )}
 
             {mode === "medical" && (
-              <form action={actionLogMedical} onSubmit={close} className="space-y-3">
+              <ActionForm action={actionLogMedical} onSuccess={close}>
                 <AnimalSelect animals={animals} />
                 <div>
                   <label className={label}>Event type</label>
@@ -169,37 +173,47 @@ export function QuickEntry({ animals }: { animals: AnimalOption[] }) {
                 </div>
                 <Field label="Date" name="date" type="date" defaultValue={todayIso()} required />
                 <Field label="Notes" name="notes" />
-                <Submit />
-              </form>
+                <SubmitButton />
+              </ActionForm>
             )}
 
             {mode === "breeding" && (
-              <form action={actionRecordBreeding} onSubmit={close} className="space-y-3">
+              <ActionForm action={actionRecordBreeding} onSuccess={close}>
                 <div>
                   <label className={label}>Female</label>
                   <select name="femaleId" className={field} required>
-                    {animals.map((a) => (
+                    {females.map((a) => (
                       <option key={a.id} value={a.id}>
                         {a.label}
                       </option>
                     ))}
                   </select>
                 </div>
-                <Field label="Buck name" name="buckName" required />
+                <BuckSelect maleAnimals={maleAnimals} pastNames={pastBuckNames} />
                 <Field label="Date crossed" name="dateCrossed" type="date" defaultValue={todayIso()} required />
                 <Field label="Notes" name="notes" />
                 <p className="text-xs text-stone-500">Due date auto-calculated as +150 days.</p>
-                <Submit />
-              </form>
+                <SubmitButton />
+              </ActionForm>
             )}
 
             {mode === "sell" && (
-              <form action={actionRecordLivestockSale} onSubmit={close} className="space-y-3">
+              <ActionForm action={actionRecordLivestockSale} onSuccess={close}>
                 <AnimalSelect animals={animals} />
-                <AnimalSelect animals={animals} optional name="additionalAnimalId" fieldLabel="Second goat (optional)" />
+                <AnimalSelect
+                  animals={animals}
+                  optional
+                  name="additionalAnimalId"
+                  fieldLabel="Second goat (optional)"
+                />
                 <Field label="Sale date" name="date" type="date" defaultValue={todayIso()} required />
                 <Field label="Gross sale price (PKR)" name="grossSalePrice" type="number" required />
-                <Field label="Delivery deducted from proceeds" name="deliveryCost" type="number" defaultValue="0" />
+                <Field
+                  label="Delivery deducted from proceeds"
+                  name="deliveryCost"
+                  type="number"
+                  defaultValue="0"
+                />
                 <div>
                   <label className={label}>Cash received by</label>
                   <select name="receivedBy" className={field} required>
@@ -210,15 +224,14 @@ export function QuickEntry({ animals }: { animals: AnimalOption[] }) {
                 <Field label="Notes" name="notes" />
                 <p className="text-xs text-stone-500">
                   Records one partner&apos;s half in the ledger (sheet convention). Dashboard shows full net
-                  proceeds (2×). Examples: Brownie 78k → −39k adj; Bhola 25k − 1k delivery → −12k adj;
-                  Bilorani+Bruno 65k → −32.5k adj (log delivery separately if not deducted from proceeds).
+                  proceeds (2×).
                 </p>
-                <Submit />
-              </form>
+                <SubmitButton />
+              </ActionForm>
             )}
 
             {mode === "status" && (
-              <form action={actionChangeStatus} onSubmit={close} className="space-y-3">
+              <ActionForm action={actionChangeStatus} onSuccess={close}>
                 <AnimalSelect animals={animals} />
                 <div>
                   <label className={label}>Status</label>
@@ -232,12 +245,12 @@ export function QuickEntry({ animals }: { animals: AnimalOption[] }) {
                 <p className="text-xs text-stone-500">
                   For sales with partner split, use &quot;Sell Goat&quot; instead.
                 </p>
-                <Submit />
-              </form>
+                <SubmitButton />
+              </ActionForm>
             )}
 
             {mode === "transfer" && (
-              <form action={actionPartnerTransfer} onSubmit={close} className="space-y-3">
+              <ActionForm action={actionPartnerTransfer} onSuccess={close}>
                 <Field label="Date" name="date" type="date" defaultValue={todayIso()} required />
                 <Field label="Amount" name="amount" type="number" required />
                 <div>
@@ -248,13 +261,71 @@ export function QuickEntry({ animals }: { animals: AnimalOption[] }) {
                   </select>
                 </div>
                 <Field label="Notes" name="notes" />
-                <Submit />
-              </form>
+                <SubmitButton />
+              </ActionForm>
             )}
           </div>
         </div>
       )}
     </>
+  );
+}
+
+function BuyGoatForm({
+  vendors,
+  ownerOptions,
+  onSuccess,
+}: {
+  vendors: ContactOption[];
+  ownerOptions: ContactOption[];
+  onSuccess: () => void;
+}) {
+  const [showPalaiRate, setShowPalaiRate] = useState(false);
+
+  return (
+    <ActionForm action={actionBuyGoat} onSuccess={onSuccess}>
+      <Field label="Date" name="date" type="date" defaultValue={todayIso()} required />
+      <Field label="Price" name="price" type="number" required />
+      <Field label="Name (optional)" name="name" />
+      <Field label="Description" name="description" required />
+      <div>
+        <label className={label}>Breed</label>
+        <select name="breed" className={field} required>
+          {["Teddy", "Gulabi", "Bissar", "Tapra"].map((b) => (
+            <option key={b}>{b}</option>
+          ))}
+        </select>
+      </div>
+      <div>
+        <label className={label}>Sex</label>
+        <select name="sex" className={field} required>
+          <option>Female</option>
+          <option>Male</option>
+        </select>
+      </div>
+      <ContactSelect
+        label="Owner"
+        name="ownerName"
+        options={ownerOptions}
+        defaultValue="Farm"
+        required
+        addNewLabel="+ Add new customer"
+        onSelectionChange={(name) => {
+          setShowPalaiRate(Boolean(name.trim()) && !["Farm", "Monis", "Saad"].includes(name));
+        }}
+      />
+      {showPalaiRate && <Field label="Palai rate (optional)" name="palaiRate" type="number" />}
+      <ContactSelect
+        label="Vendor"
+        name="vendorName"
+        options={vendors}
+        allowEmpty
+        emptyLabel="—"
+        addNewLabel="+ Add new vendor"
+      />
+      <PartnerSelect />
+      <SubmitButton />
+    </ActionForm>
   );
 }
 
@@ -337,16 +408,5 @@ function AnimalSelect({
         ))}
       </select>
     </div>
-  );
-}
-
-function Submit() {
-  return (
-    <button
-      type="submit"
-      className="w-full rounded-xl bg-emerald-700 py-3 text-base font-semibold text-white"
-    >
-      Save
-    </button>
   );
 }

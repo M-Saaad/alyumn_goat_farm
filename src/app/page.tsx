@@ -1,10 +1,11 @@
 import Link from "next/link";
-import { getDb, getSettlement, animalLabel, contactName } from "@/lib/actions";
+import { getDb, getSettlement, contactName } from "@/lib/actions";
 import { formatPkr } from "@/lib/format";
 import { BottomNav } from "@/components/BottomNav";
 import { QuickEntry } from "@/components/QuickEntry";
 import { SignOutButton } from "@/components/SignOutButton";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
+import { quickEntryPropsFromDb } from "@/lib/quick-entry-props";
 
 export const dynamic = "force-dynamic";
 
@@ -12,9 +13,7 @@ export default async function HomePage() {
   const db = await getDb();
   const s = await getSettlement();
   const recent = [...db.transactions].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 12);
-  const animals = db.animals
-    .filter((a) => a.status === "Active")
-    .map((a) => ({ id: a.id, label: animalLabel(a) }));
+  const quickEntry = quickEntryPropsFromDb(db);
 
   const palaiThisMonth = db.palai_payments
     .filter((p) => p.date.startsWith(new Date().toISOString().slice(0, 7)))
@@ -130,7 +129,7 @@ export default async function HomePage() {
         </ul>
       </section>
 
-      <QuickEntry animals={animals} />
+      <QuickEntry {...quickEntry} />
       <BottomNav active="finance" />
     </main>
   );

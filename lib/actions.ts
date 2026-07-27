@@ -96,6 +96,37 @@ export async function recordPalai(input: {
   return persistDb(applyPalaiToDb(db, result));
 }
 
+function resolveOwnerContact(
+  db: FarmDatabase,
+  ownerName: string
+): FarmDatabase["contacts"][number] {
+  let owner = db.contacts.find((c) => c.name.toLowerCase() === ownerName.toLowerCase());
+  if (!owner) {
+    const type =
+      ownerName === "Farm"
+        ? "Farm"
+        : ["Monis", "Saad"].includes(ownerName)
+          ? "Partner"
+          : "Customer";
+    owner = { id: crypto.randomUUID(), name: ownerName, type, phone: null, notes: null };
+    db.contacts.push(owner);
+  }
+  return owner;
+}
+
+function resolveVendorId(db: FarmDatabase, vendorName?: string | null): string | null {
+  const name = vendorName?.trim();
+  if (!name) return null;
+  let v = db.contacts.find(
+    (c) => c.name.toLowerCase() === name.toLowerCase() && c.type === "Vendor"
+  );
+  if (!v) {
+    v = { id: crypto.randomUUID(), name, type: "Vendor", phone: null, notes: null };
+    db.contacts.push(v);
+  }
+  return v.id;
+}
+
 export async function buyGoat(input: {
   date: string;
   price: number;
@@ -106,31 +137,19 @@ export async function buyGoat(input: {
   ownerName: string;
   vendorName?: string;
   paidBy: "Monis" | "Saad";
+  palaiRate?: number | null;
 }) {
   const db = await fetchDb();
   const { monisId, saadId } = getPartnerIds(db);
   const paidById = input.paidBy === "Monis" ? monisId : saadId;
 
-  let owner = db.contacts.find((c) => c.name.toLowerCase() === input.ownerName.toLowerCase());
-  if (!owner) {
-    const type =
-      input.ownerName === "Farm"
-        ? "Farm"
-        : ["Monis", "Saad"].includes(input.ownerName)
-          ? "Partner"
-          : "Customer";
-    owner = { id: crypto.randomUUID(), name: input.ownerName, type, phone: null, notes: null };
-    db.contacts.push(owner);
-  }
-  let vendorId: string | null = null;
-  if (input.vendorName) {
-    let v = db.contacts.find((c) => c.name.toLowerCase() === input.vendorName!.toLowerCase());
-    if (!v) {
-      v = { id: crypto.randomUUID(), name: input.vendorName, type: "Vendor", phone: null, notes: null };
-      db.contacts.push(v);
-    }
-    vendorId = v.id;
-  }
+  const owner = resolveOwnerContact(db, input.ownerName);
+  const vendorId = resolveVendorId(db, input.vendorName);
+  const isCustomerOwner = owner.type === "Customer";
+  const palaiRate =
+    isCustomerOwner && input.palaiRate != null && !Number.isNaN(input.palaiRate)
+      ? input.palaiRate
+      : null;
 
   const nextId = db.animals.reduce((m, a) => Math.max(m, a.id), 0) + 1;
   db.animals.push({
@@ -149,7 +168,7 @@ export async function buyGoat(input: {
     owner_id: owner.id,
     home_bred: false,
     out_date: null,
-    palai_rate: null,
+    palai_rate: palaiRate,
   });
 
   const { tx, ledger } = createCostTransaction({
@@ -166,6 +185,45 @@ export async function buyGoat(input: {
   for (const l of ledger) {
     db.partner_ledger_entries.push({ ...l, id: crypto.randomUUID(), created_at: now });
   }
+  return persistDb(db);
+}
+
+export async function updateAnimal(input: {
+  id: number;
+  name?: string | null;
+  breed?: AnimalBreed | null;
+  sex?: AnimalSex | null;
+  description?: string | null;
+  comment?: string | null;
+  ownerName: string;
+  vendorName?: string | null;
+  palai_rate?: number | null;
+  age_at_purchase?: string | null;
+  home_bred?: boolean;
+}) {
+  const db = await fetchDb();
+  const animal = db.animals.find((a) => a.id === input.id);
+  if (!animal) throw new Error("Animal not found");
+
+  const owner = resolveOwnerContact(db, input.ownerName);
+  const vendorId = resolveVendorId(db, input.vendorName);
+
+  animal.name = input.name?.trim() || null;
+  animal.breed = input.breed ?? null;
+  animal.sex = input.sex ?? null;
+  animal.description = input.description?.trim() || null;
+  animal.comment = input.comment?.trim() || null;
+  animal.owner_id = owner.id;
+  animal.purchased_from = vendorId;
+  animal.age_at_purchase = input.age_at_purchase?.trim() || null;
+  animal.home_bred = Boolean(input.home_bred);
+  animal.palai_rate =
+    owner.type === "Customer" && input.palai_rate != null && !Number.isNaN(input.palai_rate)
+      ? input.palai_rate
+      : owner.type === "Customer"
+        ? animal.palai_rate
+        : null;
+
   return persistDb(db);
 }
 
@@ -190,17 +248,27 @@ export async function logMedical(input: {
 export async function recordBreeding(input: {
   femaleId: number;
   buckName: string;
+  maleAnimalId?: number | null;
   dateCrossed: string;
   notes?: string;
 }) {
   const db = await fetchDb();
   const d = new Date(input.dateCrossed);
   d.setUTCDate(d.getUTCDate() + 150);
+  let maleAnimalId: number | null = input.maleAnimalId ?? null;
+  let buckName = input.buckName.trim();
+  if (maleAnimalId != null) {
+    const male = db.animals.find((a) => a.id === maleAnimalId);
+    if (!male) throw new Error("Buck animal not found");
+    if (!buckName) buckName = animalLabel(male);
+  } else {
+    maleAnimalId = null;
+  }
   db.breeding_events.push({
     id: crypto.randomUUID(),
     female_animal_id: input.femaleId,
-    male_animal_id: null,
-    buck_name: input.buckName,
+    male_animal_id: maleAnimalId,
+    buck_name: buckName || null,
     date_crossed: input.dateCrossed,
     expected_due_date: d.toISOString().slice(0, 10),
     delivered_date: null,

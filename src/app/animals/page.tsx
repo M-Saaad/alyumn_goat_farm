@@ -4,6 +4,7 @@ import { getDb, animalLabel, contactName } from "@/lib/actions";
 import { BottomNav } from "@/components/BottomNav";
 import { QuickEntry } from "@/components/QuickEntry";
 import { AnimalsFilters } from "@/components/AnimalsFilters";
+import { quickEntryPropsFromDb } from "@/lib/quick-entry-props";
 
 export const dynamic = "force-dynamic";
 
@@ -46,9 +47,7 @@ export default async function AnimalsPage({
     return animalLabel(a).localeCompare(animalLabel(b));
   });
 
-  const options = db.animals
-    .filter((a) => a.status === "Active")
-    .map((a) => ({ id: a.id, label: animalLabel(a) }));
+  const quickEntry = quickEntryPropsFromDb(db);
 
   const statusColor: Record<string, string> = {
     Active: "bg-emerald-100 text-emerald-800",
@@ -92,7 +91,7 @@ export default async function AnimalsPage({
         ))}
       </ul>
 
-      <QuickEntry animals={options} />
+      <QuickEntry {...quickEntry} />
       <BottomNav active="goats" />
     </main>
   );

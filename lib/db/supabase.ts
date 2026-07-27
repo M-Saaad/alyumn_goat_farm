@@ -224,21 +224,162 @@ async function upsert(
   }
 }
 
-/** Persist FarmDatabase to Supabase via upserts (small dataset; preserves IDs). */
+/**
+ * Delete rows that exist in Supabase but not in memory, then upsert current rows.
+ * Without this, deletes never persist (upsert-only leaves orphan rows).
+ */
+async function syncTable(
+  client: SupabaseClient,
+  table: string,
+  rows: Record<string, unknown>[],
+  idColumn = "id"
+) {
+  const { data, error } = await client.from(table).select(idColumn);
+  if (error) throw new Error(`${table} select ids: ${error.message}`);
+
+  const keep = new Set(rows.map((r) => String(r[idColumn])));
+  const orphanIds = (data as unknown as Array<Record<string, unknown>> | null ?? [])
+    .map((r) => String(r[idColumn]))
+    .filter((id) => !keep.has(id));
+
+  if (orphanIds.length > 0) {
+    const chunk = 500;
+    for (let i = 0; i < orphanIds.length; i += chunk) {
+      const slice = orphanIds.slice(i, i + chunk);
+      const { error: delErr } = await client.from(table).delete().in(idColumn, slice);
+      if (delErr) throw new Error(`${table} delete: ${delErr.message}`);
+    }
+  }
+
+  await upsert(client, table, rows, idColumn);
+}
+
+/** Persist FarmDatabase to Supabase (delete orphans, then upsert; preserves IDs). */
 export async function saveToSupabase(client: SupabaseClient, db: FarmDatabase): Promise<void> {
-  await upsert(
+  // Children before parents so FK constraints are respected when deleting.
+  await syncTable(
     client,
-    "contacts",
-    db.contacts.map((c) => ({
-      id: c.id,
-      name: c.name,
-      type: c.type,
-      phone: c.phone ?? null,
-      notes: c.notes ?? null,
+    "partner_ledger_entries",
+    db.partner_ledger_entries.map((l) => ({
+      id: l.id,
+      transaction_id: l.transaction_id,
+      partner_id: l.partner_id,
+      amount: l.amount,
+      category: l.category,
+      created_at: l.created_at,
     }))
   );
 
-  await upsert(
+  await syncTable(
+    client,
+    "palai_payments",
+    db.palai_payments.map((p) => ({
+      id: p.id,
+      date: p.date,
+      customer_id: p.customer_id,
+      rate_per_goat: p.rate_per_goat,
+      goat_count: p.goat_count,
+      total_amount: p.total_amount,
+      payment_method: p.payment_method,
+      transaction_id: p.transaction_id,
+      notes: p.notes,
+    }))
+  );
+
+  await syncTable(
+    client,
+    "livestock_sales",
+    db.livestock_sales.map((s) => ({
+      id: s.id,
+      date: s.date,
+      animal_ids: s.animal_ids,
+      gross_sale_price: s.gross_sale_price,
+      delivery_cost: s.delivery_cost,
+      net_received: s.net_received,
+      partner_share: s.partner_share,
+      received_by_partner_id: s.received_by_partner_id,
+      transaction_id: s.transaction_id,
+      notes: s.notes,
+    }))
+  );
+
+  await syncTable(
+    client,
+    "medical_events",
+    db.medical_events.map((m) => ({
+      id: m.id,
+      animal_id: m.animal_id,
+      event_type: m.event_type,
+      date: m.date,
+      notes: m.notes,
+      transaction_id: m.transaction_id,
+    }))
+  );
+
+  await syncTable(
+    client,
+    "breeding_events",
+    db.breeding_events.map((b) => ({
+      id: b.id,
+      female_animal_id: b.female_animal_id,
+      male_animal_id: b.male_animal_id,
+      buck_name: b.buck_name,
+      date_crossed: b.date_crossed,
+      expected_due_date: b.expected_due_date,
+      delivered_date: b.delivered_date,
+      outcome: b.outcome,
+      status: b.status,
+      notes: b.notes,
+    }))
+  );
+
+  await syncTable(
+    client,
+    "weight_logs",
+    db.weight_logs.map((w) => ({
+      id: w.id,
+      animal_id: w.animal_id,
+      weighed_on: w.weighed_on,
+      weight_kg: w.weight_kg,
+      notes: w.notes,
+    }))
+  );
+
+  await syncTable(
+    client,
+    "animal_media",
+    (db.animal_media ?? []).map((m) => ({
+      id: m.id,
+      animal_id: m.animal_id,
+      storage_path: m.storage_path,
+      media_type: m.media_type,
+      caption: m.caption,
+      created_at: m.created_at,
+    }))
+  );
+
+  await syncTable(
+    client,
+    "transactions",
+    db.transactions.map((t) => ({
+      id: t.id,
+      date: t.date,
+      amount: t.amount,
+      kind: t.kind,
+      category: t.category,
+      farm_model: t.farm_model,
+      animal_id: t.animal_id,
+      customer_id: t.customer_id,
+      vendor_id: t.vendor_id,
+      paid_by_partner_id: t.paid_by_partner_id,
+      received_by_partner_id: t.received_by_partner_id,
+      adjustment_partner_id: t.adjustment_partner_id,
+      notes: t.notes,
+      source_row: t.source_row,
+    }))
+  );
+
+  await syncTable(
     client,
     "animals",
     db.animals.map((a) => ({
@@ -261,125 +402,15 @@ export async function saveToSupabase(client: SupabaseClient, db: FarmDatabase): 
     }))
   );
 
-  await upsert(
+  await syncTable(
     client,
-    "transactions",
-    db.transactions.map((t) => ({
-      id: t.id,
-      date: t.date,
-      amount: t.amount,
-      kind: t.kind,
-      category: t.category,
-      farm_model: t.farm_model,
-      animal_id: t.animal_id,
-      customer_id: t.customer_id,
-      vendor_id: t.vendor_id,
-      paid_by_partner_id: t.paid_by_partner_id,
-      received_by_partner_id: t.received_by_partner_id,
-      adjustment_partner_id: t.adjustment_partner_id,
-      notes: t.notes,
-      source_row: t.source_row,
-    }))
-  );
-
-  await upsert(
-    client,
-    "partner_ledger_entries",
-    db.partner_ledger_entries.map((l) => ({
-      id: l.id,
-      transaction_id: l.transaction_id,
-      partner_id: l.partner_id,
-      amount: l.amount,
-      category: l.category,
-      created_at: l.created_at,
-    }))
-  );
-
-  await upsert(
-    client,
-    "palai_payments",
-    db.palai_payments.map((p) => ({
-      id: p.id,
-      date: p.date,
-      customer_id: p.customer_id,
-      rate_per_goat: p.rate_per_goat,
-      goat_count: p.goat_count,
-      total_amount: p.total_amount,
-      payment_method: p.payment_method,
-      transaction_id: p.transaction_id,
-      notes: p.notes,
-    }))
-  );
-
-  await upsert(
-    client,
-    "livestock_sales",
-    db.livestock_sales.map((s) => ({
-      id: s.id,
-      date: s.date,
-      animal_ids: s.animal_ids,
-      gross_sale_price: s.gross_sale_price,
-      delivery_cost: s.delivery_cost,
-      net_received: s.net_received,
-      partner_share: s.partner_share,
-      received_by_partner_id: s.received_by_partner_id,
-      transaction_id: s.transaction_id,
-      notes: s.notes,
-    }))
-  );
-
-  await upsert(
-    client,
-    "medical_events",
-    db.medical_events.map((m) => ({
-      id: m.id,
-      animal_id: m.animal_id,
-      event_type: m.event_type,
-      date: m.date,
-      notes: m.notes,
-      transaction_id: m.transaction_id,
-    }))
-  );
-
-  await upsert(
-    client,
-    "breeding_events",
-    db.breeding_events.map((b) => ({
-      id: b.id,
-      female_animal_id: b.female_animal_id,
-      male_animal_id: b.male_animal_id,
-      buck_name: b.buck_name,
-      date_crossed: b.date_crossed,
-      expected_due_date: b.expected_due_date,
-      delivered_date: b.delivered_date,
-      outcome: b.outcome,
-      status: b.status,
-      notes: b.notes,
-    }))
-  );
-
-  await upsert(
-    client,
-    "weight_logs",
-    db.weight_logs.map((w) => ({
-      id: w.id,
-      animal_id: w.animal_id,
-      weighed_on: w.weighed_on,
-      weight_kg: w.weight_kg,
-      notes: w.notes,
-    }))
-  );
-
-  await upsert(
-    client,
-    "animal_media",
-    (db.animal_media ?? []).map((m) => ({
-      id: m.id,
-      animal_id: m.animal_id,
-      storage_path: m.storage_path,
-      media_type: m.media_type,
-      caption: m.caption,
-      created_at: m.created_at,
+    "contacts",
+    db.contacts.map((c) => ({
+      id: c.id,
+      name: c.name,
+      type: c.type,
+      phone: c.phone ?? null,
+      notes: c.notes ?? null,
     }))
   );
 
