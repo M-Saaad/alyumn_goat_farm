@@ -1,10 +1,15 @@
 import { Suspense } from "react";
 import Link from "next/link";
-import { getDb, animalLabel, contactName } from "@/lib/actions";
+import nextDynamic from "next/dynamic";
+import { animalLabel } from "@/lib/actions";
+import { loadAnimalsListData, contactNameFrom } from "@/lib/db/queries";
 import { BottomNav } from "@/components/BottomNav";
-import { QuickEntry } from "@/components/QuickEntry";
 import { AnimalsFilters } from "@/components/AnimalsFilters";
-import { quickEntryPropsFromDb } from "@/lib/quick-entry-props";
+
+const QuickEntry = nextDynamic(
+  () => import("@/components/QuickEntry").then((m) => m.QuickEntry),
+  { ssr: false }
+);
 
 export const dynamic = "force-dynamic";
 
@@ -14,19 +19,19 @@ export default async function AnimalsPage({
   searchParams: Promise<{ q?: string; filter?: string }>;
 }) {
   const sp = await searchParams;
-  const db = await getDb();
+  const data = await loadAnimalsListData();
   const q = (sp.q || "").toLowerCase();
   const filter = sp.filter || "all";
 
-  let animals = [...db.animals];
+  let animals = [...data.animals];
   if (filter === "active") animals = animals.filter((a) => a.status === "Active");
   if (filter === "palai") {
-    const farmId = db.contacts.find((c) => c.name === "Farm")?.id;
+    const farmId = data.contacts.find((c) => c.name === "Farm")?.id;
     animals = animals.filter((a) => a.owner_id && a.owner_id !== farmId && a.status === "Active");
   }
   if (filter === "breeding") {
     const femaleIds = new Set(
-      db.breeding_events
+      data.breeding_events
         .filter((b) => b.outcome === "Pending" || b.status === "Doubt")
         .map((b) => b.female_animal_id)
     );
@@ -46,8 +51,6 @@ export default async function AnimalsPage({
     if (b.status === "Active" && a.status !== "Active") return 1;
     return animalLabel(a).localeCompare(animalLabel(b));
   });
-
-  const quickEntry = quickEntryPropsFromDb(db);
 
   const statusColor: Record<string, string> = {
     Active: "bg-emerald-100 text-emerald-800",
@@ -79,7 +82,9 @@ export default async function AnimalsPage({
                 <div>
                   <p className="font-semibold text-stone-900">{animalLabel(a)}</p>
                   <p className="text-sm text-stone-500">
-                    {[a.breed, a.sex, contactName(db, a.owner_id)].filter(Boolean).join(" · ")}
+                    {[a.breed, a.sex, contactNameFrom(data.contacts, a.owner_id)]
+                      .filter(Boolean)
+                      .join(" · ")}
                   </p>
                 </div>
                 <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${statusColor[a.status]}`}>
@@ -91,7 +96,7 @@ export default async function AnimalsPage({
         ))}
       </ul>
 
-      <QuickEntry {...quickEntry} />
+      <QuickEntry {...data.quickEntry} />
       <BottomNav active="goats" />
     </main>
   );

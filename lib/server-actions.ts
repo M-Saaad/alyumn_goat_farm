@@ -231,6 +231,17 @@ export async function actionUploadAnimalMedia(formData: FormData) {
   revalidatePath("/animals");
 }
 
+/** Batch-sign media storage paths after first paint (client gallery). */
+export async function actionSignMediaUrls(
+  paths: string[]
+): Promise<Record<string, string | null>> {
+  const { signedMediaUrl } = await import("@/lib/media/upload");
+  const entries = await Promise.all(
+    paths.map(async (p) => [p, await signedMediaUrl(p)] as const)
+  );
+  return Object.fromEntries(entries);
+}
+
 export async function actionSignOut() {
   const { createClient } = await import("@/lib/supabase/server");
   const supabase = await createClient();

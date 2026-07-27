@@ -1,3 +1,4 @@
+import { cache } from "react";
 import fs from "fs";
 import path from "path";
 import type { FarmDatabase } from "./types";
@@ -44,13 +45,24 @@ export function saveDb(db: FarmDatabase): void {
   saveJsonDb(db);
 }
 
-export async function fetchDb(): Promise<FarmDatabase> {
+async function fetchDbUncached(): Promise<FarmDatabase> {
   if (isSupabaseDb()) {
     const client = createServiceClient();
     return loadFromSupabase(client);
   }
   return loadJsonDb();
 }
+
+/**
+ * Always-fresh DB load — use in mutations and scripts.
+ * Page loaders should prefer targeted queries in lib/db/queries.ts.
+ */
+export async function fetchDb(): Promise<FarmDatabase> {
+  return fetchDbUncached();
+}
+
+/** Dedupes multiple reads within a single React server render (pages only). */
+export const getCachedDb = cache(fetchDbUncached);
 
 export async function persistDb(db: FarmDatabase): Promise<FarmDatabase> {
   if (isSupabaseDb()) {

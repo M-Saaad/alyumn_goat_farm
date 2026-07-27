@@ -1,8 +1,9 @@
 import { Suspense } from "react";
-import { getDb, contactName, animalLabel } from "@/lib/actions";
+import nextDynamic from "next/dynamic";
+import { animalLabel } from "@/lib/actions";
 import { LEDGER_CATEGORIES, slugToCategory } from "@/lib/constants";
+import { loadTransactionsData, contactNameFrom } from "@/lib/db/queries";
 import { BottomNav } from "@/components/BottomNav";
-import { QuickEntry } from "@/components/QuickEntry";
 import { TransactionsFilters } from "@/components/TransactionsFilters";
 import {
   TransactionEditor,
@@ -10,7 +11,12 @@ import {
 } from "@/components/TransactionEditor";
 import { resolveTransactionKind } from "@/lib/transactions/mutate";
 import { getPartnerIds } from "@/lib/partner-equity/settlement";
-import { quickEntryPropsFromDb } from "@/lib/quick-entry-props";
+import type { FarmDatabase } from "@/lib/types";
+
+const QuickEntry = nextDynamic(
+  () => import("@/components/QuickEntry").then((m) => m.QuickEntry),
+  { ssr: false }
+);
 
 export const dynamic = "force-dynamic";
 
@@ -20,12 +26,12 @@ export default async function TransactionsPage({
   searchParams: Promise<{ q?: string; filter?: string }>;
 }) {
   const sp = await searchParams;
-  const db = await getDb();
+  const data = await loadTransactionsData();
   const q = (sp.q || "").toLowerCase().trim();
   const filter = sp.filter || "all";
-  const { monisId, saadId } = getPartnerIds(db);
+  const { monisId, saadId } = getPartnerIds({ contacts: data.contacts } as FarmDatabase);
 
-  let txs = [...db.transactions].sort((a, b) => {
+  let txs = [...data.transactions].sort((a, b) => {
     const byDate = b.date.localeCompare(a.date);
     if (byDate !== 0) return byDate;
     return (b.source_row ?? 0) - (a.source_row ?? 0);
@@ -52,12 +58,11 @@ export default async function TransactionsPage({
     );
   }
 
-  const animals = db.animals
+  const animals = data.animals
     .filter((a) => a.status === "Active")
     .map((a) => ({ id: a.id, label: animalLabel(a) }));
 
-  const allAnimals = db.animals.map((a) => ({ id: a.id, label: animalLabel(a) }));
-  const quickEntry = quickEntryPropsFromDb(db);
+  const allAnimals = data.animals.map((a) => ({ id: a.id, label: animalLabel(a) }));
 
   const editable: EditableTransaction[] = txs.map((tx) => {
     const variant = resolveTransactionKind(tx);
@@ -68,9 +73,9 @@ export default async function TransactionsPage({
           ? ("Saad" as const)
           : null;
 
-    const animal = tx.animal_id != null ? db.animals.find((a) => a.id === tx.animal_id) : null;
-    const palaiPayment = db.palai_payments.find((p) => p.transaction_id === tx.id);
-    const sale = (db.livestock_sales ?? []).find((s) => s.transaction_id === tx.id);
+    const animal = tx.animal_id != null ? data.animals.find((a) => a.id === tx.animal_id) : null;
+    const palaiPayment = data.palai_payments.find((p) => p.transaction_id === tx.id);
+    const sale = (data.livestock_sales ?? []).find((s) => s.transaction_id === tx.id);
 
     let transferAbsAmount: number | null = null;
     let transferDirection: "from_monis" | "to_monis" | null = null;
@@ -89,7 +94,6 @@ export default async function TransactionsPage({
           totalAmount: palaiPayment.total_amount,
         };
       } else {
-        // Legacy import: infer total from adjustment half
         const total = Math.abs(tx.amount) * 2;
         palai = {
           ratePerGoat: total,
@@ -123,10 +127,10 @@ export default async function TransactionsPage({
       }
     }
 
-    const vendor = contactName(db, tx.vendor_id);
-    const customerFromTx = contactName(db, tx.customer_id);
+    const vendor = contactNameFrom(data.contacts, tx.vendor_id);
+    const customerFromTx = contactNameFrom(data.contacts, tx.customer_id);
     const customerFromPalai = palaiPayment
-      ? contactName(db, palaiPayment.customer_id)
+      ? contactNameFrom(data.contacts, palaiPayment.customer_id)
       : "—";
 
     return {
@@ -177,13 +181,13 @@ export default async function TransactionsPage({
             transactions={editable}
             animals={animals}
             allAnimals={allAnimals}
-            vendors={quickEntry.vendors}
-            customers={quickEntry.customers}
+            vendors={data.quickEntry.vendors}
+            customers={data.quickEntry.customers}
           />
         )}
       </section>
 
-      <QuickEntry {...quickEntry} />
+      <QuickEntry {...data.quickEntry} />
       <BottomNav active="txns" />
     </main>
   );

@@ -1,7 +1,7 @@
 "use client";
 
+import { useEffect, useRef, useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useTransition } from "react";
 import { LEDGER_CATEGORIES, categoryToSlug } from "@/lib/constants";
 
 const filters = [
@@ -17,6 +17,13 @@ export function TransactionsFilters() {
   const [pending, startTransition] = useTransition();
   const current = sp.get("filter") || "all";
   const q = sp.get("q") || "";
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, []);
 
   function navigate(next: URLSearchParams) {
     const qs = next.toString();
@@ -33,10 +40,13 @@ export function TransactionsFilters() {
   }
 
   function onSearch(value: string) {
-    const params = new URLSearchParams(sp.toString());
-    if (value) params.set("q", value);
-    else params.delete("q");
-    navigate(params);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      const params = new URLSearchParams(sp.toString());
+      if (value) params.set("q", value);
+      else params.delete("q");
+      navigate(params);
+    }, 300);
   }
 
   return (

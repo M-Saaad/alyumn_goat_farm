@@ -1,14 +1,18 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getDb, animalLabel, contactName } from "@/lib/actions";
+import nextDynamic from "next/dynamic";
+import { animalLabel } from "@/lib/actions";
 import { formatPkr } from "@/lib/format";
-import { signedMediaUrl } from "@/lib/media/upload";
 import { isSupabaseDb } from "@/lib/db";
+import { loadAnimalProfileData, contactNameFrom } from "@/lib/db/queries";
 import { BottomNav } from "@/components/BottomNav";
-import { QuickEntry } from "@/components/QuickEntry";
-import { AnimalMediaUpload } from "@/components/AnimalMediaUpload";
 import { AnimalEditor } from "@/components/AnimalEditor";
-import { quickEntryPropsFromDb } from "@/lib/quick-entry-props";
+import { AnimalMediaGallery } from "@/components/AnimalMediaGallery";
+
+const QuickEntry = nextDynamic(
+  () => import("@/components/QuickEntry").then((m) => m.QuickEntry),
+  { ssr: false }
+);
 
 export const dynamic = "force-dynamic";
 
@@ -19,38 +23,28 @@ export default async function AnimalProfilePage({
 }) {
   const { id } = await params;
   const animalId = Number(id);
-  const db = await getDb();
-  const animal = db.animals.find((a) => a.id === animalId);
-  if (!animal) notFound();
+  const data = await loadAnimalProfileData(animalId);
+  if (!data) notFound();
 
-  const medical = db.medical_events
-    .filter((m) => m.animal_id === animalId)
-    .sort((a, b) => (b.date || "").localeCompare(a.date || ""));
-  const breeding = db.breeding_events
-    .filter((b) => b.female_animal_id === animalId)
-    .sort((a, b) => (b.date_crossed || "").localeCompare(a.date_crossed || ""));
-  const saleMeta = (db.livestock_sales ?? []).filter((s) => s.animal_ids.includes(animalId));
-  const saleTxIds = new Set(saleMeta.map((s) => s.transaction_id));
-  const txs = db.transactions
-    .filter((t) => t.animal_id === animalId || saleTxIds.has(t.id))
-    .sort((a, b) => b.date.localeCompare(a.date));
-  const weights = db.weight_logs
-    .filter((w) => w.animal_id === animalId)
-    .sort((a, b) => b.weighed_on.localeCompare(a.weighed_on));
-  const media = (db.animal_media ?? [])
-    .filter((m) => m.animal_id === animalId)
-    .sort((a, b) => b.created_at.localeCompare(a.created_at));
-  const mediaWithUrls = await Promise.all(
-    media.map(async (m) => ({
-      ...m,
-      url: await signedMediaUrl(m.storage_path),
-    }))
+  const { animal } = data;
+  const medical = [...data.medical_events].sort((a, b) =>
+    (b.date || "").localeCompare(a.date || "")
+  );
+  const breeding = [...data.breeding_events].sort((a, b) =>
+    (b.date_crossed || "").localeCompare(a.date_crossed || "")
+  );
+  const saleMeta = data.livestock_sales;
+  const txs = [...data.transactions].sort((a, b) => b.date.localeCompare(a.date));
+  const weights = [...data.weight_logs].sort((a, b) =>
+    b.weighed_on.localeCompare(a.weighed_on)
+  );
+  const media = [...data.animal_media].sort((a, b) =>
+    b.created_at.localeCompare(a.created_at)
   );
   const supabaseEnabled = isSupabaseDb();
-  const quickEntry = quickEntryPropsFromDb(db);
-  const ownerName = contactName(db, animal.owner_id);
+  const ownerName = contactNameFrom(data.contacts, animal.owner_id);
   const vendorName = animal.purchased_from
-    ? contactName(db, animal.purchased_from)
+    ? contactNameFrom(data.contacts, animal.purchased_from)
     : null;
 
   return (
@@ -82,45 +76,15 @@ export default async function AnimalProfilePage({
           age_at_purchase: animal.age_at_purchase,
           home_bred: animal.home_bred,
         }}
-        vendors={quickEntry.vendors}
-        ownerOptions={quickEntry.ownerOptions}
+        vendors={data.quickEntry.vendors}
+        ownerOptions={data.quickEntry.ownerOptions}
       />
 
-      <section className="mb-3 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-stone-200">
-        <h2 className="mb-2 text-sm font-bold">Photos &amp; videos ({mediaWithUrls.length})</h2>
-        {mediaWithUrls.length === 0 ? (
-          <p className="text-sm text-stone-500">No media yet.</p>
-        ) : (
-          <ul className="space-y-3">
-            {mediaWithUrls.map((m) => (
-              <li key={m.id} className="overflow-hidden rounded-xl bg-stone-50">
-                {m.url ? (
-                  m.media_type === "video" ? (
-                    <video src={m.url} controls className="max-h-64 w-full bg-black object-contain" />
-                  ) : (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={m.url}
-                      alt={m.caption || "Goat media"}
-                      className="max-h-64 w-full object-cover"
-                    />
-                  )
-                ) : (
-                  <p className="p-3 text-sm text-stone-500">Could not load media</p>
-                )}
-                {m.caption && <p className="px-3 py-2 text-xs text-stone-600">{m.caption}</p>}
-              </li>
-            ))}
-          </ul>
-        )}
-        {supabaseEnabled ? (
-          <AnimalMediaUpload animalId={animalId} />
-        ) : (
-          <p className="mt-3 text-xs text-stone-500">
-            Media upload is available when Supabase is configured.
-          </p>
-        )}
-      </section>
+      <AnimalMediaGallery
+        media={media}
+        animalId={animalId}
+        supabaseEnabled={supabaseEnabled}
+      />
 
       <section className="mb-3 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-stone-200">
         <h2 className="mb-2 text-sm font-bold">Purchase</h2>
@@ -143,7 +107,7 @@ export default async function AnimalProfilePage({
           </div>
           <div>
             <dt className="text-stone-500">From</dt>
-            <dd>{contactName(db, animal.purchased_from)}</dd>
+            <dd>{contactNameFrom(data.contacts, animal.purchased_from)}</dd>
           </div>
           {animal.palai_rate != null && (
             <div>
@@ -244,7 +208,7 @@ export default async function AnimalProfilePage({
         </section>
       )}
 
-      <QuickEntry {...quickEntry} />
+      <QuickEntry {...data.quickEntry} />
       <BottomNav active="goats" />
     </main>
   );

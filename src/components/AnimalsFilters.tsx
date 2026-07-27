@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 const filters = [
@@ -14,6 +15,13 @@ export function AnimalsFilters() {
   const sp = useSearchParams();
   const current = sp.get("filter") || "all";
   const q = sp.get("q") || "";
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, []);
 
   function setFilter(id: string) {
     const params = new URLSearchParams(sp.toString());
@@ -23,10 +31,13 @@ export function AnimalsFilters() {
   }
 
   function onSearch(value: string) {
-    const params = new URLSearchParams(sp.toString());
-    if (value) params.set("q", value);
-    else params.delete("q");
-    router.push(`/animals?${params.toString()}`);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      const params = new URLSearchParams(sp.toString());
+      if (value) params.set("q", value);
+      else params.delete("q");
+      router.push(`/animals?${params.toString()}`);
+    }, 300);
   }
 
   return (

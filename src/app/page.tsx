@@ -1,21 +1,31 @@
 import Link from "next/link";
-import { getDb, getSettlement, contactName } from "@/lib/actions";
+import nextDynamic from "next/dynamic";
+import { loadHomeData, contactNameFrom } from "@/lib/db/queries";
+import { computeSettlement } from "@/lib/partner-equity/settlement";
 import { formatPkr } from "@/lib/format";
 import { BottomNav } from "@/components/BottomNav";
-import { QuickEntry } from "@/components/QuickEntry";
 import { SignOutButton } from "@/components/SignOutButton";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
-import { quickEntryPropsFromDb } from "@/lib/quick-entry-props";
+import type { FarmDatabase } from "@/lib/types";
+
+const QuickEntry = nextDynamic(
+  () => import("@/components/QuickEntry").then((m) => m.QuickEntry),
+  { ssr: false }
+);
 
 export const dynamic = "force-dynamic";
 
 export default async function HomePage() {
-  const db = await getDb();
-  const s = await getSettlement();
-  const recent = [...db.transactions].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 12);
-  const quickEntry = quickEntryPropsFromDb(db);
+  const data = await loadHomeData();
+  // Settlement only needs contacts + transactions
+  const settlementDb = {
+    contacts: data.contacts,
+    transactions: data.transactions,
+  } as FarmDatabase;
+  const s = computeSettlement(settlementDb);
+  const recent = [...data.transactions].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 12);
 
-  const palaiThisMonth = db.palai_payments
+  const palaiThisMonth = data.palai_payments
     .filter((p) => p.date.startsWith(new Date().toISOString().slice(0, 7)))
     .reduce((sum, p) => sum + p.total_amount, 0);
 
@@ -59,7 +69,7 @@ export default async function HomePage() {
             </p>
           </>
         )}
-        {db.meta.settlementVerified && (
+        {data.meta.settlementVerified && (
           <p className="mt-2 text-xs opacity-80">Import verified · Monis +192,247 / Saad −192,247</p>
         )}
       </section>
@@ -121,7 +131,7 @@ export default async function HomePage() {
                 <p className="text-xs text-stone-500">
                   {tx.date} ·{" "}
                   {tx.kind === "cost"
-                    ? `paid by ${contactName(db, tx.paid_by_partner_id)}`
+                    ? `paid by ${contactNameFrom(data.contacts, tx.paid_by_partner_id)}`
                     : "adjustment"}
                 </p>
                 {tx.notes && <p className="text-xs text-stone-500 line-clamp-1">{tx.notes}</p>}
@@ -132,7 +142,7 @@ export default async function HomePage() {
         </ul>
       </section>
 
-      <QuickEntry {...quickEntry} />
+      <QuickEntry {...data.quickEntry} />
       <BottomNav active="finance" />
     </main>
   );

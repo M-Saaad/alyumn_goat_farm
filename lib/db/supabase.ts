@@ -14,11 +14,11 @@ import type {
 } from "../types";
 import { emptyDb } from "../db-empty";
 
-function num(v: unknown): number {
+export function num(v: unknown): number {
   return typeof v === "number" ? v : Number(v);
 }
 
-function mapContact(r: Record<string, unknown>): Contact {
+export function mapContact(r: Record<string, unknown>): Contact {
   return {
     id: String(r.id),
     name: String(r.name),
@@ -28,7 +28,7 @@ function mapContact(r: Record<string, unknown>): Contact {
   };
 }
 
-function mapAnimal(r: Record<string, unknown>): Animal {
+export function mapAnimal(r: Record<string, unknown>): Animal {
   return {
     id: num(r.id),
     name: (r.name as string) ?? null,
@@ -49,7 +49,7 @@ function mapAnimal(r: Record<string, unknown>): Animal {
   };
 }
 
-function mapTx(r: Record<string, unknown>): Transaction {
+export function mapTx(r: Record<string, unknown>): Transaction {
   return {
     id: String(r.id),
     date: String(r.date),
@@ -68,7 +68,7 @@ function mapTx(r: Record<string, unknown>): Transaction {
   };
 }
 
-function mapLedger(r: Record<string, unknown>): PartnerLedgerEntry {
+export function mapLedger(r: Record<string, unknown>): PartnerLedgerEntry {
   return {
     id: String(r.id),
     transaction_id: String(r.transaction_id),
@@ -79,7 +79,7 @@ function mapLedger(r: Record<string, unknown>): PartnerLedgerEntry {
   };
 }
 
-function mapPalai(r: Record<string, unknown>): PalaiPayment {
+export function mapPalai(r: Record<string, unknown>): PalaiPayment {
   return {
     id: String(r.id),
     date: String(r.date),
@@ -93,7 +93,7 @@ function mapPalai(r: Record<string, unknown>): PalaiPayment {
   };
 }
 
-function mapSale(r: Record<string, unknown>): LivestockSale {
+export function mapSale(r: Record<string, unknown>): LivestockSale {
   return {
     id: String(r.id),
     date: String(r.date),
@@ -108,7 +108,7 @@ function mapSale(r: Record<string, unknown>): LivestockSale {
   };
 }
 
-function mapMedical(r: Record<string, unknown>): MedicalEvent {
+export function mapMedical(r: Record<string, unknown>): MedicalEvent {
   return {
     id: String(r.id),
     animal_id: num(r.animal_id),
@@ -119,7 +119,7 @@ function mapMedical(r: Record<string, unknown>): MedicalEvent {
   };
 }
 
-function mapBreeding(r: Record<string, unknown>): BreedingEvent {
+export function mapBreeding(r: Record<string, unknown>): BreedingEvent {
   return {
     id: String(r.id),
     female_animal_id: num(r.female_animal_id),
@@ -134,7 +134,7 @@ function mapBreeding(r: Record<string, unknown>): BreedingEvent {
   };
 }
 
-function mapWeight(r: Record<string, unknown>): WeightLog {
+export function mapWeight(r: Record<string, unknown>): WeightLog {
   return {
     id: String(r.id),
     animal_id: num(r.animal_id),
@@ -144,7 +144,7 @@ function mapWeight(r: Record<string, unknown>): WeightLog {
   };
 }
 
-function mapMedia(r: Record<string, unknown>): AnimalMedia {
+export function mapMedia(r: Record<string, unknown>): AnimalMedia {
   return {
     id: String(r.id),
     animal_id: num(r.animal_id),
@@ -155,10 +155,19 @@ function mapMedia(r: Record<string, unknown>): AnimalMedia {
   };
 }
 
-async function selectAll(client: SupabaseClient, table: string) {
+export async function selectAll(client: SupabaseClient, table: string) {
   const { data, error } = await client.from(table).select("*");
   if (error) throw new Error(`${table}: ${error.message}`);
   return (data ?? []) as Record<string, unknown>[];
+}
+
+export function mapMeta(meta: Record<string, unknown> | undefined): FarmDatabase["meta"] {
+  return {
+    importedAt: meta?.imported_at ? String(meta.imported_at) : null,
+    settlementVerified: Boolean(meta?.settlement_verified),
+    monisDiff: meta?.monis_diff == null ? null : num(meta.monis_diff),
+    saadDiff: meta?.saad_diff == null ? null : num(meta.saad_diff),
+  };
 }
 
 export async function loadFromSupabase(client: SupabaseClient): Promise<FarmDatabase> {
@@ -202,12 +211,7 @@ export async function loadFromSupabase(client: SupabaseClient): Promise<FarmData
   db.breeding_events = breeding.map(mapBreeding);
   db.weight_logs = weights.map(mapWeight);
   db.animal_media = media.map(mapMedia);
-  db.meta = {
-    importedAt: meta?.imported_at ? String(meta.imported_at) : null,
-    settlementVerified: Boolean(meta?.settlement_verified),
-    monisDiff: meta?.monis_diff == null ? null : num(meta.monis_diff),
-    saadDiff: meta?.saad_diff == null ? null : num(meta.saad_diff),
-  };
+  db.meta = mapMeta(meta);
   return db;
 }
 

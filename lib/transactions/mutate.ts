@@ -19,6 +19,7 @@ import {
   computeSaleSplit,
   saleAdjustmentAmount,
 } from "../livestock/record-sale";
+import { diffDb, type WritePlan } from "../db/writes";
 
 export type TransactionEditVariant =
   | "expense"
@@ -443,4 +444,22 @@ export function applyDeleteTransaction(db: FarmDatabase, id: string): FarmDataba
       return removeTxAndLedger(db, id);
     }
   }
+}
+
+/** Build a row-level WritePlan for an update (in-memory apply + diff). */
+export function planUpdateTransaction(
+  db: FarmDatabase,
+  input: UpdateTransactionInput
+): { after: FarmDatabase; plan: WritePlan } {
+  const after = applyUpdateTransaction(db, input);
+  return { after, plan: diffDb(db, after) };
+}
+
+/** Build a row-level WritePlan for a delete (in-memory apply + diff). */
+export function planDeleteTransaction(
+  db: FarmDatabase,
+  id: string
+): { after: FarmDatabase; plan: WritePlan } {
+  const after = applyDeleteTransaction(db, id);
+  return { after, plan: diffDb(db, after) };
 }

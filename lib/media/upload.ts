@@ -1,5 +1,6 @@
-import { fetchDb, persistDb, isSupabaseDb } from "../db";
+import { isSupabaseDb } from "../db";
 import { createServiceClient } from "../supabase/admin";
+import { applyWritePlan } from "../db/writes";
 import type { MediaType } from "../types";
 
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
@@ -43,14 +44,18 @@ export async function uploadAnimalMedia(input: {
     );
   }
 
-  const db = await fetchDb();
-  const animal = db.animals.find((a) => a.id === input.animalId);
-  if (!animal) throw new Error("Animal not found");
+  const client = createServiceClient();
+  const { data: animalRow, error: animalErr } = await client
+    .from("animals")
+    .select("id")
+    .eq("id", input.animalId)
+    .maybeSingle();
+  if (animalErr) throw new Error(animalErr.message);
+  if (!animalRow) throw new Error("Animal not found");
 
   const ext = extFromName(input.file.name, mime);
   const id = crypto.randomUUID();
   const storagePath = `${input.animalId}/${id}.${ext}`;
-  const client = createServiceClient();
   const buffer = Buffer.from(await input.file.arrayBuffer());
 
   const { error: uploadError } = await client.storage
@@ -59,17 +64,16 @@ export async function uploadAnimalMedia(input: {
   if (uploadError) throw new Error(`Upload failed: ${uploadError.message}`);
 
   const now = new Date().toISOString();
-  if (!db.animal_media) db.animal_media = [];
-  db.animal_media.push({
+  const media = {
     id,
     animal_id: input.animalId,
     storage_path: storagePath,
     media_type: mediaType,
     caption: input.caption ?? null,
     created_at: now,
-  });
-
-  return persistDb(db);
+  };
+  await applyWritePlan({ upsertMedia: [media] });
+  return media;
 }
 
 export async function signedMediaUrl(storagePath: string, expiresIn = 3600): Promise<string | null> {
