@@ -2,7 +2,6 @@
  * Transaction update/delete with ledger re-sync.
  * Settlement formula is untouched — only rebuilds ledger rows for the affected tx
  * using existing ledgerForCost / ledgerForAdjustment / Palai / Sale helpers.
- * customer_wallet txs never touch partner_ledger_entries.
  */
 import type {
   FarmDatabase,
@@ -20,28 +19,15 @@ import {
   computeSaleSplit,
   saleAdjustmentAmount,
 } from "../livestock/record-sale";
-import {
-  removeWalletEntriesForTx,
-  syncWalletCreditForDeposit,
-  syncWalletDebitForPurchase,
-} from "../customer-wallet/wallet";
 
 export type TransactionEditVariant =
   | "expense"
   | "livestock_purchase"
-  | "customer_purchase"
-  | "wallet_deposit"
   | "partner_transfer"
   | "palai_income"
   | "livestock_sale";
 
 export function resolveTransactionKind(tx: Transaction): TransactionEditVariant {
-  if (tx.kind === "customer_wallet" && tx.category === "Customer Wallet") {
-    return "wallet_deposit";
-  }
-  if (tx.kind === "customer_wallet" && tx.category === "Livestock Purchase") {
-    return "customer_purchase";
-  }
   if (tx.category === "Livestock Sale") return "livestock_sale";
   if (tx.category === "Palai Income") return "palai_income";
   if (tx.category === "Partner Transfer") return "partner_transfer";
@@ -52,12 +38,6 @@ export function resolveTransactionKind(tx: Transaction): TransactionEditVariant 
 }
 
 function rebuildLedger(db: FarmDatabase, tx: Transaction): FarmDatabase {
-  if (tx.kind === "customer_wallet") {
-    return {
-      ...db,
-      partner_ledger_entries: db.partner_ledger_entries.filter((e) => e.transaction_id !== tx.id),
-    };
-  }
   const { monisId } = getPartnerIds(db);
   const without = db.partner_ledger_entries.filter((e) => e.transaction_id !== tx.id);
   const now = new Date().toISOString();
@@ -114,22 +94,6 @@ export type UpdateTransactionInput =
       amount: number;
       paidBy: "Monis" | "Saad";
       vendorName?: string | null;
-      notes?: string | null;
-    }
-  | {
-      id: string;
-      variant: "customer_purchase";
-      date: string;
-      amount: number;
-      vendorName?: string | null;
-      notes?: string | null;
-    }
-  | {
-      id: string;
-      variant: "wallet_deposit";
-      date: string;
-      amount: number;
-      customerName: string;
       notes?: string | null;
     }
   | {
@@ -229,80 +193,6 @@ export function applyUpdateTransaction(
         ...next,
         animals,
         transactions: next.transactions.map((t) => (t.id === tx.id ? updated : t)),
-      };
-      return rebuildLedger(next, updated);
-    }
-
-    case "customer_purchase": {
-      let next = db;
-      let vendorId: string | null = tx.vendor_id;
-      if (input.vendorName != null && input.vendorName.trim()) {
-        const r = findOrCreateContact(next, input.vendorName.trim(), "Vendor");
-        next = r.db;
-        vendorId = r.id;
-      } else if (input.vendorName === "") {
-        vendorId = null;
-      }
-
-      const updated: Transaction = {
-        ...tx,
-        date: input.date,
-        amount: input.amount,
-        vendor_id: vendorId,
-        paid_by_partner_id: null,
-        notes: input.notes || null,
-      };
-
-      const animals = next.animals.map((a) => {
-        if (tx.animal_id == null || a.id !== tx.animal_id) return a;
-        return {
-          ...a,
-          price: input.amount,
-          date_of_purchase: input.date,
-          purchased_from: vendorId,
-        };
-      });
-
-      next = {
-        ...next,
-        animals,
-        transactions: next.transactions.map((t) => (t.id === tx.id ? updated : t)),
-      };
-      next = syncWalletDebitForPurchase(next, tx.id, {
-        date: input.date,
-        amount: input.amount,
-        animalId: tx.animal_id,
-        notes: input.notes || null,
-      });
-      return rebuildLedger(next, updated);
-    }
-
-    case "wallet_deposit": {
-      let next = db;
-      const r = findOrCreateContact(next, input.customerName.trim(), "Customer");
-      next = r.db;
-      const updated: Transaction = {
-        ...tx,
-        date: input.date,
-        amount: input.amount,
-        customer_id: r.id,
-        notes: input.notes || `Wallet deposit — ${input.customerName.trim()}`,
-      };
-      next = {
-        ...next,
-        transactions: next.transactions.map((t) => (t.id === tx.id ? updated : t)),
-      };
-      next = syncWalletCreditForDeposit(next, tx.id, {
-        date: input.date,
-        amount: input.amount,
-        notes: input.notes || null,
-      });
-      // Keep wallet entry customer_id in sync
-      next = {
-        ...next,
-        customer_wallet_entries: (next.customer_wallet_entries ?? []).map((e) =>
-          e.transaction_id === tx.id ? { ...e, customer_id: r.id } : e
-        ),
       };
       return rebuildLedger(next, updated);
     }
@@ -492,11 +382,6 @@ export function applyDeleteTransaction(db: FarmDatabase, id: string): FarmDataba
       return removeTxAndLedger(db, id);
     }
 
-    case "wallet_deposit": {
-      const next = removeTxAndLedger(db, id);
-      return removeWalletEntriesForTx(next, id);
-    }
-
     case "palai_income": {
       const next = removeTxAndLedger(db, id);
       return {
@@ -522,8 +407,7 @@ export function applyDeleteTransaction(db: FarmDatabase, id: string): FarmDataba
       };
     }
 
-    case "livestock_purchase":
-    case "customer_purchase": {
+    case "livestock_purchase": {
       const animalId = tx.animal_id;
       if (animalId != null) {
         const otherTxs = db.transactions.filter(
@@ -550,15 +434,13 @@ export function applyDeleteTransaction(db: FarmDatabase, id: string): FarmDataba
           );
         }
 
-        let next = removeTxAndLedger(db, id);
-        next = removeWalletEntriesForTx(next, id);
+        const next = removeTxAndLedger(db, id);
         return {
           ...next,
           animals: next.animals.filter((a) => a.id !== animalId),
         };
       }
-      const next = removeTxAndLedger(db, id);
-      return removeWalletEntriesForTx(next, id);
+      return removeTxAndLedger(db, id);
     }
   }
 }

@@ -10,7 +10,6 @@ export const LEDGER_CATEGORIES = [
   "Palai Income",
   "Palai Expense",
   "Partner Transfer",
-  "Customer Wallet",
   "Other",
 ] as const;
 

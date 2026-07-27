@@ -10,7 +10,6 @@ import {
   recordBreeding,
   recordLivestockSale,
   recordPalai,
-  recordWalletDeposit,
   updateAnimal,
   updateTransaction,
 } from "@/lib/actions";
@@ -49,19 +48,8 @@ export async function actionRecordPalai(formData: FormData) {
   revalidateTxnPaths();
 }
 
-export async function actionWalletDeposit(formData: FormData) {
-  await recordWalletDeposit({
-    date: String(formData.get("date")),
-    customerName: String(formData.get("customerName")),
-    amount: Number(formData.get("amount")),
-    notes: String(formData.get("notes") || ""),
-  });
-  revalidateTxnPaths();
-}
-
 export async function actionBuyGoat(formData: FormData) {
   const palaiRaw = String(formData.get("palaiRate") || "").trim();
-  const paidBy = String(formData.get("paidBy")) as "Monis" | "Saad" | "Customer";
   await buyGoat({
     date: String(formData.get("date")),
     price: Number(formData.get("price")),
@@ -71,7 +59,7 @@ export async function actionBuyGoat(formData: FormData) {
     name: String(formData.get("name") || "") || undefined,
     ownerName: String(formData.get("ownerName")),
     vendorName: String(formData.get("vendorName") || "") || undefined,
-    paidBy,
+    paidBy: String(formData.get("paidBy")) as "Monis" | "Saad",
     palaiRate: palaiRaw ? Number(palaiRaw) : null,
   });
   revalidateTxnPaths();
@@ -156,24 +144,6 @@ export async function actionUpdateTransaction(formData: FormData) {
       amount: Number(formData.get("amount")),
       paidBy: String(formData.get("paidBy")) as "Monis" | "Saad",
       vendorName: String(formData.get("vendorName") || ""),
-      notes: String(formData.get("notes") || "") || null,
-    });
-  } else if (variant === "customer_purchase") {
-    await updateTransaction({
-      id,
-      variant: "customer_purchase",
-      date: String(formData.get("date")),
-      amount: Number(formData.get("amount")),
-      vendorName: String(formData.get("vendorName") || ""),
-      notes: String(formData.get("notes") || "") || null,
-    });
-  } else if (variant === "wallet_deposit") {
-    await updateTransaction({
-      id,
-      variant: "wallet_deposit",
-      date: String(formData.get("date")),
-      amount: Number(formData.get("amount")),
-      customerName: String(formData.get("customerName")),
       notes: String(formData.get("notes") || "") || null,
     });
   } else if (variant === "partner_transfer") {

@@ -9,7 +9,6 @@ export const LEDGER_CATEGORIES = [
   "Palai Income",
   "Palai Expense",
   "Partner Transfer",
-  "Customer Wallet",
   "Other",
 ] as const;
 
@@ -18,12 +17,11 @@ export type AnimalStatus = "Active" | "Died" | "Sold" | "Slaughtered" | "Gone";
 export type AnimalSex = "Male" | "Female";
 export type AnimalBreed = "Gulabi" | "Teddy" | "Bissar" | "Tapra";
 export type ContactType = "Vendor" | "Customer" | "Partner" | "Farm";
-export type TransactionKind = "cost" | "partner_adjustment" | "customer_wallet";
+export type TransactionKind = "cost" | "partner_adjustment";
 export type FarmModel = "Trading" | "Palai";
 export type MedicalEventType = "Vaccine" | "Deworming" | "Ultrasound" | "Surgery" | "General";
 export type BreedingOutcome = "Pending" | "Delivered" | "Stillbirth" | "Miscarriage" | "Doubt";
 export type BreedingStatus = "Ready" | "Doubt" | "Delivered" | "Kid";
-export type WalletEntryReason = "deposit" | "livestock_purchase";
 
 export interface Contact {
   id: string;
@@ -145,18 +143,6 @@ export interface AnimalMedia {
   created_at: string;
 }
 
-/** Escrow ledger: positive = credit (deposit), negative = debit (e.g. goat purchase). */
-export interface CustomerWalletEntry {
-  id: string;
-  date: string;
-  customer_id: string;
-  amount: number;
-  reason: WalletEntryReason;
-  animal_id: number | null;
-  transaction_id: string | null;
-  notes: string | null;
-}
-
 export interface FarmDatabase {
   contacts: Contact[];
   animals: Animal[];
@@ -168,7 +154,6 @@ export interface FarmDatabase {
   breeding_events: BreedingEvent[];
   weight_logs: WeightLog[];
   animal_media: AnimalMedia[];
-  customer_wallet_entries: CustomerWalletEntry[];
   meta: {
     importedAt: string | null;
     settlementVerified: boolean;

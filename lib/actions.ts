@@ -14,7 +14,6 @@ import {
   type UpdateTransactionInput,
 } from "./transactions/mutate";
 import type { LedgerCategory, AnimalStatus, AnimalBreed, AnimalSex, MedicalEventType } from "./types";
-import { creditWallet, debitWalletForPurchase } from "./customer-wallet/wallet";
 
 export async function getDb(): Promise<FarmDatabase> {
   return fetchDb();
@@ -137,18 +136,16 @@ export async function buyGoat(input: {
   name?: string;
   ownerName: string;
   vendorName?: string;
-  paidBy: "Monis" | "Saad" | "Customer";
+  paidBy: "Monis" | "Saad";
   palaiRate?: number | null;
 }) {
-  let db = await fetchDb();
+  const db = await fetchDb();
   const { monisId, saadId } = getPartnerIds(db);
+  const paidById = input.paidBy === "Monis" ? monisId : saadId;
 
   const owner = resolveOwnerContact(db, input.ownerName);
   const vendorId = resolveVendorId(db, input.vendorName);
   const isCustomerOwner = owner.type === "Customer";
-  if (input.paidBy === "Customer" && !isCustomerOwner) {
-    throw new Error("Paid by customer is only allowed when the owner is a customer");
-  }
   const palaiRate =
     isCustomerOwner && input.palaiRate != null && !Number.isNaN(input.palaiRate)
       ? input.palaiRate
@@ -174,19 +171,6 @@ export async function buyGoat(input: {
     palai_rate: palaiRate,
   });
 
-  if (input.paidBy === "Customer") {
-    db = debitWalletForPurchase(db, {
-      customerId: owner.id,
-      date: input.date,
-      amount: input.price,
-      animalId: nextId,
-      vendorId,
-      notes: `Buy ${input.name || input.description}`,
-    });
-    return persistDb(db);
-  }
-
-  const paidById = input.paidBy === "Monis" ? monisId : saadId;
   const { tx, ledger } = createCostTransaction({
     date: input.date,
     amount: input.price,
@@ -342,35 +326,6 @@ export async function partnerTransfer(input: {
   for (const l of ledger) {
     db.partner_ledger_entries.push({ ...l, id: crypto.randomUUID(), created_at: now });
   }
-  return persistDb(db);
-}
-
-export async function recordWalletDeposit(input: {
-  date: string;
-  customerName: string;
-  amount: number;
-  notes?: string;
-}) {
-  let db = await fetchDb();
-  let customer = db.contacts.find(
-    (c) => c.name.toLowerCase() === input.customerName.toLowerCase() && c.type === "Customer"
-  );
-  if (!customer) {
-    customer = {
-      id: crypto.randomUUID(),
-      name: input.customerName,
-      type: "Customer",
-      phone: null,
-      notes: null,
-    };
-    db.contacts.push(customer);
-  }
-  db = creditWallet(db, {
-    customerId: customer.id,
-    date: input.date,
-    amount: input.amount,
-    notes: input.notes || null,
-  });
   return persistDb(db);
 }
 

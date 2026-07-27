@@ -32,11 +32,6 @@ export function computeSettlement(db: FarmDatabase): SettlementResult {
   const byCategory: Record<string, number> = {};
 
   for (const tx of db.transactions) {
-    if (tx.kind === "customer_wallet") {
-      // Escrow only — not farm spending / partner settlement
-      continue;
-    }
-
     // Livestock Sale ledger rows store one partner's half; show full net proceeds in totals.
     const displayAmount =
       tx.kind === "partner_adjustment" && tx.category === "Livestock Sale"

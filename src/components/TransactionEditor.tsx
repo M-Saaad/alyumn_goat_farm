@@ -18,7 +18,7 @@ export type EditableTransaction = {
   id: string;
   date: string;
   amount: number;
-  kind: "cost" | "partner_adjustment" | "customer_wallet";
+  kind: "cost" | "partner_adjustment";
   category: string;
   variant: TransactionEditVariant;
   notes: string | null;
@@ -128,11 +128,7 @@ export function TransactionEditor({
                 {tx.date} ·{" "}
                 {tx.kind === "cost"
                   ? `paid by ${tx.paidBy ?? "—"}`
-                  : tx.kind === "customer_wallet"
-                    ? tx.variant === "wallet_deposit"
-                      ? `wallet · ${tx.customerName ?? "customer"}`
-                      : `customer-paid · ${tx.customerName ?? "customer"}`
-                    : "adjustment"}
+                  : "adjustment"}
                 {tx.animalLabel ? ` · ${tx.animalLabel}` : ""}
               </p>
               {tx.notes && (
@@ -209,12 +205,6 @@ export function TransactionEditor({
               )}
               {editing.variant === "livestock_purchase" && (
                 <PurchaseForm tx={editing} vendors={vendors} />
-              )}
-              {editing.variant === "customer_purchase" && (
-                <CustomerPurchaseForm tx={editing} vendors={vendors} />
-              )}
-              {editing.variant === "wallet_deposit" && (
-                <WalletDepositForm tx={editing} customers={customers} />
               )}
               {editing.variant === "partner_transfer" && <TransferForm tx={editing} />}
               {editing.variant === "palai_income" && (
@@ -362,76 +352,6 @@ function PurchaseForm({
         allowEmpty
         emptyLabel="—"
         addNewLabel="+ Add new vendor"
-      />
-      <Field label="Notes" name="notes" defaultValue={tx.notes ?? ""} />
-    </>
-  );
-}
-
-function CustomerPurchaseForm({
-  tx,
-  vendors,
-}: {
-  tx: EditableTransaction;
-  vendors: ContactOption[];
-}) {
-  return (
-    <>
-      {tx.animalLabel && (
-        <p className="rounded-xl bg-stone-100 px-3 py-2 text-sm text-stone-600">
-          Linked animal: <span className="font-semibold">{tx.animalLabel}</span>
-          {tx.customerName ? ` · paid by ${tx.customerName}` : " · paid by customer"}
-        </p>
-      )}
-      <Field label="Date" name="date" type="date" defaultValue={tx.date} required />
-      <Field
-        label="Price (PKR)"
-        name="amount"
-        type="number"
-        defaultValue={tx.amount}
-        required
-        step="any"
-      />
-      <ContactSelect
-        label="Vendor"
-        name="vendorName"
-        options={vendors}
-        defaultValue={tx.vendorName ?? undefined}
-        allowEmpty
-        emptyLabel="—"
-        addNewLabel="+ Add new vendor"
-      />
-      <Field label="Notes" name="notes" defaultValue={tx.notes ?? ""} />
-      <p className="text-xs text-stone-500">Updates customer wallet debit — no partner equity change.</p>
-    </>
-  );
-}
-
-function WalletDepositForm({
-  tx,
-  customers,
-}: {
-  tx: EditableTransaction;
-  customers: ContactOption[];
-}) {
-  return (
-    <>
-      <Field label="Date" name="date" type="date" defaultValue={tx.date} required />
-      <ContactSelect
-        label="Customer"
-        name="customerName"
-        options={customers}
-        defaultValue={tx.customerName ?? undefined}
-        required
-        addNewLabel="+ Add new customer"
-      />
-      <Field
-        label="Amount (PKR)"
-        name="amount"
-        type="number"
-        defaultValue={tx.amount}
-        required
-        step="any"
       />
       <Field label="Notes" name="notes" defaultValue={tx.notes ?? ""} />
     </>

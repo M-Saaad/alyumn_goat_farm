@@ -12,7 +12,6 @@ export function emptyDb(): FarmDatabase {
     breeding_events: [],
     weight_logs: [],
     animal_media: [],
-    customer_wallet_entries: [],
     meta: {
       importedAt: null,
       settlementVerified: false,
