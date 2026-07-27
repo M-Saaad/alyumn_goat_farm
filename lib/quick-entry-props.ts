@@ -2,6 +2,7 @@ import { animalLabel } from "@/lib/actions";
 import type { FarmDatabase } from "@/lib/types";
 import type { QuickEntryProps } from "@/components/QuickEntry";
 import type { ContactOption } from "@/components/ContactSelect";
+import { walletBalance } from "@/lib/customer-wallet/wallet";
 
 /** Build QuickEntry contact/animal props from the loaded database. */
 export function quickEntryPropsFromDb(db: FarmDatabase): QuickEntryProps {
@@ -46,6 +47,11 @@ export function quickEntryPropsFromDb(db: FarmDatabase): QuickEntryProps {
     ),
   ].sort((a, b) => a.localeCompare(b));
 
+  const walletBalances: Record<string, number> = {};
+  for (const c of customers) {
+    walletBalances[c.name] = walletBalance(db, c.id);
+  }
+
   return {
     animals,
     femaleAnimals: femaleAnimals.length > 0 ? femaleAnimals : animals,
@@ -54,5 +60,6 @@ export function quickEntryPropsFromDb(db: FarmDatabase): QuickEntryProps {
     ownerOptions,
     maleAnimals,
     pastBuckNames,
+    walletBalances,
   };
 }

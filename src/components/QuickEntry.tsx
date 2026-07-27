@@ -10,9 +10,10 @@ import {
   actionRecordBreeding,
   actionRecordLivestockSale,
   actionRecordPalai,
+  actionWalletDeposit,
 } from "@/lib/server-actions";
 import { LEDGER_CATEGORIES } from "@/lib/constants";
-import { todayIso } from "@/lib/format";
+import { formatPkr, todayIso } from "@/lib/format";
 import { ActionForm, SubmitButton } from "@/components/ActionForm";
 import { BuckSelect, ContactSelect, type ContactOption } from "@/components/ContactSelect";
 
@@ -21,6 +22,7 @@ type Mode =
   | null
   | "expense"
   | "palai"
+  | "wallet"
   | "buy"
   | "medical"
   | "breeding"
@@ -40,6 +42,8 @@ export type QuickEntryProps = {
   ownerOptions: ContactOption[];
   maleAnimals: AnimalOption[];
   pastBuckNames: string[];
+  /** Wallet balance keyed by customer name. */
+  walletBalances?: Record<string, number>;
 };
 
 export function QuickEntry({
@@ -50,6 +54,7 @@ export function QuickEntry({
   ownerOptions,
   maleAnimals,
   pastBuckNames,
+  walletBalances = {},
 }: QuickEntryProps) {
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<Mode>(null);
@@ -93,6 +98,7 @@ export function QuickEntry({
                   [
                     ["expense", "Log Expense"],
                     ["palai", "Palai Payment"],
+                    ["wallet", "Wallet Deposit"],
                     ["buy", "Buy Goat"],
                     ["medical", "Log Medical"],
                     ["breeding", "Record Breeding"],
@@ -156,8 +162,33 @@ export function QuickEntry({
               </ActionForm>
             )}
 
+            {mode === "wallet" && (
+              <ActionForm action={actionWalletDeposit} onSuccess={close}>
+                <Field label="Date" name="date" type="date" defaultValue={todayIso()} required />
+                <ContactSelect
+                  label="Customer"
+                  name="customerName"
+                  options={customers}
+                  defaultValue={customers.find((c) => c.name === "Awais")?.name ?? customers[0]?.name}
+                  required
+                  addNewLabel="+ Add new customer"
+                />
+                <Field label="Amount (PKR)" name="amount" type="number" required />
+                <Field label="Notes" name="notes" />
+                <p className="text-xs text-stone-500">
+                  Credits customer escrow only — does not change partner equity. Use for money given to buy goats.
+                </p>
+                <SubmitButton />
+              </ActionForm>
+            )}
+
             {mode === "buy" && (
-              <BuyGoatForm vendors={vendors} ownerOptions={ownerOptions} onSuccess={close} />
+              <BuyGoatForm
+                vendors={vendors}
+                ownerOptions={ownerOptions}
+                walletBalances={walletBalances}
+                onSuccess={close}
+              />
             )}
 
             {mode === "medical" && (
@@ -274,13 +305,20 @@ export function QuickEntry({
 function BuyGoatForm({
   vendors,
   ownerOptions,
+  walletBalances,
   onSuccess,
 }: {
   vendors: ContactOption[];
   ownerOptions: ContactOption[];
+  walletBalances: Record<string, number>;
   onSuccess: () => void;
 }) {
-  const [showPalaiRate, setShowPalaiRate] = useState(false);
+  const [ownerName, setOwnerName] = useState("Farm");
+  const [paidBy, setPaidBy] = useState<"Saad" | "Monis" | "Customer">("Saad");
+  const isCustomerOwner =
+    Boolean(ownerName.trim()) && !["Farm", "Monis", "Saad"].includes(ownerName);
+  const showPalaiRate = isCustomerOwner;
+  const balance = isCustomerOwner ? walletBalances[ownerName] : undefined;
 
   return (
     <ActionForm action={actionBuyGoat} onSuccess={onSuccess}>
@@ -311,7 +349,10 @@ function BuyGoatForm({
         required
         addNewLabel="+ Add new customer"
         onSelectionChange={(name) => {
-          setShowPalaiRate(Boolean(name.trim()) && !["Farm", "Monis", "Saad"].includes(name));
+          setOwnerName(name);
+          if (["Farm", "Monis", "Saad"].includes(name) && paidBy === "Customer") {
+            setPaidBy("Saad");
+          }
         }}
       />
       {showPalaiRate && <Field label="Palai rate (optional)" name="palaiRate" type="number" />}
@@ -323,7 +364,26 @@ function BuyGoatForm({
         emptyLabel="—"
         addNewLabel="+ Add new vendor"
       />
-      <PartnerSelect />
+      <div>
+        <label className={label}>Who paid</label>
+        <select
+          name="paidBy"
+          className={field}
+          required
+          value={paidBy}
+          onChange={(e) => setPaidBy(e.target.value as "Saad" | "Monis" | "Customer")}
+        >
+          <option value="Saad">Saad</option>
+          <option value="Monis">Monis</option>
+          {isCustomerOwner && <option value="Customer">Customer</option>}
+        </select>
+        {paidBy === "Customer" && (
+          <p className="mt-1 text-xs text-stone-500">
+            Debits customer wallet
+            {balance != null ? ` (balance ${formatPkr(balance)})` : ""} — no partner expense.
+          </p>
+        )}
+      </div>
       <SubmitButton />
     </ActionForm>
   );
@@ -335,6 +395,8 @@ function modeLabel(m: Mode) {
       return "Log Expense";
     case "palai":
       return "Palai Payment";
+    case "wallet":
+      return "Wallet Deposit";
     case "buy":
       return "Buy Goat";
     case "medical":

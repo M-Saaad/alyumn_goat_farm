@@ -6,6 +6,7 @@ import { QuickEntry } from "@/components/QuickEntry";
 import { SignOutButton } from "@/components/SignOutButton";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 import { quickEntryPropsFromDb } from "@/lib/quick-entry-props";
+import { allCustomerWalletBalances } from "@/lib/customer-wallet/wallet";
 
 export const dynamic = "force-dynamic";
 
@@ -14,6 +15,11 @@ export default async function HomePage() {
   const s = await getSettlement();
   const recent = [...db.transactions].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 12);
   const quickEntry = quickEntryPropsFromDb(db);
+  const wallets = allCustomerWalletBalances(db).filter(
+    (w) =>
+      w.balance !== 0 ||
+      (db.customer_wallet_entries ?? []).some((e) => e.customer_id === w.customerId)
+  );
 
   const palaiThisMonth = db.palai_payments
     .filter((p) => p.date.startsWith(new Date().toISOString().slice(0, 7)))
@@ -30,6 +36,7 @@ export default async function HomePage() {
     "Palai Income",
     "Palai Expense",
     "Partner Transfer",
+    "Customer Wallet",
     "Other",
   ];
 
@@ -93,6 +100,31 @@ export default async function HomePage() {
       </section>
 
       <section className="mb-4 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-stone-200">
+        <h2 className="mb-2 text-sm font-bold text-stone-800">Customer wallets</h2>
+        {wallets.length === 0 ? (
+          <p className="text-sm text-stone-500">
+            No wallet activity yet. Use Quick Entry → Wallet Deposit, then Buy Goat with Paid by
+            customer.
+          </p>
+        ) : (
+          <ul className="space-y-1">
+            {wallets.map((w) => (
+              <li key={w.customerId} className="flex justify-between text-sm">
+                <span className="text-stone-600">{w.name}</span>
+                <span
+                  className={`font-medium ${
+                    w.balance < 0 ? "text-red-600" : w.balance > 0 ? "text-emerald-700" : ""
+                  }`}
+                >
+                  {formatPkr(w.balance)}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      <section className="mb-4 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-stone-200">
         <h2 className="mb-2 text-sm font-bold text-stone-800">Spending by category</h2>
         <ul className="space-y-1">
           {categoryOrder
@@ -119,7 +151,12 @@ export default async function HomePage() {
               <div>
                 <p className="font-medium text-stone-800">{tx.category}</p>
                 <p className="text-xs text-stone-500">
-                  {tx.date} · {tx.kind === "cost" ? `paid by ${contactName(db, tx.paid_by_partner_id)}` : "adjustment"}
+                  {tx.date} ·{" "}
+                  {tx.kind === "cost"
+                    ? `paid by ${contactName(db, tx.paid_by_partner_id)}`
+                    : tx.kind === "customer_wallet"
+                      ? "customer wallet"
+                      : "adjustment"}
                 </p>
                 {tx.notes && <p className="text-xs text-stone-500 line-clamp-1">{tx.notes}</p>}
               </div>

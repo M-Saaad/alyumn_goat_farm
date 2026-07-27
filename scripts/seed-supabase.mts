@@ -17,6 +17,7 @@ const DB_PATH = path.join(ROOT, "data", "farm.db.json");
 async function clearTables(client: ReturnType<typeof createServiceClient>) {
   const ordered = [
     "animal_media",
+    "customer_wallet_entries",
     "livestock_sales",
     "partner_ledger_entries",
     "palai_payments",
@@ -52,6 +53,7 @@ async function main() {
   const raw = JSON.parse(fs.readFileSync(DB_PATH, "utf8")) as FarmDatabase;
   if (!raw.animal_media) raw.animal_media = [];
   if (!raw.livestock_sales) raw.livestock_sales = [];
+  if (!raw.customer_wallet_entries) raw.customer_wallet_entries = [];
 
   const localSettlement = assertCanonicalSettlement(raw);
   console.log(

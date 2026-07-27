@@ -4,6 +4,7 @@ import type {
   AnimalMedia,
   BreedingEvent,
   Contact,
+  CustomerWalletEntry,
   FarmDatabase,
   LivestockSale,
   MedicalEvent,
@@ -155,6 +156,19 @@ function mapMedia(r: Record<string, unknown>): AnimalMedia {
   };
 }
 
+function mapWallet(r: Record<string, unknown>): CustomerWalletEntry {
+  return {
+    id: String(r.id),
+    date: String(r.date),
+    customer_id: String(r.customer_id),
+    amount: num(r.amount),
+    reason: r.reason as CustomerWalletEntry["reason"],
+    animal_id: r.animal_id == null ? null : num(r.animal_id),
+    transaction_id: (r.transaction_id as string) ?? null,
+    notes: (r.notes as string) ?? null,
+  };
+}
+
 async function selectAll(client: SupabaseClient, table: string) {
   const { data, error } = await client.from(table).select("*");
   if (error) throw new Error(`${table}: ${error.message}`);
@@ -173,6 +187,7 @@ export async function loadFromSupabase(client: SupabaseClient): Promise<FarmData
     breeding,
     weights,
     media,
+    wallet,
     metaRows,
   ] = await Promise.all([
     selectAll(client, "contacts"),
@@ -185,6 +200,7 @@ export async function loadFromSupabase(client: SupabaseClient): Promise<FarmData
     selectAll(client, "breeding_events"),
     selectAll(client, "weight_logs"),
     selectAll(client, "animal_media"),
+    selectAll(client, "customer_wallet_entries"),
     selectAll(client, "app_meta"),
   ]);
 
@@ -200,6 +216,7 @@ export async function loadFromSupabase(client: SupabaseClient): Promise<FarmData
   db.breeding_events = breeding.map(mapBreeding);
   db.weight_logs = weights.map(mapWeight);
   db.animal_media = media.map(mapMedia);
+  db.customer_wallet_entries = wallet.map(mapWallet);
   db.meta = {
     importedAt: meta?.imported_at ? String(meta.imported_at) : null,
     settlementVerified: Boolean(meta?.settlement_verified),
@@ -358,6 +375,35 @@ export async function saveToSupabase(client: SupabaseClient, db: FarmDatabase): 
     }))
   );
 
+  // Delete wallet orphans before transactions; upsert after transactions exist (FK).
+  {
+    const table = "customer_wallet_entries";
+    const rows = (db.customer_wallet_entries ?? []).map((e) => ({
+      id: e.id,
+      date: e.date,
+      customer_id: e.customer_id,
+      amount: e.amount,
+      reason: e.reason,
+      animal_id: e.animal_id,
+      transaction_id: e.transaction_id,
+      notes: e.notes,
+    }));
+    const { data, error } = await client.from(table).select("id");
+    if (error) throw new Error(`${table} select ids: ${error.message}`);
+    const keep = new Set(rows.map((r) => String(r.id)));
+    const orphanIds = (data as unknown as Array<Record<string, unknown>> | null ?? [])
+      .map((r) => String(r.id))
+      .filter((id) => !keep.has(id));
+    if (orphanIds.length > 0) {
+      const chunk = 500;
+      for (let i = 0; i < orphanIds.length; i += chunk) {
+        const slice = orphanIds.slice(i, i + chunk);
+        const { error: delErr } = await client.from(table).delete().in("id", slice);
+        if (delErr) throw new Error(`${table} delete: ${delErr.message}`);
+      }
+    }
+  }
+
   await syncTable(
     client,
     "transactions",
@@ -399,6 +445,21 @@ export async function saveToSupabase(client: SupabaseClient, db: FarmDatabase): 
       home_bred: a.home_bred,
       out_date: a.out_date,
       palai_rate: a.palai_rate,
+    }))
+  );
+
+  await upsert(
+    client,
+    "customer_wallet_entries",
+    (db.customer_wallet_entries ?? []).map((e) => ({
+      id: e.id,
+      date: e.date,
+      customer_id: e.customer_id,
+      amount: e.amount,
+      reason: e.reason,
+      animal_id: e.animal_id,
+      transaction_id: e.transaction_id,
+      notes: e.notes,
     }))
   );
 

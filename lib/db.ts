@@ -20,6 +20,7 @@ function loadJsonDb(): FarmDatabase {
   const db = JSON.parse(fs.readFileSync(DB_PATH, "utf8")) as FarmDatabase;
   if (!db.livestock_sales) db.livestock_sales = [];
   if (!db.animal_media) db.animal_media = [];
+  if (!db.customer_wallet_entries) db.customer_wallet_entries = [];
   return db;
 }
 

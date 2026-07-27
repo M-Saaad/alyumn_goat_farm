@@ -32,6 +32,11 @@ export function computeSettlement(db: FarmDatabase): SettlementResult {
   const byCategory: Record<string, number> = {};
 
   for (const tx of db.transactions) {
+    if (tx.kind === "customer_wallet") {
+      // Escrow only — not farm spending / partner settlement
+      continue;
+    }
+
     // Livestock Sale ledger rows store one partner's half; show full net proceeds in totals.
     const displayAmount =
       tx.kind === "partner_adjustment" && tx.category === "Livestock Sale"
@@ -43,7 +48,7 @@ export function computeSettlement(db: FarmDatabase): SettlementResult {
       costBase += tx.amount;
       if (tx.paid_by_partner_id === monisId) monisFunded += tx.amount;
       else if (tx.paid_by_partner_id === saadId) saadFunded += tx.amount;
-    } else {
+    } else if (tx.kind === "partner_adjustment") {
       // partner_adjustment: signed amount on Monis's side of the book
       const adj = tx.amount;
       monisFunded += adj;
