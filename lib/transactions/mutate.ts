@@ -557,7 +557,7 @@ export function applyDeleteTransaction(db: FarmDatabase, id: string): FarmDataba
           animals: next.animals.filter((a) => a.id !== animalId),
         };
       }
-      let next = removeTxAndLedger(db, id);
+      const next = removeTxAndLedger(db, id);
       return removeWalletEntriesForTx(next, id);
     }
   }
