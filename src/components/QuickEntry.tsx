@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   actionBuyGoat,
   actionChangeStatus,
@@ -69,16 +69,16 @@ export function QuickEntry({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="fixed bottom-20 right-4 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-emerald-700 text-3xl font-light text-white shadow-lg"
+        className="fixed bottom-20 right-4 z-[60] flex h-14 w-14 items-center justify-center rounded-full bg-emerald-700 text-3xl font-light text-white shadow-lg touch-manipulation"
         aria-label="Quick entry"
       >
         +
       </button>
 
       {open && (
-        <div className="fixed inset-0 z-50 flex items-end bg-black/40 sm:items-center sm:justify-center">
-          <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-t-2xl bg-stone-50 p-4 sm:rounded-2xl">
-            <div className="mb-3 flex items-center justify-between">
+        <div className="fixed inset-0 z-[55] flex items-end bg-black/40 sm:items-center sm:justify-center">
+          <div className="flex max-h-[90dvh] w-full max-w-lg flex-col rounded-t-2xl bg-stone-50 sm:rounded-2xl">
+            <div className="flex shrink-0 items-center justify-between border-b border-stone-200 p-4">
               <h2 className="text-lg font-bold text-stone-900">
                 {mode ? modeLabel(mode) : "Quick Entry"}
               </h2>
@@ -87,6 +87,7 @@ export function QuickEntry({
               </button>
             </div>
 
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4">
             {!mode && (
               <div className="grid grid-cols-2 gap-2">
                 {(
@@ -264,6 +265,7 @@ export function QuickEntry({
                 <SubmitButton />
               </ActionForm>
             )}
+            </div>
           </div>
         </div>
       )}
@@ -285,15 +287,15 @@ function BuyGoatForm({
   const [paidBy, setPaidBy] = useState<"Saad" | "Monis" | "Customer">("Saad");
   const priceOptional = showCustomerPaid && paidBy === "Customer";
 
+  useEffect(() => {
+    if (!showCustomerPaid && paidBy === "Customer") {
+      setPaidBy("Saad");
+    }
+  }, [showCustomerPaid, paidBy]);
+
   return (
     <ActionForm action={actionBuyGoat} onSuccess={onSuccess}>
       <Field label="Date" name="date" type="date" defaultValue={todayIso()} required />
-      <Field
-        label={priceOptional ? "Price (optional)" : "Price"}
-        name="price"
-        type="number"
-        required={!priceOptional}
-      />
       <Field label="Name (optional)" name="name" />
       <Field label="Description" name="description" required />
       <div>
@@ -323,9 +325,6 @@ function BuyGoatForm({
             Boolean(name.trim()) && !["Farm", "Monis", "Saad"].includes(name);
           setShowPalaiRate(isCustomer);
           setShowCustomerPaid(isCustomer);
-          if (!isCustomer && paidBy === "Customer") {
-            setPaidBy("Saad");
-          }
         }}
       />
       {showPalaiRate && <Field label="Palai rate (optional)" name="palaiRate" type="number" />}
@@ -351,7 +350,13 @@ function BuyGoatForm({
           {showCustomerPaid && <option value="Customer">Customer</option>}
         </select>
       </div>
-      <SubmitButton />
+      <Field
+        label={priceOptional ? "Price (optional)" : "Price"}
+        name="price"
+        type="number"
+        required={!priceOptional}
+      />
+      <SubmitButton label="Add goat" pendingLabel="Adding…" />
     </ActionForm>
   );
 }
