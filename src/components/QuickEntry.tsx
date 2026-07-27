@@ -281,11 +281,19 @@ function BuyGoatForm({
   onSuccess: () => void;
 }) {
   const [showPalaiRate, setShowPalaiRate] = useState(false);
+  const [showCustomerPaid, setShowCustomerPaid] = useState(false);
+  const [paidBy, setPaidBy] = useState<"Saad" | "Monis" | "Customer">("Saad");
+  const priceOptional = showCustomerPaid && paidBy === "Customer";
 
   return (
     <ActionForm action={actionBuyGoat} onSuccess={onSuccess}>
       <Field label="Date" name="date" type="date" defaultValue={todayIso()} required />
-      <Field label="Price" name="price" type="number" required />
+      <Field
+        label={priceOptional ? "Price (optional)" : "Price"}
+        name="price"
+        type="number"
+        required={!priceOptional}
+      />
       <Field label="Name (optional)" name="name" />
       <Field label="Description" name="description" required />
       <div>
@@ -311,7 +319,13 @@ function BuyGoatForm({
         required
         addNewLabel="+ Add new customer"
         onSelectionChange={(name) => {
-          setShowPalaiRate(Boolean(name.trim()) && !["Farm", "Monis", "Saad"].includes(name));
+          const isCustomer =
+            Boolean(name.trim()) && !["Farm", "Monis", "Saad"].includes(name);
+          setShowPalaiRate(isCustomer);
+          setShowCustomerPaid(isCustomer);
+          if (!isCustomer && paidBy === "Customer") {
+            setPaidBy("Saad");
+          }
         }}
       />
       {showPalaiRate && <Field label="Palai rate (optional)" name="palaiRate" type="number" />}
@@ -323,7 +337,20 @@ function BuyGoatForm({
         emptyLabel="—"
         addNewLabel="+ Add new vendor"
       />
-      <PartnerSelect />
+      <div>
+        <label className={label}>Who paid</label>
+        <select
+          name="paidBy"
+          className={field}
+          required
+          value={paidBy}
+          onChange={(e) => setPaidBy(e.target.value as "Saad" | "Monis" | "Customer")}
+        >
+          <option value="Saad">Saad</option>
+          <option value="Monis">Monis</option>
+          {showCustomerPaid && <option value="Customer">Customer</option>}
+        </select>
+      </div>
       <SubmitButton />
     </ActionForm>
   );

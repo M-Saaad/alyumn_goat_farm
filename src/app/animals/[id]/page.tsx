@@ -127,7 +127,9 @@ export default async function AnimalProfilePage({
         <dl className="grid grid-cols-2 gap-2 text-sm">
           <div>
             <dt className="text-stone-500">Price</dt>
-            <dd className="font-semibold">{formatPkr(animal.price)}</dd>
+            <dd className="font-semibold">
+              {animal.price ? formatPkr(animal.price) : "—"}
+            </dd>
           </div>
           <div>
             <dt className="text-stone-500">Sold price</dt>

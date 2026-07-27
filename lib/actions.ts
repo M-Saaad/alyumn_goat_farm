@@ -129,20 +129,17 @@ function resolveVendorId(db: FarmDatabase, vendorName?: string | null): string |
 
 export async function buyGoat(input: {
   date: string;
-  price: number;
+  price?: number | null;
   breed: AnimalBreed;
   sex: AnimalSex;
   description: string;
   name?: string;
   ownerName: string;
   vendorName?: string;
-  paidBy: "Monis" | "Saad";
+  paidBy: "Monis" | "Saad" | "Customer";
   palaiRate?: number | null;
 }) {
   const db = await fetchDb();
-  const { monisId, saadId } = getPartnerIds(db);
-  const paidById = input.paidBy === "Monis" ? monisId : saadId;
-
   const owner = resolveOwnerContact(db, input.ownerName);
   const vendorId = resolveVendorId(db, input.vendorName);
   const isCustomerOwner = owner.type === "Customer";
@@ -150,6 +147,22 @@ export async function buyGoat(input: {
     isCustomerOwner && input.palaiRate != null && !Number.isNaN(input.palaiRate)
       ? input.palaiRate
       : null;
+
+  const customerPaid = input.paidBy === "Customer";
+  if (customerPaid && !isCustomerOwner) {
+    throw new Error("Paid by customer requires a customer owner");
+  }
+
+  let price: number;
+  if (customerPaid) {
+    price =
+      input.price != null && !Number.isNaN(input.price) ? input.price : 0;
+  } else {
+    if (input.price == null || Number.isNaN(input.price)) {
+      throw new Error("Price is required");
+    }
+    price = input.price;
+  }
 
   const nextId = db.animals.reduce((m, a) => Math.max(m, a.id), 0) + 1;
   db.animals.push({
@@ -162,7 +175,7 @@ export async function buyGoat(input: {
     description: input.description,
     comment: null,
     status: "Active",
-    price: input.price,
+    price,
     sold_price: null,
     purchased_from: vendorId,
     owner_id: owner.id,
@@ -171,9 +184,16 @@ export async function buyGoat(input: {
     palai_rate: palaiRate,
   });
 
+  // Customer-paid: animal profile only — no purchase transaction / partner equity hit
+  if (customerPaid) {
+    return persistDb(db);
+  }
+
+  const { monisId, saadId } = getPartnerIds(db);
+  const paidById = input.paidBy === "Monis" ? monisId : saadId;
   const { tx, ledger } = createCostTransaction({
     date: input.date,
-    amount: input.price,
+    amount: price,
     category: "Livestock Purchase",
     paidByPartnerId: paidById,
     animalId: nextId,

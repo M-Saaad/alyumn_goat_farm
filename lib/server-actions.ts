@@ -50,16 +50,21 @@ export async function actionRecordPalai(formData: FormData) {
 
 export async function actionBuyGoat(formData: FormData) {
   const palaiRaw = String(formData.get("palaiRate") || "").trim();
+  const paidBy = String(formData.get("paidBy")) as "Monis" | "Saad" | "Customer";
+  const priceRaw = String(formData.get("price") || "").trim();
+  if (paidBy !== "Customer" && !priceRaw) {
+    throw new Error("Price is required");
+  }
   await buyGoat({
     date: String(formData.get("date")),
-    price: Number(formData.get("price")),
+    price: priceRaw ? Number(priceRaw) : null,
     breed: String(formData.get("breed")) as AnimalBreed,
     sex: String(formData.get("sex")) as AnimalSex,
     description: String(formData.get("description")),
     name: String(formData.get("name") || "") || undefined,
     ownerName: String(formData.get("ownerName")),
     vendorName: String(formData.get("vendorName") || "") || undefined,
-    paidBy: String(formData.get("paidBy")) as "Monis" | "Saad",
+    paidBy,
     palaiRate: palaiRaw ? Number(palaiRaw) : null,
   });
   revalidateTxnPaths();
