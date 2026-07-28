@@ -8,6 +8,7 @@ export function emptyDb(): FarmDatabase {
     partner_ledger_entries: [],
     palai_payments: [],
     livestock_sales: [],
+    purchase_agreements: [],
     medical_events: [],
     breeding_events: [],
     weight_logs: [],

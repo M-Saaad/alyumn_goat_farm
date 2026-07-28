@@ -13,6 +13,7 @@ import type {
   MedicalEvent,
   PalaiPayment,
   PartnerLedgerEntry,
+  PurchaseAgreement,
   Transaction,
   WeightLog,
 } from "../types";
@@ -33,6 +34,8 @@ export type WritePlan = {
   deletePalaiIds?: string[];
   upsertSales?: LivestockSale[];
   deleteSaleIds?: string[];
+  upsertPurchaseAgreements?: PurchaseAgreement[];
+  deletePurchaseAgreementIds?: string[];
   upsertMedical?: MedicalEvent[];
   upsertBreeding?: BreedingEvent[];
   upsertMedia?: AnimalMedia[];
@@ -55,6 +58,8 @@ function txRow(t: Transaction): Record<string, unknown> {
     adjustment_partner_id: t.adjustment_partner_id,
     notes: t.notes,
     source_row: t.source_row,
+    purchase_agreement_id: t.purchase_agreement_id,
+    livestock_sale_id: t.livestock_sale_id,
   };
 }
 
@@ -125,7 +130,21 @@ function saleRow(s: LivestockSale): Record<string, unknown> {
     partner_share: s.partner_share,
     received_by_partner_id: s.received_by_partner_id,
     transaction_id: s.transaction_id,
+    amount_received: s.amount_received,
+    status: s.status,
     notes: s.notes,
+  };
+}
+
+function purchaseAgreementRow(p: PurchaseAgreement): Record<string, unknown> {
+  return {
+    id: p.id,
+    animal_id: p.animal_id,
+    vendor_id: p.vendor_id,
+    total_amount: p.total_amount,
+    amount_paid: p.amount_paid,
+    status: p.status,
+    notes: p.notes,
   };
 }
 
@@ -211,6 +230,9 @@ export async function applyWritePlan(plan: WritePlan): Promise<void> {
   if (plan.deleteSaleIds?.length) {
     await deleteByIds(client, "livestock_sales", plan.deleteSaleIds);
   }
+  if (plan.deletePurchaseAgreementIds?.length) {
+    await deleteByIds(client, "purchase_agreements", plan.deletePurchaseAgreementIds);
+  }
 
   if (plan.deleteTransactionIds?.length) {
     await deleteByIds(client, "transactions", plan.deleteTransactionIds);
@@ -233,6 +255,13 @@ export async function applyWritePlan(plan: WritePlan): Promise<void> {
   }
   if (plan.upsertSales?.length) {
     await upsertRows(client, "livestock_sales", plan.upsertSales.map(saleRow));
+  }
+  if (plan.upsertPurchaseAgreements?.length) {
+    await upsertRows(
+      client,
+      "purchase_agreements",
+      plan.upsertPurchaseAgreements.map(purchaseAgreementRow)
+    );
   }
   if (plan.upsertMedical?.length) {
     await upsertRows(client, "medical_events", plan.upsertMedical.map(medicalRow));
@@ -293,6 +322,11 @@ export function diffDb(before: FarmDatabase, after: FarmDatabase): WritePlan {
   const ledger = changed(before.partner_ledger_entries, after.partner_ledger_entries, jsonEq);
   const palai = changed(before.palai_payments, after.palai_payments, jsonEq);
   const sales = changed(before.livestock_sales ?? [], after.livestock_sales ?? [], jsonEq);
+  const purchaseAgreements = changed(
+    before.purchase_agreements ?? [],
+    after.purchase_agreements ?? [],
+    jsonEq
+  );
   const medical = changed(before.medical_events, after.medical_events, jsonEq);
   const breeding = changed(before.breeding_events, after.breeding_events, jsonEq);
   const media = changed(before.animal_media ?? [], after.animal_media ?? [], jsonEq);
@@ -331,6 +365,8 @@ export function diffDb(before: FarmDatabase, after: FarmDatabase): WritePlan {
     deletePalaiIds: palai.deleteIds,
     upsertSales: sales.upsert,
     deleteSaleIds: sales.deleteIds,
+    upsertPurchaseAgreements: purchaseAgreements.upsert,
+    deletePurchaseAgreementIds: purchaseAgreements.deleteIds,
     upsertMedical: medical.upsert,
     upsertBreeding: breeding.upsert,
     upsertMedia: media.upsert,
@@ -363,6 +399,7 @@ export async function insertTransactionWithLedger(
     animals?: Animal[];
     palai?: PalaiPayment[];
     sales?: LivestockSale[];
+    purchaseAgreements?: PurchaseAgreement[];
     medical?: MedicalEvent[];
     breeding?: BreedingEvent[];
     media?: AnimalMedia[];
@@ -379,6 +416,7 @@ export async function insertTransactionWithLedger(
     upsertLedger: ledger,
     upsertPalai: extras?.palai,
     upsertSales: extras?.sales,
+    upsertPurchaseAgreements: extras?.purchaseAgreements,
     upsertMedical: extras?.medical,
     upsertBreeding: extras?.breeding,
     upsertMedia: extras?.media,

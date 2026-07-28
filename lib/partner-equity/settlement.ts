@@ -128,6 +128,8 @@ export function createCostTransaction(input: {
   farmModel?: "Trading" | "Palai" | null;
   notes?: string | null;
   sourceRow?: number | null;
+  purchaseAgreementId?: string | null;
+  livestockSaleId?: string | null;
 }): { tx: Transaction; ledger: Omit<PartnerLedgerEntry, "id" | "created_at">[] } {
   const tx: Transaction = {
     id: crypto.randomUUID(),
@@ -144,6 +146,8 @@ export function createCostTransaction(input: {
     adjustment_partner_id: null,
     notes: input.notes ?? null,
     source_row: input.sourceRow ?? null,
+    purchase_agreement_id: input.purchaseAgreementId ?? null,
+    livestock_sale_id: input.livestockSaleId ?? null,
   };
   return { tx, ledger: ledgerForCost(tx, input.paidByPartnerId) };
 }
@@ -157,6 +161,7 @@ export function createAdjustmentTransaction(input: {
   sourceRow?: number | null;
   customerId?: string | null;
   animalId?: number | null;
+  livestockSaleId?: string | null;
 }): { tx: Transaction; ledger: Omit<PartnerLedgerEntry, "id" | "created_at">[] } {
   const tx: Transaction = {
     id: crypto.randomUUID(),
@@ -173,6 +178,8 @@ export function createAdjustmentTransaction(input: {
     adjustment_partner_id: input.monisId,
     notes: input.notes ?? null,
     source_row: input.sourceRow ?? null,
+    purchase_agreement_id: null,
+    livestock_sale_id: input.livestockSaleId ?? null,
   };
   return { tx, ledger: ledgerForAdjustment(tx, input.monisId) };
 }

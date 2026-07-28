@@ -53,12 +53,12 @@ async function main() {
     }
     console.log("PASS palai 14k → Monis +7k / Saad -7k settlement shift");
 
-    const { partnerShare } = computeSaleSplit(25000, 1000);
+    const { netReceived, partnerShare } = computeSaleSplit(25000, 1000);
     if (partnerShare !== 12000) throw new Error(`bhola half expected 12000 got ${partnerShare}`);
-    if (saleAdjustmentAmount(partnerShare, "Monis") !== -12000) {
+    if (saleAdjustmentAmount(netReceived, "Monis") !== -12000) {
       throw new Error("monis received → negative adjustment");
     }
-    if (saleAdjustmentAmount(partnerShare, "Saad") !== 12000) {
+    if (saleAdjustmentAmount(netReceived, "Saad") !== 12000) {
       throw new Error("saad received → positive adjustment");
     }
     console.log("PASS livestock sale split math (Bhola pattern)");
@@ -109,6 +109,10 @@ async function main() {
       (t) => t.animal_id === vg.id && t.category === "Livestock Purchase"
     );
     if (!linked) throw new Error("buy goat missing transaction");
+    const agreement = afterBuy.purchase_agreements?.find((a) => a.animal_id === vg.id);
+    if (!agreement || agreement.status !== "settled") {
+      throw new Error("buy goat missing settled purchase agreement");
+    }
     console.log("PASS buy goat creates animal + linked transaction");
 
     await logMedical({ animalId: vg.id, eventType: "Vaccine", date: "2026-07-26", notes: "test vax" });
