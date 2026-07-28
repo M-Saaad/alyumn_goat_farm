@@ -5,7 +5,7 @@ import { loadDb, saveDb } from "../lib/db";
 import { computeSettlement, assertCanonicalSettlement } from "../lib/partner-equity/settlement";
 import { recognizePalaiPayment, applyPalaiToDb } from "../lib/palai/recognize-payment";
 import { computeSaleSplit, saleAdjustmentAmount } from "../lib/livestock/record-sale";
-import { buyGoat, logExpense, logMedical, recordBreeding, recordLivestockSale } from "../lib/actions";
+import { buyGoat, logExpense, logMedical, recordBreeding, recordLivestockSale, addSaleReceipt } from "../lib/actions";
 import fs from "fs";
 import path from "path";
 
@@ -90,6 +90,50 @@ async function main() {
       throw new Error(`sale shift saad ${sSale.saadDiff - s0.saadDiff}`);
     }
     console.log("PASS sell goat 25k-1k delivery → Monis adj -12k / Saad +12k settlement shift");
+
+    restore();
+    const dbPartial = loadDb();
+    const partialGoat = dbPartial.animals.find((a) => a.status === "Active");
+    if (!partialGoat) throw new Error("no active goat for partial sale test");
+    await recordLivestockSale({
+      date: "2026-07-27",
+      animalId: partialGoat.id,
+      grossSalePrice: 30000,
+      deliveryCost: 0,
+      receivedBy: "Saad",
+      amountReceivedNow: 10000,
+      notes: "partial sale test",
+    });
+    const afterPartial = loadDb();
+    const partialSold = afterPartial.animals.find((a) => a.id === partialGoat.id);
+    if (partialSold?.status !== "Sold") throw new Error("partial sale did not mark sold");
+    const partialSale = (afterPartial.livestock_sales ?? []).find((s) =>
+      s.animal_ids.includes(partialGoat.id)
+    );
+    if (!partialSale || partialSale.status !== "open" || partialSale.amount_received !== 10000) {
+      throw new Error(`partial sale meta expected open/10k got ${partialSale?.status}/${partialSale?.amount_received}`);
+    }
+    const partialTx = afterPartial.transactions.find((t) => t.notes === "partial sale test");
+    if (!partialTx || partialTx.livestock_sale_id != null) {
+      throw new Error("initial partial receipt should link via sale.transaction_id only");
+    }
+    await addSaleReceipt({
+      animalId: partialGoat.id,
+      date: "2026-07-28",
+      amount: 20000,
+      receivedBy: "Monis",
+      notes: "partial sale receipt",
+    });
+    const afterReceipt = loadDb();
+    const settledSale = (afterReceipt.livestock_sales ?? []).find((s) => s.id === partialSale.id);
+    if (!settledSale || settledSale.status !== "settled" || settledSale.amount_received !== 30000) {
+      throw new Error(`sale should be settled at 30k got ${settledSale?.status}/${settledSale?.amount_received}`);
+    }
+    const receiptTx = afterReceipt.transactions.find((t) => t.notes === "partial sale receipt");
+    if (!receiptTx || receiptTx.livestock_sale_id !== partialSale.id) {
+      throw new Error("follow-up receipt should link via livestock_sale_id");
+    }
+    console.log("PASS partial sale + follow-up receipt");
 
     restore();
     await buyGoat({

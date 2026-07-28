@@ -128,15 +128,36 @@ export async function actionChangeStatus(formData: FormData) {
 }
 
 export async function actionRecordLivestockSale(formData: FormData) {
+  const date = String(formData.get("date") || "").trim();
+  const animalId = Number(formData.get("animalId"));
+  const grossSalePrice = Number(String(formData.get("grossSalePrice") || "").trim());
+  const deliveryRaw = String(formData.get("deliveryCost") || "").trim();
+  const receivedBy = String(formData.get("receivedBy") || "").trim();
   const additional = String(formData.get("additionalAnimalId") || "").trim();
   const receivedNowRaw = String(formData.get("amountReceivedNow") || "").trim();
+
+  if (!date) throw new Error("Sale date is required");
+  if (!animalId || Number.isNaN(animalId)) throw new Error("Select a goat");
+  if (!grossSalePrice || Number.isNaN(grossSalePrice) || grossSalePrice <= 0) {
+    throw new Error("Gross sale price must be a positive number");
+  }
+  if (receivedBy !== "Monis" && receivedBy !== "Saad") {
+    throw new Error("Select who received cash (Monis or Saad)");
+  }
+  if (receivedNowRaw) {
+    const receivedNow = Number(receivedNowRaw);
+    if (Number.isNaN(receivedNow) || receivedNow < 0) {
+      throw new Error("Received now must be zero or a positive number");
+    }
+  }
+
   await recordLivestockSale({
-    date: String(formData.get("date")),
-    animalId: Number(formData.get("animalId")),
+    date,
+    animalId,
     additionalAnimalIds: additional ? [Number(additional)] : undefined,
-    grossSalePrice: Number(formData.get("grossSalePrice")),
-    deliveryCost: formData.get("deliveryCost") ? Number(formData.get("deliveryCost")) : undefined,
-    receivedBy: String(formData.get("receivedBy")) as "Monis" | "Saad",
+    grossSalePrice,
+    deliveryCost: deliveryRaw ? Number(deliveryRaw) : undefined,
+    receivedBy: receivedBy as "Monis" | "Saad",
     amountReceivedNow: receivedNowRaw ? Number(receivedNowRaw) : null,
     notes: String(formData.get("notes") || "") || undefined,
   });
