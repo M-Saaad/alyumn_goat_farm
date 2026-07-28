@@ -31,6 +31,7 @@ import {
   mapWeight,
   selectAll,
 } from "./supabase";
+import { getPartnerIds } from "../partner-equity/settlement";
 import { quickEntryPropsFromDb } from "../quick-entry-props";
 import type { QuickEntryProps } from "@/components/QuickEntry";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -61,6 +62,16 @@ function filterLedgerTxs(rows: Record<string, unknown>[]): Transaction[] {
   return rows
     .map(mapTx)
     .filter((t) => t.kind === "cost" || t.kind === "partner_adjustment");
+}
+
+/** Resolve Monis/Saad partner IDs without loading the full database. */
+export async function loadPartnerIds(): Promise<{ monisId: string; saadId: string }> {
+  if (!isSupabaseDb()) {
+    return getPartnerIds(await getCachedDb());
+  }
+  const client = createServiceClient();
+  const contacts = await selectAll(client, "contacts");
+  return getPartnerIds({ contacts: contacts.map(mapContact) } as FarmDatabase);
 }
 
 /** Shared QuickEntry props — active animals, contacts, buck names. */

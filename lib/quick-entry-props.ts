@@ -1,4 +1,4 @@
-import { animalLabel } from "@/lib/actions";
+import { animalLabel } from "@/lib/labels";
 import type { FarmDatabase } from "@/lib/types";
 import type { QuickEntryProps } from "@/components/QuickEntry";
 import type { ContactOption } from "@/components/ContactSelect";

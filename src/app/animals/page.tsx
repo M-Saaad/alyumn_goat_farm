@@ -1,15 +1,10 @@
 import { Suspense } from "react";
 import Link from "next/link";
-import nextDynamic from "next/dynamic";
-import { animalLabel } from "@/lib/actions";
+import { animalLabel } from "@/lib/labels";
 import { loadAnimalsListData, contactNameFrom } from "@/lib/db/queries";
 import { BottomNav } from "@/components/BottomNav";
+import { QuickEntryLoader } from "@/components/QuickEntryLoader";
 import { AnimalsFilters } from "@/components/AnimalsFilters";
-
-const QuickEntry = nextDynamic(
-  () => import("@/components/QuickEntry").then((m) => m.QuickEntry),
-  { ssr: false }
-);
 
 export const dynamic = "force-dynamic";
 
@@ -96,7 +91,7 @@ export default async function AnimalsPage({
         ))}
       </ul>
 
-      <QuickEntry {...data.quickEntry} />
+      <QuickEntryLoader {...data.quickEntry} />
       <BottomNav active="goats" />
     </main>
   );

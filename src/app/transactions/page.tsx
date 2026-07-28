@@ -1,9 +1,9 @@
 import { Suspense } from "react";
-import nextDynamic from "next/dynamic";
-import { animalLabel } from "@/lib/actions";
+import { animalLabel } from "@/lib/labels";
 import { LEDGER_CATEGORIES, slugToCategory } from "@/lib/constants";
 import { loadTransactionsData, contactNameFrom } from "@/lib/db/queries";
 import { BottomNav } from "@/components/BottomNav";
+import { QuickEntryLoader } from "@/components/QuickEntryLoader";
 import { TransactionsFilters } from "@/components/TransactionsFilters";
 import {
   TransactionEditor,
@@ -12,11 +12,6 @@ import {
 import { resolveTransactionKind } from "@/lib/transactions/mutate";
 import { getPartnerIds } from "@/lib/partner-equity/settlement";
 import type { FarmDatabase } from "@/lib/types";
-
-const QuickEntry = nextDynamic(
-  () => import("@/components/QuickEntry").then((m) => m.QuickEntry),
-  { ssr: false }
-);
 
 export const dynamic = "force-dynamic";
 
@@ -187,7 +182,7 @@ export default async function TransactionsPage({
         )}
       </section>
 
-      <QuickEntry {...data.quickEntry} />
+      <QuickEntryLoader {...data.quickEntry} />
       <BottomNav active="txns" />
     </main>
   );

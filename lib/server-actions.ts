@@ -15,6 +15,7 @@ import {
 } from "@/lib/actions";
 import { revalidatePath } from "next/cache";
 import type { AnimalBreed, AnimalSex, AnimalStatus, LedgerCategory, MedicalEventType } from "@/lib/types";
+import { LEDGER_CATEGORIES } from "@/lib/types";
 import { uploadAnimalMedia } from "@/lib/media/upload";
 import type { TransactionEditVariant } from "@/lib/transactions/mutate";
 
@@ -25,13 +26,32 @@ function revalidateTxnPaths() {
 }
 
 export async function actionLogExpense(formData: FormData) {
+  const date = String(formData.get("date") || "").trim();
+  const amountRaw = String(formData.get("amount") || "").trim();
+  const category = String(formData.get("category") || "").trim();
+  const paidBy = String(formData.get("paidBy") || "").trim();
+  const animalRaw = String(formData.get("animalId") || "").trim();
+  const notes = String(formData.get("notes") || "");
+
+  if (!date) throw new Error("Date is required");
+  const amount = Number(amountRaw);
+  if (!amountRaw || Number.isNaN(amount) || amount <= 0) {
+    throw new Error("Amount must be a positive number");
+  }
+  if (!(LEDGER_CATEGORIES as readonly string[]).includes(category)) {
+    throw new Error("Invalid category");
+  }
+  if (paidBy !== "Monis" && paidBy !== "Saad") {
+    throw new Error("Select who paid (Monis or Saad)");
+  }
+
   await logExpense({
-    date: String(formData.get("date")),
-    amount: Number(formData.get("amount")),
-    category: String(formData.get("category")) as LedgerCategory,
-    paidBy: String(formData.get("paidBy")) as "Monis" | "Saad",
-    animalId: formData.get("animalId") ? Number(formData.get("animalId")) : null,
-    notes: String(formData.get("notes") || ""),
+    date,
+    amount,
+    category: category as LedgerCategory,
+    paidBy,
+    animalId: animalRaw ? Number(animalRaw) : null,
+    notes,
   });
   revalidateTxnPaths();
 }
