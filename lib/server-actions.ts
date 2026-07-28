@@ -8,6 +8,7 @@ import {
   changeStatus,
   deleteTransaction,
   deleteAnimal,
+  deleteSaleReceipt,
   logExpense,
   logMedical,
   partnerTransfer,
@@ -16,6 +17,7 @@ import {
   recordPalai,
   updateAnimal,
   updateTransaction,
+  undoLivestockSale,
 } from "@/lib/actions";
 import { revalidatePath } from "next/cache";
 import type { AnimalBreed, AnimalSex, AnimalStatus, LedgerCategory, MedicalEventType } from "@/lib/types";
@@ -151,6 +153,19 @@ export async function actionRecordLivestockSale(formData: FormData) {
     }
   }
 
+  const soldOnPalai =
+    formData.get("soldOnPalai") === "on" || formData.get("soldOnPalai") === "true";
+  const buyerName = String(formData.get("buyerName") || "").trim();
+  const palaiRateRaw = String(formData.get("palaiRatePerGoat") || "").trim();
+
+  if (soldOnPalai) {
+    if (!buyerName) throw new Error("Select the buyer for sold-on-palai");
+    const palaiRate = Number(palaiRateRaw);
+    if (!palaiRateRaw || Number.isNaN(palaiRate) || palaiRate <= 0) {
+      throw new Error("Palai rate per goat is required for sold-on-palai");
+    }
+  }
+
   await recordLivestockSale({
     date,
     animalId,
@@ -160,7 +175,29 @@ export async function actionRecordLivestockSale(formData: FormData) {
     receivedBy: receivedBy as "Monis" | "Saad",
     amountReceivedNow: receivedNowRaw ? Number(receivedNowRaw) : null,
     notes: String(formData.get("notes") || "") || undefined,
+    soldOnPalai,
+    buyerName: soldOnPalai ? buyerName : null,
+    palaiRatePerGoat: soldOnPalai ? Number(palaiRateRaw) : null,
   });
+  revalidateTxnPaths();
+}
+
+export async function actionDeleteSaleReceipt(formData: FormData) {
+  const txId = String(formData.get("txId") || "").trim();
+  const animalId = Number(formData.get("animalId"));
+  if (!txId) throw new Error("Receipt id is required");
+  await deleteSaleReceipt(txId);
+  if (animalId && !Number.isNaN(animalId)) {
+    revalidatePath(`/animals/${animalId}`);
+  }
+  revalidateTxnPaths();
+}
+
+export async function actionUndoLivestockSale(formData: FormData) {
+  const animalId = Number(formData.get("animalId"));
+  if (!animalId || Number.isNaN(animalId)) throw new Error("Animal id is required");
+  await undoLivestockSale(animalId);
+  revalidatePath(`/animals/${animalId}`);
   revalidateTxnPaths();
 }
 

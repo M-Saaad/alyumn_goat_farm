@@ -10,6 +10,10 @@ import {
 import { recognizePalaiPayment, applyPalaiToDb } from "./palai/recognize-payment";
 import { applyLivestockSaleToDb, applySaleReceiptToDb, beginLivestockSale, buildSaleReceipt, findSaleForAnimal } from "./livestock/record-sale";
 import {
+  applyDeleteSaleReceipt,
+  applyUndoLivestockSaleForAnimal,
+} from "./livestock/cancel-sale";
+import {
   applyPurchasePayment,
   createPurchaseAgreement,
   findPurchaseAgreement,
@@ -527,6 +531,18 @@ export async function changeStatus(input: {
   return persistMutation(before, after);
 }
 
+export async function deleteSaleReceipt(txId: string) {
+  const before = await fetchDb();
+  const after = applyDeleteSaleReceipt(before, txId);
+  return persistMutation(before, after);
+}
+
+export async function undoLivestockSale(animalId: number) {
+  const before = await fetchDb();
+  const after = applyUndoLivestockSaleForAnimal(before, animalId);
+  return persistMutation(before, after);
+}
+
 export async function recordLivestockSale(input: {
   date: string;
   animalId: number;
@@ -536,6 +552,9 @@ export async function recordLivestockSale(input: {
   receivedBy?: "Monis" | "Saad";
   amountReceivedNow?: number | null;
   notes?: string;
+  soldOnPalai?: boolean;
+  buyerName?: string | null;
+  palaiRatePerGoat?: number | null;
 }) {
   const before = await fetchDb();
   const result = beginLivestockSale(before, input);
@@ -544,6 +563,7 @@ export async function recordLivestockSale(input: {
     const animalIds = new Set(result.sale.animal_ids);
     const entries = result.tx ? withLedgerIds(result.ledger) : [];
     await applyWritePlan({
+      upsertContacts: result.newContacts.length ? result.newContacts : undefined,
       upsertAnimals: result.animals.filter((a) => animalIds.has(a.id)),
       upsertTransactions: result.tx ? [result.tx] : undefined,
       upsertLedger: entries.length ? entries : undefined,
@@ -551,6 +571,9 @@ export async function recordLivestockSale(input: {
     });
     return {
       ...before,
+      contacts: result.newContacts.length
+        ? [...before.contacts, ...result.newContacts]
+        : before.contacts,
       animals: result.animals,
       transactions: result.tx ? [...before.transactions, result.tx] : before.transactions,
       partner_ledger_entries: result.tx

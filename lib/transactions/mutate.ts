@@ -19,6 +19,7 @@ import {
   computeSaleSplit,
   saleAdjustmentAmount,
 } from "../livestock/record-sale";
+import { applyDeleteSaleReceipt, findSaleForReceipt } from "../livestock/cancel-sale";
 import { diffDb, type WritePlan } from "../db/writes";
 
 export type TransactionEditVariant =
@@ -402,20 +403,11 @@ export function applyDeleteTransaction(db: FarmDatabase, id: string): FarmDataba
     }
 
     case "livestock_sale": {
-      const sale = db.livestock_sales.find((s) => s.transaction_id === id);
-      const animalIds = new Set(
-        sale?.animal_ids ?? (tx.animal_id != null ? [tx.animal_id] : [])
-      );
-      const animals = db.animals.map((a) => {
-        if (!animalIds.has(a.id)) return a;
-        return { ...a, status: "Active" as const, sold_price: null, out_date: null };
-      });
-      const next = removeTxAndLedger(db, id);
-      return {
-        ...next,
-        animals,
-        livestock_sales: (next.livestock_sales ?? []).filter((s) => s.transaction_id !== id),
-      };
+      const linkedSale = findSaleForReceipt(db, id);
+      if (linkedSale) {
+        return applyDeleteSaleReceipt(db, id);
+      }
+      return removeTxAndLedger(db, id);
     }
 
     case "livestock_purchase": {

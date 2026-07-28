@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { animalLabel } from "@/lib/labels";
 import { formatPkr, formatDate } from "@/lib/format";
 import { isSupabaseDb } from "@/lib/db";
+import { isSoldOnPalaiSale, saleReceiptAmount } from "@/lib/livestock/cancel-sale";
 import { loadAnimalProfileData, contactNameFrom } from "@/lib/db/queries";
 import { BottomNav } from "@/components/BottomNav";
 import { QuickEntryLoader } from "@/components/QuickEntryLoader";
@@ -60,6 +61,22 @@ export default async function AnimalProfilePage({
       )
       .reduce((sum, t) => sum + t.amount, 0);
 
+  const saleReceipts = sale
+    ? txs
+        .filter(
+          (t) =>
+            t.category === "Livestock Sale" &&
+            (t.livestock_sale_id === sale.id || sale.transaction_id === t.id)
+        )
+        .map((t) => ({
+          id: t.id,
+          date: t.date,
+          amount: saleReceiptAmount(t.amount),
+          notes: t.notes,
+        }))
+        .sort((a, b) => b.date.localeCompare(a.date))
+    : [];
+
   return (
     <main className="px-4 pt-6">
       <Link href="/animals" className="text-sm font-semibold text-emerald-700">
@@ -73,6 +90,7 @@ export default async function AnimalProfilePage({
             {[animal.breed, animal.sex, animal.status, ownerName]
               .filter(Boolean)
               .join(" · ")}
+            {sale && isSoldOnPalaiSale(sale) ? " · Sold on palai" : ""}
           </p>
         </div>
         <DeleteAnimalButton animalId={animal.id} label={animalLabel(animal)} />
@@ -138,6 +156,8 @@ export default async function AnimalProfilePage({
           animalId={animalId}
           sale={sale}
           balance={data.sale_balance ?? 0}
+          receipts={saleReceipts}
+          soldOnPalai={isSoldOnPalaiSale(sale)}
         />
       )}
 
