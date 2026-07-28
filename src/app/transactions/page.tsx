@@ -9,6 +9,7 @@ import {
   TransactionEditor,
   type EditableTransaction,
 } from "@/components/TransactionEditor";
+import { formatDate } from "@/lib/format";
 import { resolveTransactionKind } from "@/lib/transactions/mutate";
 import { getPartnerIds } from "@/lib/partner-equity/settlement";
 import type { FarmDatabase } from "@/lib/types";
@@ -49,7 +50,8 @@ export default async function TransactionsPage({
       (t) =>
         (t.notes || "").toLowerCase().includes(q) ||
         t.category.toLowerCase().includes(q) ||
-        t.date.includes(q)
+        t.date.includes(q) ||
+        formatDate(t.date).toLowerCase().includes(q)
     );
   }
 

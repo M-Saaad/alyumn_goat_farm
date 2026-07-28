@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { animalLabel } from "@/lib/labels";
-import { formatPkr } from "@/lib/format";
+import { formatPkr, formatDate } from "@/lib/format";
 import { isSupabaseDb } from "@/lib/db";
 import { loadAnimalProfileData, contactNameFrom } from "@/lib/db/queries";
 import { BottomNav } from "@/components/BottomNav";
@@ -98,7 +98,7 @@ export default async function AnimalProfilePage({
           </div>
           <div>
             <dt className="text-stone-500">Purchased</dt>
-            <dd>{animal.date_of_purchase || "—"}</dd>
+            <dd>{formatDate(animal.date_of_purchase)}</dd>
           </div>
           <div>
             <dt className="text-stone-500">From</dt>
@@ -135,7 +135,7 @@ export default async function AnimalProfilePage({
                   <span className="font-medium">{m.event_type}</span>
                   {m.notes && <span className="text-stone-500"> — {m.notes}</span>}
                 </span>
-                <span className="shrink-0 text-stone-500">{m.date || "—"}</span>
+                <span className="shrink-0 text-stone-500">{formatDate(m.date)}</span>
               </li>
             ))}
           </ul>
@@ -154,7 +154,7 @@ export default async function AnimalProfilePage({
                   {b.buck_name || "Unknown buck"} · {b.status || b.outcome}
                 </p>
                 <p className="text-stone-500">
-                  Crossed {b.date_crossed || "—"} · Due {b.expected_due_date || "—"}
+                  Crossed {formatDate(b.date_crossed)} · Due {formatDate(b.expected_due_date)}
                 </p>
                 {b.notes && <p className="text-xs text-stone-500">{b.notes}</p>}
               </li>
@@ -174,7 +174,7 @@ export default async function AnimalProfilePage({
               return (
                 <li key={t.id} className="flex justify-between gap-2">
                   <span>
-                    {t.date} · {t.category}
+                    {formatDate(t.date)} · {t.category}
                     {sale && (
                       <span className="block text-xs text-stone-500">
                         Net {formatPkr(sale.net_received)} (your half {formatPkr(sale.partner_share)})
@@ -195,7 +195,7 @@ export default async function AnimalProfilePage({
           <ul className="space-y-1 text-sm">
             {weights.map((w) => (
               <li key={w.id} className="flex justify-between">
-                <span>{w.weighed_on}</span>
+                <span>{formatDate(w.weighed_on)}</span>
                 <span className="font-semibold">{w.weight_kg} kg</span>
               </li>
             ))}
