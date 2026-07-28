@@ -49,6 +49,16 @@ export default async function AnimalProfilePage({
   const ownerContact = data.contacts.find((c) => c.id === animal.owner_id);
   const isCustomerOwner = ownerContact?.type === "Customer";
   const sale = saleMeta[0];
+  const purchasePaid =
+    data.purchase_agreement?.amount_paid ??
+    data.transactions
+      .filter(
+        (t) =>
+          t.kind === "cost" &&
+          t.category === "Livestock Purchase" &&
+          t.animal_id === animalId
+      )
+      .reduce((sum, t) => sum + t.amount, 0);
 
   return (
     <main className="px-4 pt-6">
@@ -81,6 +91,20 @@ export default async function AnimalProfilePage({
           palai_rate: animal.palai_rate,
           age_at_purchase: animal.age_at_purchase,
           home_bred: animal.home_bred,
+          status: animal.status,
+          date_of_purchase: animal.date_of_purchase,
+          price: animal.price,
+          purchase_paid: purchasePaid,
+          out_date: animal.out_date,
+          sold_price: animal.sold_price,
+          sale: sale
+            ? {
+                date: sale.date,
+                gross_sale_price: sale.gross_sale_price,
+                delivery_cost: sale.delivery_cost,
+                amount_received: sale.amount_received,
+              }
+            : null,
         }}
         vendors={data.quickEntry.vendors}
         ownerOptions={data.quickEntry.ownerOptions}
