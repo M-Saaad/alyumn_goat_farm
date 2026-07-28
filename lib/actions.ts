@@ -15,6 +15,7 @@ import {
   findPurchaseAgreement,
   validatePurchasePaymentAmount,
 } from "./livestock/purchase-agreement";
+import { applyDeleteAnimal } from "./animals/delete";
 import {
   applyDeleteTransaction,
   applyUpdateTransaction,
@@ -603,5 +604,11 @@ export async function updateTransaction(input: UpdateTransactionInput) {
 export async function deleteTransaction(id: string) {
   const before = await fetchDb();
   const after = applyDeleteTransaction(before, id);
+  return persistMutation(before, after);
+}
+
+export async function deleteAnimal(animalId: number) {
+  const before = await fetchDb();
+  const after = applyDeleteAnimal(before, animalId);
   return persistMutation(before, after);
 }

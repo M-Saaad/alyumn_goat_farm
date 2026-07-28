@@ -1,11 +1,13 @@
 "use server";
 
+import { redirect } from "next/navigation";
 import {
   addPurchasePayment,
   addSaleReceipt,
   buyGoat,
   changeStatus,
   deleteTransaction,
+  deleteAnimal,
   logExpense,
   logMedical,
   partnerTransfer,
@@ -281,6 +283,16 @@ export async function actionUpdateAnimal(formData: FormData) {
   });
   revalidatePath(`/animals/${id}`);
   revalidateTxnPaths();
+}
+
+export async function actionDeleteAnimal(formData: FormData) {
+  const animalId = Number(formData.get("animalId"));
+  if (!animalId || Number.isNaN(animalId)) {
+    throw new Error("Animal id is required");
+  }
+  await deleteAnimal(animalId);
+  revalidateTxnPaths();
+  redirect("/animals");
 }
 
 export async function actionUploadAnimalMedia(formData: FormData) {
