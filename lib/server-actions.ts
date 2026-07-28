@@ -11,8 +11,11 @@ import {
   deleteSaleReceipt,
   logExpense,
   logMedical,
+  logWeight,
   partnerTransfer,
   recordBreeding,
+  updateBreeding,
+  deleteBreeding,
   recordLivestockSale,
   recordPalai,
   updateAnimal,
@@ -29,6 +32,7 @@ function revalidateTxnPaths() {
   revalidatePath("/");
   revalidatePath("/transactions");
   revalidatePath("/animals");
+  revalidatePath("/health");
 }
 
 export async function actionLogExpense(formData: FormData) {
@@ -108,6 +112,21 @@ export async function actionLogMedical(formData: FormData) {
   revalidateTxnPaths();
 }
 
+export async function actionLogWeight(formData: FormData) {
+  const weightRaw = String(formData.get("weightKg") || "").trim();
+  const weightKg = Number(weightRaw);
+  if (!weightRaw || Number.isNaN(weightKg) || weightKg <= 0) {
+    throw new Error("Weight must be a positive number");
+  }
+  await logWeight({
+    animalId: Number(formData.get("animalId")),
+    weighedOn: String(formData.get("date")),
+    weightKg,
+    notes: String(formData.get("notes") || ""),
+  });
+  revalidateTxnPaths();
+}
+
 export async function actionRecordBreeding(formData: FormData) {
   const maleRaw = String(formData.get("maleAnimalId") || "").trim();
   await recordBreeding({
@@ -117,6 +136,37 @@ export async function actionRecordBreeding(formData: FormData) {
     dateCrossed: String(formData.get("dateCrossed")),
     notes: String(formData.get("notes") || ""),
   });
+  revalidateTxnPaths();
+}
+
+export async function actionUpdateBreeding(formData: FormData) {
+  const maleRaw = String(formData.get("maleAnimalId") || "").trim();
+  const statusRaw = String(formData.get("status") || "").trim();
+  const deliveredRaw = String(formData.get("deliveredDate") || "").trim();
+  await updateBreeding({
+    id: String(formData.get("id")),
+    buckName: String(formData.get("buckName") || ""),
+    maleAnimalId: maleRaw ? Number(maleRaw) : null,
+    dateCrossed: String(formData.get("dateCrossed")),
+    outcome: String(formData.get("outcome")) as import("@/lib/types").BreedingOutcome,
+    status: statusRaw as import("@/lib/types").BreedingStatus | "",
+    deliveredDate: deliveredRaw || null,
+    notes: String(formData.get("notes") || "") || null,
+  });
+  const femaleId = Number(formData.get("femaleId"));
+  if (femaleId && !Number.isNaN(femaleId)) {
+    revalidatePath(`/animals/${femaleId}`);
+  }
+  revalidateTxnPaths();
+}
+
+export async function actionDeleteBreeding(formData: FormData) {
+  const id = String(formData.get("id"));
+  const femaleId = Number(formData.get("femaleId"));
+  await deleteBreeding(id);
+  if (femaleId && !Number.isNaN(femaleId)) {
+    revalidatePath(`/animals/${femaleId}`);
+  }
   revalidateTxnPaths();
 }
 

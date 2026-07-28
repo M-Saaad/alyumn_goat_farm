@@ -180,6 +180,24 @@ export async function selectAll(client: SupabaseClient, table: string) {
   return (data ?? []) as Record<string, unknown>[];
 }
 
+/** Like selectAll but returns [] when a table is missing (e.g. migration not applied). */
+export async function selectAllOptional(client: SupabaseClient, table: string) {
+  try {
+    return await selectAll(client, table);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    if (
+      message.includes("does not exist") ||
+      message.includes("Could not find the table") ||
+      message.includes("permission denied")
+    ) {
+      console.warn(`[farm] optional table ${table} unavailable: ${message}`);
+      return [] as Record<string, unknown>[];
+    }
+    throw err;
+  }
+}
+
 export function mapMeta(meta: Record<string, unknown> | undefined): FarmDatabase["meta"] {
   return {
     importedAt: meta?.imported_at ? String(meta.imported_at) : null,

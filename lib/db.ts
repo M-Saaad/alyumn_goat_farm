@@ -22,6 +22,9 @@ function loadJsonDb(): FarmDatabase {
   if (!db.livestock_sales) db.livestock_sales = [];
   if (!db.purchase_agreements) db.purchase_agreements = [];
   if (!db.animal_media) db.animal_media = [];
+  if (!db.weight_logs) db.weight_logs = [];
+  if (!db.medical_events) db.medical_events = [];
+  if (!db.breeding_events) db.breeding_events = [];
   return db;
 }
 

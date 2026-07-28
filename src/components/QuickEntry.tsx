@@ -6,6 +6,7 @@ import {
   actionChangeStatus,
   actionLogExpense,
   actionLogMedical,
+  actionLogWeight,
   actionPartnerTransfer,
   actionRecordBreeding,
   actionRecordLivestockSale,
@@ -23,6 +24,7 @@ type Mode =
   | "palai"
   | "buy"
   | "medical"
+  | "weight"
   | "breeding"
   | "sell"
   | "status"
@@ -35,6 +37,7 @@ const label = "block text-sm font-medium text-stone-700";
 export type QuickEntryProps = {
   animals: AnimalOption[];
   femaleAnimals?: AnimalOption[];
+  breedingEligibleFemales?: AnimalOption[];
   vendors: ContactOption[];
   customers: ContactOption[];
   ownerOptions: ContactOption[];
@@ -45,6 +48,7 @@ export type QuickEntryProps = {
 export function QuickEntry({
   animals,
   femaleAnimals,
+  breedingEligibleFemales,
   vendors,
   customers,
   ownerOptions,
@@ -54,6 +58,7 @@ export function QuickEntry({
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<Mode>(null);
   const females = femaleAnimals ?? animals;
+  const breedingFemales = breedingEligibleFemales ?? females;
 
   function pick(m: Mode) {
     setMode(m);
@@ -96,6 +101,7 @@ export function QuickEntry({
                     ["palai", "Palai Payment"],
                     ["buy", "Buy Goat"],
                     ["medical", "Log Medical"],
+                    ["weight", "Log Weight"],
                     ["breeding", "Record Breeding"],
                     ["sell", "Sell Goat"],
                     ["status", "Change Status"],
@@ -178,12 +184,28 @@ export function QuickEntry({
               </ActionForm>
             )}
 
+            {mode === "weight" && (
+              <ActionForm action={actionLogWeight} onSuccess={close}>
+                <AnimalSelect animals={animals} />
+                <Field label="Date" name="date" type="date" defaultValue={todayIso()} required />
+                <Field label="Weight (kg)" name="weightKg" type="number" required />
+                <Field label="Notes" name="notes" />
+                <SubmitButton label="Save weight" />
+              </ActionForm>
+            )}
+
             {mode === "breeding" && (
+              breedingFemales.length === 0 ? (
+                <p className="text-sm text-stone-600">
+                  All active does already have an open breeding record. Update an existing record on
+                  the goat profile or Health → Breeding tab before logging a new one.
+                </p>
+              ) : (
               <ActionForm action={actionRecordBreeding} onSuccess={close}>
                 <div>
                   <label className={label}>Female</label>
                   <select name="femaleId" className={field} required>
-                    {females.map((a) => (
+                    {breedingFemales.map((a) => (
                       <option key={a.id} value={a.id}>
                         {a.label}
                       </option>
@@ -196,6 +218,7 @@ export function QuickEntry({
                 <p className="text-xs text-stone-500">Due date auto-calculated as +150 days.</p>
                 <SubmitButton />
               </ActionForm>
+              )
             )}
 
             {mode === "sell" && (
@@ -426,6 +449,8 @@ function modeLabel(m: Mode) {
       return "Buy Goat";
     case "medical":
       return "Log Medical";
+    case "weight":
+      return "Log Weight";
     case "breeding":
       return "Record Breeding";
     case "sell":

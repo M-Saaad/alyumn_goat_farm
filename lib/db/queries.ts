@@ -32,9 +32,11 @@ import {
   mapTx,
   mapWeight,
   selectAll,
+  selectAllOptional,
 } from "./supabase";
 import { getPartnerIds } from "../partner-equity/settlement";
 import { quickEntryPropsFromDb } from "../quick-entry-props";
+import { computeHerdHealth, type HerdHealthData } from "../livestock/herd-health";
 import type { QuickEntryProps } from "@/components/QuickEntry";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
@@ -405,6 +407,51 @@ export const loadTransactionsData = cache(async (): Promise<TransactionsData> =>
     animals: mappedAnimals,
     palai_payments: palai.map(mapPalai),
     livestock_sales: sales.map(mapSale),
+    quickEntry: quickEntryPropsFromDb(db),
+  };
+});
+
+export type HerdHealthPageData = {
+  herd: HerdHealthData;
+  quickEntry: QuickEntryProps;
+};
+
+export const loadHerdHealthData = cache(async (): Promise<HerdHealthPageData> => {
+  if (!isSupabaseDb()) {
+    const db = await getCachedDb();
+    return {
+      herd: computeHerdHealth({
+        animals: db.animals,
+        medical_events: db.medical_events ?? [],
+        breeding_events: db.breeding_events ?? [],
+        weight_logs: db.weight_logs ?? [],
+      }),
+      quickEntry: quickEntryPropsFromDb(db),
+    };
+  }
+
+  const client = createServiceClient();
+  const [animals, medical, breeding, weights, contacts] = await Promise.all([
+    selectAll(client, "animals"),
+    selectAllOptional(client, "medical_events"),
+    selectAllOptional(client, "breeding_events"),
+    selectAllOptional(client, "weight_logs"),
+    selectAll(client, "contacts"),
+  ]);
+
+  const mappedAnimals = animals.map(mapAnimal);
+  const db = emptyDb();
+  db.animals = mappedAnimals;
+  db.contacts = contacts.map(mapContact);
+  db.breeding_events = breeding.map(mapBreeding);
+
+  return {
+    herd: computeHerdHealth({
+      animals: mappedAnimals,
+      medical_events: medical.map(mapMedical),
+      breeding_events: breeding.map(mapBreeding),
+      weight_logs: weights.map(mapWeight),
+    }),
     quickEntry: quickEntryPropsFromDb(db),
   };
 });

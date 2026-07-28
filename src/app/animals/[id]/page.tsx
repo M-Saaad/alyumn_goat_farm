@@ -14,15 +14,21 @@ import {
   SaleInstallmentCard,
 } from "@/components/InstallmentCards";
 import { DeleteAnimalButton } from "@/components/DeleteAnimalButton";
+import { BreedingEventEditor } from "@/components/BreedingEventEditor";
+import { backFromAnimalProfile } from "@/lib/livestock/health-nav";
 
 export const dynamic = "force-dynamic";
 
 export default async function AnimalProfilePage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ from?: string; tab?: string }>;
 }) {
   const { id } = await params;
+  const sp = await searchParams;
+  const back = backFromAnimalProfile(sp);
   const animalId = Number(id);
   const data = await loadAnimalProfileData(animalId);
   if (!data) notFound();
@@ -79,8 +85,8 @@ export default async function AnimalProfilePage({
 
   return (
     <main className="px-4 pt-6">
-      <Link href="/animals" className="text-sm font-semibold text-emerald-700">
-        ← Goats
+      <Link href={back.href} className="text-sm font-semibold text-emerald-700">
+        ← {back.label}
       </Link>
 
       <header className="mt-2 mb-4 flex flex-wrap items-start justify-between gap-3">
@@ -204,7 +210,12 @@ export default async function AnimalProfilePage({
       </section>
 
       <section className="mb-3 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-stone-200">
-        <h2 className="mb-2 text-sm font-bold">Medical ({medical.length})</h2>
+        <div className="mb-2 flex items-center justify-between gap-2">
+          <h2 className="text-sm font-bold">Medical ({medical.length})</h2>
+          <Link href="/health?tab=vaccine" className="text-xs font-semibold text-emerald-700">
+            Schedule →
+          </Link>
+        </div>
         {medical.length === 0 ? (
           <p className="text-sm text-stone-500">No medical events yet.</p>
         ) : (
@@ -222,8 +233,13 @@ export default async function AnimalProfilePage({
         )}
       </section>
 
-      <section className="mb-3 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-stone-200">
-        <h2 className="mb-2 text-sm font-bold">Breeding ({breeding.length})</h2>
+      <section id="breeding" className="mb-3 scroll-mt-20 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-stone-200">
+        <div className="mb-2 flex items-center justify-between gap-2">
+          <h2 className="text-sm font-bold">Breeding ({breeding.length})</h2>
+          <Link href="/health?tab=breeding" className="text-xs font-semibold text-emerald-700">
+            Herd view →
+          </Link>
+        </div>
         {breeding.length === 0 ? (
           <p className="text-sm text-stone-500">No breeding records.</p>
         ) : (
@@ -237,6 +253,22 @@ export default async function AnimalProfilePage({
                   Crossed {formatDate(b.date_crossed)} · Due {formatDate(b.expected_due_date)}
                 </p>
                 {b.notes && <p className="text-xs text-stone-500">{b.notes}</p>}
+                <BreedingEventEditor
+                  event={{
+                    id: b.id,
+                    femaleId: animalId,
+                    buck_name: b.buck_name,
+                    male_animal_id: b.male_animal_id,
+                    date_crossed: b.date_crossed,
+                    expected_due_date: b.expected_due_date,
+                    delivered_date: b.delivered_date,
+                    outcome: b.outcome,
+                    status: b.status,
+                    notes: b.notes,
+                  }}
+                  maleAnimals={data.quickEntry.maleAnimals}
+                  pastBuckNames={data.quickEntry.pastBuckNames}
+                />
               </li>
             ))}
           </ul>
@@ -269,9 +301,16 @@ export default async function AnimalProfilePage({
         )}
       </section>
 
-      {weights.length > 0 && (
-        <section className="mb-3 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-stone-200">
-          <h2 className="mb-2 text-sm font-bold">Weight</h2>
+      <section className="mb-3 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-stone-200">
+        <div className="mb-2 flex items-center justify-between gap-2">
+          <h2 className="text-sm font-bold">Weight ({weights.length})</h2>
+          <Link href="/health?tab=weight" className="text-xs font-semibold text-emerald-700">
+            Herd view →
+          </Link>
+        </div>
+        {weights.length === 0 ? (
+          <p className="text-sm text-stone-500">No weight records yet. Use Quick Entry → Log Weight.</p>
+        ) : (
           <ul className="space-y-1 text-sm">
             {weights.map((w) => (
               <li key={w.id} className="flex justify-between">
@@ -280,11 +319,11 @@ export default async function AnimalProfilePage({
               </li>
             ))}
           </ul>
-        </section>
-      )}
+        )}
+      </section>
 
       <QuickEntryLoader {...data.quickEntry} />
-      <BottomNav active="goats" />
+      <BottomNav active={sp.from === "health" ? "health" : "goats"} />
     </main>
   );
 }

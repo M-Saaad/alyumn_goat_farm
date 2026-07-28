@@ -19,6 +19,10 @@ import {
   findPurchaseAgreement,
   validatePurchasePaymentAmount,
 } from "./livestock/purchase-agreement";
+import {
+  assertFemaleAvailableForBreeding,
+  expectedDueDate,
+} from "./livestock/breeding";
 import { applyDeleteAnimal } from "./animals/delete";
 import { applyUpdateAnimalDetails, type UpdateAnimalInput } from "./animals/update";
 import {
@@ -31,7 +35,15 @@ import {
   insertTransactionWithLedger,
   applyWritePlan,
 } from "./db/writes";
-import type { LedgerCategory, AnimalStatus, AnimalBreed, AnimalSex, MedicalEventType } from "./types";
+import type {
+  LedgerCategory,
+  AnimalStatus,
+  AnimalBreed,
+  AnimalSex,
+  MedicalEventType,
+  BreedingOutcome,
+  BreedingStatus,
+} from "./types";
 import { animalLabel } from "./labels";
 
 export { animalLabel };
@@ -473,8 +485,7 @@ export async function recordBreeding(input: {
   notes?: string;
 }) {
   const before = await fetchDb();
-  const d = new Date(input.dateCrossed);
-  d.setUTCDate(d.getUTCDate() + 150);
+  assertFemaleAvailableForBreeding(before.breeding_events, input.femaleId);
   let maleAnimalId: number | null = input.maleAnimalId ?? null;
   let buckName = input.buckName.trim();
   if (maleAnimalId != null) {
@@ -490,7 +501,7 @@ export async function recordBreeding(input: {
     male_animal_id: maleAnimalId,
     buck_name: buckName || null,
     date_crossed: input.dateCrossed,
-    expected_due_date: d.toISOString().slice(0, 10),
+    expected_due_date: expectedDueDate(input.dateCrossed),
     delivered_date: null,
     outcome: "Pending" as const,
     status: "Doubt" as const,
@@ -502,6 +513,113 @@ export async function recordBreeding(input: {
   };
   if (isSupabaseDb()) {
     await applyWritePlan({ upsertBreeding: [event] });
+    return after;
+  }
+  return persistMutation(before, after);
+}
+
+export async function updateBreeding(input: {
+  id: string;
+  buckName: string;
+  maleAnimalId?: number | null;
+  dateCrossed: string;
+  outcome: BreedingOutcome;
+  status: BreedingStatus | "";
+  deliveredDate?: string | null;
+  notes?: string | null;
+}) {
+  const before = await fetchDb();
+  const existing = before.breeding_events.find((b) => b.id === input.id);
+  if (!existing) throw new Error("Breeding record not found");
+
+  const nextOutcome = input.outcome;
+  const nextStatus = input.status || null;
+  const willBeInPipeline =
+    nextOutcome !== "Delivered" &&
+    nextOutcome !== "Stillbirth" &&
+    nextOutcome !== "Miscarriage" &&
+    (nextOutcome === "Pending" || nextOutcome === "Doubt" || nextStatus === "Doubt");
+
+  if (willBeInPipeline) {
+    assertFemaleAvailableForBreeding(before.breeding_events, existing.female_animal_id, input.id);
+  }
+
+  const maleAnimalId: number | null = input.maleAnimalId ?? null;
+  let buckName = input.buckName.trim();
+  if (maleAnimalId != null) {
+    const male = before.animals.find((a) => a.id === maleAnimalId);
+    if (!male) throw new Error("Buck animal not found");
+    if (!buckName) buckName = animalLabel(male);
+  }
+
+  const deliveredDate =
+    input.deliveredDate?.trim() ||
+    (nextOutcome === "Delivered" ? existing.delivered_date : null) ||
+    null;
+
+  const updated = {
+    ...existing,
+    male_animal_id: maleAnimalId,
+    buck_name: buckName || null,
+    date_crossed: input.dateCrossed,
+    expected_due_date: expectedDueDate(input.dateCrossed),
+    delivered_date: nextOutcome === "Delivered" ? deliveredDate : null,
+    outcome: nextOutcome,
+    status: nextStatus,
+    notes: input.notes?.trim() || null,
+  };
+
+  const after = {
+    ...before,
+    breeding_events: before.breeding_events.map((b) => (b.id === updated.id ? updated : b)),
+  };
+  if (isSupabaseDb()) {
+    await applyWritePlan({ upsertBreeding: [updated] });
+    return after;
+  }
+  return persistMutation(before, after);
+}
+
+export async function deleteBreeding(id: string) {
+  const before = await fetchDb();
+  const existing = before.breeding_events.find((b) => b.id === id);
+  if (!existing) throw new Error("Breeding record not found");
+
+  const after = {
+    ...before,
+    breeding_events: before.breeding_events.filter((b) => b.id !== id),
+  };
+  if (isSupabaseDb()) {
+    await applyWritePlan({ deleteBreedingIds: [id] });
+    return after;
+  }
+  return persistMutation(before, after);
+}
+
+export async function logWeight(input: {
+  animalId: number;
+  weighedOn: string;
+  weightKg: number;
+  notes?: string;
+}) {
+  const before = await fetchDb();
+  const animal = before.animals.find((a) => a.id === input.animalId);
+  if (!animal) throw new Error("Animal not found");
+  if (!input.weightKg || input.weightKg <= 0) throw new Error("Weight must be positive");
+
+  const entry = {
+    id: crypto.randomUUID(),
+    animal_id: input.animalId,
+    weighed_on: input.weighedOn,
+    weight_kg: input.weightKg,
+    notes: input.notes || null,
+  };
+  const after = {
+    ...before,
+    weight_logs: [...(before.weight_logs ?? []), entry],
+  };
+  if (isSupabaseDb()) {
+    await applyWritePlan({ upsertWeights: [entry] });
     return after;
   }
   return persistMutation(before, after);
