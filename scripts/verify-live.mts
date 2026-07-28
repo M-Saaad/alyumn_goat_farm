@@ -5,7 +5,7 @@ import { loadDb, saveDb } from "../lib/db";
 import { computeSettlement, assertCanonicalSettlement } from "../lib/partner-equity/settlement";
 import { recognizePalaiPayment, applyPalaiToDb } from "../lib/palai/recognize-payment";
 import { computeSaleSplit, saleAdjustmentAmount } from "../lib/livestock/record-sale";
-import { buyGoat, logExpense, logMedical, recordBreeding, recordLivestockSale, addSaleReceipt } from "../lib/actions";
+import { buyGoat, logExpense, logMedical, recordBreeding, recordLivestockSale, addSaleReceipt, updateAnimal } from "../lib/actions";
 import fs from "fs";
 import path from "path";
 
@@ -182,6 +182,23 @@ async function main() {
     const exp = loadDb().transactions.find((t) => t.notes === "test feed" && t.animal_id === vg.id);
     if (!exp) throw new Error("expense linkage missing");
     console.log("PASS expense linked to animal");
+
+    await updateAnimal({
+      id: vg.id,
+      ownerName: "Farm",
+      name: "VerifyGoat",
+      purchase_price: 1500,
+      purchase_paid: 1500,
+      status: "Active",
+    });
+    const afterEdit = loadDb();
+    const edited = afterEdit.animals.find((a) => a.id === vg.id);
+    const editedAgreement = afterEdit.purchase_agreements?.find((a) => a.animal_id === vg.id);
+    if (!edited || edited.price !== 1500) throw new Error("edit purchase price failed");
+    if (!editedAgreement || editedAgreement.total_amount !== 1500 || editedAgreement.amount_paid !== 1500) {
+      throw new Error("edit purchase agreement failed");
+    }
+    console.log("PASS edit goat purchase details");
 
     console.log("\nAll live engine tests passed.");
   } finally {

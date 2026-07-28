@@ -289,6 +289,16 @@ export async function actionUpdateAnimal(formData: FormData) {
   const palaiRaw = String(formData.get("palaiRate") || "").trim();
   const breedRaw = String(formData.get("breed") || "").trim();
   const sexRaw = String(formData.get("sex") || "").trim();
+  const statusRaw = String(formData.get("status") || "").trim();
+  const purchasePriceRaw = String(formData.get("purchasePrice") || "").trim();
+  const purchasePaidRaw = String(formData.get("purchasePaid") || "").trim();
+  const soldPriceRaw = String(formData.get("soldPrice") || "").trim();
+  const saleDateRaw = String(formData.get("saleDate") || "").trim();
+  const deliveryRaw = String(formData.get("deliveryCost") || "").trim();
+  const receivedRaw = String(formData.get("amountReceived") || "").trim();
+  const purchaseDateRaw = String(formData.get("purchaseDate") || "").trim();
+  const outDateRaw = String(formData.get("outDate") || "").trim();
+
   await updateAnimal({
     id,
     name: String(formData.get("name") || "") || null,
@@ -301,6 +311,16 @@ export async function actionUpdateAnimal(formData: FormData) {
     palai_rate: palaiRaw ? Number(palaiRaw) : null,
     age_at_purchase: String(formData.get("ageAtPurchase") || "") || null,
     home_bred: formData.get("homeBred") === "on" || formData.get("homeBred") === "true",
+    status: statusRaw ? (statusRaw as AnimalStatus) : undefined,
+    date_of_purchase: purchaseDateRaw || null,
+    purchase_price: purchasePriceRaw ? Number(purchasePriceRaw) : null,
+    purchase_paid: purchasePaidRaw ? Number(purchasePaidRaw) : null,
+    out_date: outDateRaw || null,
+    sold_price: soldPriceRaw ? Number(soldPriceRaw) : null,
+    sale_date: saleDateRaw || null,
+    gross_sale_price: soldPriceRaw ? Number(soldPriceRaw) : null,
+    delivery_cost: deliveryRaw ? Number(deliveryRaw) : null,
+    amount_received: receivedRaw ? Number(receivedRaw) : null,
   });
   revalidatePath(`/animals/${id}`);
   revalidateTxnPaths();

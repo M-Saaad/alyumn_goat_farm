@@ -8,7 +8,7 @@ import {
   getPartnerIds,
 } from "./partner-equity/settlement";
 import { recognizePalaiPayment, applyPalaiToDb } from "./palai/recognize-payment";
-import { applyLivestockSaleToDb, applySaleReceiptToDb, beginLivestockSale, buildSaleReceipt } from "./livestock/record-sale";
+import { applyLivestockSaleToDb, applySaleReceiptToDb, beginLivestockSale, buildSaleReceipt, findSaleForAnimal } from "./livestock/record-sale";
 import {
   applyPurchasePayment,
   createPurchaseAgreement,
@@ -16,6 +16,7 @@ import {
   validatePurchasePaymentAmount,
 } from "./livestock/purchase-agreement";
 import { applyDeleteAnimal } from "./animals/delete";
+import { applyUpdateAnimalDetails, type UpdateAnimalInput } from "./animals/update";
 import {
   applyDeleteTransaction,
   applyUpdateTransaction,
@@ -415,64 +416,19 @@ export async function addSaleReceipt(input: {
   return persistMutation(before, after);
 }
 
-export async function updateAnimal(input: {
-  id: number;
-  name?: string | null;
-  breed?: AnimalBreed | null;
-  sex?: AnimalSex | null;
-  description?: string | null;
-  comment?: string | null;
-  ownerName: string;
-  vendorName?: string | null;
-  palai_rate?: number | null;
-  age_at_purchase?: string | null;
-  home_bred?: boolean;
-}) {
+export async function updateAnimal(input: UpdateAnimalInput) {
   const before = await fetchDb();
-  let db = before;
-  const animal = db.animals.find((a) => a.id === input.id);
-  if (!animal) throw new Error("Animal not found");
+  const { db: after, newContacts } = applyUpdateAnimalDetails(before, input);
+  const updated = after.animals.find((a) => a.id === input.id)!;
+  const agreement = findPurchaseAgreement(after, input.id);
+  const sale = findSaleForAnimal(after, input.id);
 
-  const ownerRes = resolveOwnerContact(db, input.ownerName);
-  const newContacts: FarmDatabase["contacts"] = [];
-  if (ownerRes.created) {
-    newContacts.push(ownerRes.contact);
-    db = { ...db, contacts: [...db.contacts, ownerRes.contact] };
-  }
-  const vendorRes = resolveVendor(db, input.vendorName);
-  if (vendorRes.contact) {
-    newContacts.push(vendorRes.contact);
-    db = { ...db, contacts: [...db.contacts, vendorRes.contact] };
-  }
-  const owner = ownerRes.contact;
-
-  const updated = {
-    ...animal,
-    name: input.name?.trim() || null,
-    breed: input.breed ?? null,
-    sex: input.sex ?? null,
-    description: input.description?.trim() || null,
-    comment: input.comment?.trim() || null,
-    owner_id: owner.id,
-    purchased_from: vendorRes.id,
-    age_at_purchase: input.age_at_purchase?.trim() || null,
-    home_bred: Boolean(input.home_bred),
-    palai_rate:
-      owner.type === "Customer" && input.palai_rate != null && !Number.isNaN(input.palai_rate)
-        ? input.palai_rate
-        : owner.type === "Customer"
-          ? animal.palai_rate
-          : null,
-  };
-
-  const after = {
-    ...db,
-    animals: db.animals.map((a) => (a.id === updated.id ? updated : a)),
-  };
   if (isSupabaseDb()) {
     await applyWritePlan({
       upsertContacts: newContacts.length ? newContacts : undefined,
       upsertAnimals: [updated],
+      upsertPurchaseAgreements: agreement ? [agreement] : undefined,
+      upsertSales: sale ? [sale] : undefined,
     });
     return after;
   }
