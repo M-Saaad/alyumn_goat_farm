@@ -409,9 +409,9 @@ function PartnerSelect() {
   return (
     <div>
       <label className={label}>Who paid</label>
-      <select name="paidBy" className={field} required>
-        <option>Saad</option>
-        <option>Monis</option>
+      <select name="paidBy" className={field} required defaultValue="Saad">
+        <option value="Saad">Saad</option>
+        <option value="Monis">Monis</option>
       </select>
     </div>
   );

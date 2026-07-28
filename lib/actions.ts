@@ -1,5 +1,6 @@
 import type { FarmDatabase } from "./types";
 import { fetchDb, isSupabaseDb } from "./db";
+import { loadPartnerIds } from "./db/queries";
 import { computeSettlement } from "./partner-equity/settlement";
 import {
   createCostTransaction,
@@ -19,6 +20,9 @@ import {
   applyWritePlan,
 } from "./db/writes";
 import type { LedgerCategory, AnimalStatus, AnimalBreed, AnimalSex, MedicalEventType } from "./types";
+import { animalLabel } from "./labels";
+
+export { animalLabel };
 
 export async function getDb(): Promise<FarmDatabase> {
   return fetchDb();
@@ -31,10 +35,6 @@ export async function getSettlement() {
 export function contactName(db: FarmDatabase, id: string | null | undefined) {
   if (!id) return "—";
   return db.contacts.find((c) => c.id === id)?.name ?? "—";
-}
-
-export function animalLabel(a: { name: string | null; description: string | null; id: number }) {
-  return a.name || a.description?.slice(0, 40) || `Goat #${a.id}`;
 }
 
 function withLedgerIds(
@@ -52,6 +52,21 @@ export async function logExpense(input: {
   animalId?: number | null;
   notes?: string;
 }) {
+  if (isSupabaseDb()) {
+    const { monisId, saadId } = await loadPartnerIds();
+    const paidById = input.paidBy === "Monis" ? monisId : saadId;
+    const { tx, ledger } = createCostTransaction({
+      date: input.date,
+      amount: input.amount,
+      category: input.category,
+      paidByPartnerId: paidById,
+      animalId: input.animalId,
+      notes: input.notes,
+    });
+    await insertTransactionWithLedger(tx, withLedgerIds(ledger));
+    return;
+  }
+
   const db = await fetchDb();
   const { monisId, saadId } = getPartnerIds(db);
   const paidById = input.paidBy === "Monis" ? monisId : saadId;
@@ -64,10 +79,6 @@ export async function logExpense(input: {
     notes: input.notes,
   });
   const entries = withLedgerIds(ledger);
-  if (isSupabaseDb()) {
-    await insertTransactionWithLedger(tx, entries);
-    return db;
-  }
   const after = {
     ...db,
     transactions: [...db.transactions, tx],
