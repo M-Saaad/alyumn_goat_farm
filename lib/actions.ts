@@ -8,7 +8,13 @@ import {
   getPartnerIds,
 } from "./partner-equity/settlement";
 import { recognizePalaiPayment, applyPalaiToDb } from "./palai/recognize-payment";
-import { applyLivestockSaleToDb } from "./livestock/record-sale";
+import { applyLivestockSaleToDb, applySaleReceiptToDb } from "./livestock/record-sale";
+import {
+  applyPurchasePayment,
+  createPurchaseAgreement,
+  findPurchaseAgreement,
+  validatePurchasePaymentAmount,
+} from "./livestock/purchase-agreement";
 import {
   applyDeleteTransaction,
   applyUpdateTransaction,
@@ -173,6 +179,7 @@ function resolveVendor(
 export async function buyGoat(input: {
   date: string;
   price?: number | null;
+  paidNow?: number | null;
   breed: AnimalBreed;
   sex: AnimalSex;
   description: string;
@@ -239,41 +246,151 @@ export async function buyGoat(input: {
   };
   db = { ...db, animals: [...db.animals, animal] };
 
+  const defaultPaidNow = customerPaid ? 0 : price;
+  const paidNow =
+    input.paidNow == null || Number.isNaN(input.paidNow) ? defaultPaidNow : input.paidNow;
+  if (paidNow < 0) throw new Error("Amount paid cannot be negative");
+  if (paidNow > price + 0.005) throw new Error("Amount paid cannot exceed total price");
+
+  const agreement = createPurchaseAgreement({
+    animalId: nextId,
+    vendorId,
+    totalAmount: price,
+    amountPaid: customerPaid ? paidNow : 0,
+    notes: `Buy ${input.name || input.description}`,
+  });
+
+  let after = {
+    ...db,
+    purchase_agreements: [...(db.purchase_agreements ?? []), agreement],
+  };
+
   if (customerPaid) {
     if (isSupabaseDb()) {
       await applyWritePlan({
         upsertContacts: newContacts.length ? newContacts : undefined,
         upsertAnimals: [animal],
+        upsertPurchaseAgreements: [agreement],
       });
-      return db;
+      return after;
     }
-    return persistMutation(before, db);
+    return persistMutation(before, after);
   }
 
-  const { monisId, saadId } = getPartnerIds(db);
-  const paidById = input.paidBy === "Monis" ? monisId : saadId;
-  const { tx, ledger } = createCostTransaction({
-    date: input.date,
-    amount: price,
-    category: "Livestock Purchase",
-    paidByPartnerId: paidById,
-    animalId: nextId,
-    vendorId,
-    notes: `Buy ${input.name || input.description}`,
-  });
-  const entries = withLedgerIds(ledger);
-  const after = {
-    ...db,
-    transactions: [...db.transactions, tx],
-    partner_ledger_entries: [...db.partner_ledger_entries, ...entries],
-  };
+  if (paidNow > 0) {
+    const { monisId, saadId } = getPartnerIds(after);
+    const paidById = input.paidBy === "Monis" ? monisId : saadId;
+    const { tx, ledger } = createCostTransaction({
+      date: input.date,
+      amount: paidNow,
+      category: "Livestock Purchase",
+      paidByPartnerId: paidById,
+      animalId: nextId,
+      vendorId,
+      notes: `Buy ${input.name || input.description}`,
+      purchaseAgreementId: agreement.id,
+    });
+    const entries = withLedgerIds(ledger);
+    const settledAgreement = applyPurchasePayment(agreement, paidNow);
+    after = {
+      ...after,
+      transactions: [...after.transactions, tx],
+      partner_ledger_entries: [...after.partner_ledger_entries, ...entries],
+      purchase_agreements: (after.purchase_agreements ?? []).map((a) =>
+        a.id === agreement.id ? settledAgreement : a
+      ),
+    };
+    if (isSupabaseDb()) {
+      await insertTransactionWithLedger(tx, entries, {
+        contacts: newContacts.length ? newContacts : undefined,
+        animals: [animal],
+        purchaseAgreements: [settledAgreement],
+      });
+      return after;
+    }
+    return persistMutation(before, after);
+  }
+
   if (isSupabaseDb()) {
-    await insertTransactionWithLedger(tx, entries, {
-      contacts: newContacts.length ? newContacts : undefined,
-      animals: [animal],
+    await applyWritePlan({
+      upsertContacts: newContacts.length ? newContacts : undefined,
+      upsertAnimals: [animal],
+      upsertPurchaseAgreements: [agreement],
     });
     return after;
   }
+  return persistMutation(before, after);
+}
+
+export async function addPurchasePayment(input: {
+  animalId: number;
+  date: string;
+  amount: number;
+  paidBy: "Monis" | "Saad" | "Customer";
+  notes?: string;
+}) {
+  const before = await fetchDb();
+  const agreement = findPurchaseAgreement(before, input.animalId);
+  if (!agreement) throw new Error("No purchase agreement for this goat");
+  validatePurchasePaymentAmount(agreement, input.amount);
+
+  const updatedAgreement = applyPurchasePayment(agreement, input.amount);
+  let after: FarmDatabase = {
+    ...before,
+    purchase_agreements: (before.purchase_agreements ?? []).map((a) =>
+      a.id === agreement.id ? updatedAgreement : a
+    ),
+  };
+
+  if (input.paidBy === "Customer") {
+    return persistMutation(before, after);
+  }
+
+  const { monisId, saadId } = getPartnerIds(before);
+  const paidById = input.paidBy === "Monis" ? monisId : saadId;
+  const animal = before.animals.find((a) => a.id === input.animalId);
+  const { tx, ledger } = createCostTransaction({
+    date: input.date,
+    amount: input.amount,
+    category: "Livestock Purchase",
+    paidByPartnerId: paidById,
+    animalId: input.animalId,
+    vendorId: agreement.vendor_id,
+    notes: input.notes || `Purchase payment — ${animal?.name || animal?.description || "goat"}`,
+    purchaseAgreementId: agreement.id,
+  });
+  const entries = withLedgerIds(ledger);
+  after = {
+    ...after,
+    transactions: [...after.transactions, tx],
+    partner_ledger_entries: [...after.partner_ledger_entries, ...entries],
+  };
+
+  if (isSupabaseDb()) {
+    await insertTransactionWithLedger(tx, entries, {
+      purchaseAgreements: [updatedAgreement],
+    });
+    return after;
+  }
+  return persistMutation(before, after);
+}
+
+export async function addSaleReceipt(input: {
+  animalId: number;
+  date: string;
+  amount: number;
+  receivedBy: "Monis" | "Saad";
+  notes?: string;
+}) {
+  const before = await fetchDb();
+  const sale = (before.livestock_sales ?? []).find((s) => s.animal_ids.includes(input.animalId));
+  if (!sale) throw new Error("No sale agreement for this goat");
+  const after = applySaleReceiptToDb(before, sale.id, {
+    date: input.date,
+    amount: input.amount,
+    receivedBy: input.receivedBy,
+    notes: input.notes,
+  });
   return persistMutation(before, after);
 }
 
@@ -440,6 +557,7 @@ export async function recordLivestockSale(input: {
   grossSalePrice: number;
   deliveryCost?: number;
   receivedBy?: "Monis" | "Saad";
+  amountReceivedNow?: number | null;
   notes?: string;
 }) {
   const before = await fetchDb();

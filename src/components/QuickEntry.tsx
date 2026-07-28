@@ -210,6 +210,11 @@ export function QuickEntry({
                 <Field label="Sale date" name="date" type="date" defaultValue={todayIso()} required />
                 <Field label="Gross sale price (PKR)" name="grossSalePrice" type="number" required />
                 <Field
+                  label="Received now (PKR, optional — leave blank for full net)"
+                  name="amountReceivedNow"
+                  type="number"
+                />
+                <Field
                   label="Delivery deducted from proceeds"
                   name="deliveryCost"
                   type="number"
@@ -224,8 +229,8 @@ export function QuickEntry({
                 </div>
                 <Field label="Notes" name="notes" />
                 <p className="text-xs text-stone-500">
-                  Records one partner&apos;s half in the ledger (sheet convention). Dashboard shows full net
-                  proceeds (2×).
+                  Goat is marked sold immediately. Each receipt splits 50/50 in the ledger. Leave
+                  received blank to record full net proceeds now.
                 </p>
                 <SubmitButton />
               </ActionForm>
@@ -351,10 +356,15 @@ function BuyGoatForm({
         </select>
       </div>
       <Field
-        label={priceOptional ? "Price (optional)" : "Price"}
+        label={priceOptional ? "Price (optional)" : "Total price"}
         name="price"
         type="number"
         required={!priceOptional}
+      />
+      <Field
+        label="Paid now (optional — leave blank for full amount)"
+        name="paidNow"
+        type="number"
       />
       <SubmitButton label="Add goat" pendingLabel="Adding…" />
     </ActionForm>

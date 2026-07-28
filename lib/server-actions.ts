@@ -1,6 +1,8 @@
 "use server";
 
 import {
+  addPurchasePayment,
+  addSaleReceipt,
   buyGoat,
   changeStatus,
   deleteTransaction,
@@ -72,12 +74,14 @@ export async function actionBuyGoat(formData: FormData) {
   const palaiRaw = String(formData.get("palaiRate") || "").trim();
   const paidBy = String(formData.get("paidBy")) as "Monis" | "Saad" | "Customer";
   const priceRaw = String(formData.get("price") || "").trim();
+  const paidNowRaw = String(formData.get("paidNow") || "").trim();
   if (paidBy !== "Customer" && !priceRaw) {
     throw new Error("Price is required");
   }
   await buyGoat({
     date: String(formData.get("date")),
     price: priceRaw ? Number(priceRaw) : null,
+    paidNow: paidNowRaw ? Number(paidNowRaw) : null,
     breed: String(formData.get("breed")) as AnimalBreed,
     sex: String(formData.get("sex")) as AnimalSex,
     description: String(formData.get("description")),
@@ -123,6 +127,7 @@ export async function actionChangeStatus(formData: FormData) {
 
 export async function actionRecordLivestockSale(formData: FormData) {
   const additional = String(formData.get("additionalAnimalId") || "").trim();
+  const receivedNowRaw = String(formData.get("amountReceivedNow") || "").trim();
   await recordLivestockSale({
     date: String(formData.get("date")),
     animalId: Number(formData.get("animalId")),
@@ -130,8 +135,47 @@ export async function actionRecordLivestockSale(formData: FormData) {
     grossSalePrice: Number(formData.get("grossSalePrice")),
     deliveryCost: formData.get("deliveryCost") ? Number(formData.get("deliveryCost")) : undefined,
     receivedBy: String(formData.get("receivedBy")) as "Monis" | "Saad",
+    amountReceivedNow: receivedNowRaw ? Number(receivedNowRaw) : null,
     notes: String(formData.get("notes") || "") || undefined,
   });
+  revalidateTxnPaths();
+}
+
+export async function actionAddPurchasePayment(formData: FormData) {
+  const amount = Number(formData.get("amount"));
+  if (!amount || Number.isNaN(amount) || amount <= 0) {
+    throw new Error("Amount must be positive");
+  }
+  const paidBy = String(formData.get("paidBy"));
+  if (paidBy !== "Monis" && paidBy !== "Saad" && paidBy !== "Customer") {
+    throw new Error("Select who paid");
+  }
+  await addPurchasePayment({
+    animalId: Number(formData.get("animalId")),
+    date: String(formData.get("date")),
+    amount,
+    paidBy,
+    notes: String(formData.get("notes") || "") || undefined,
+  });
+  const id = Number(formData.get("animalId"));
+  revalidatePath(`/animals/${id}`);
+  revalidateTxnPaths();
+}
+
+export async function actionAddSaleReceipt(formData: FormData) {
+  const amount = Number(formData.get("amount"));
+  if (!amount || Number.isNaN(amount) || amount <= 0) {
+    throw new Error("Amount must be positive");
+  }
+  await addSaleReceipt({
+    animalId: Number(formData.get("animalId")),
+    date: String(formData.get("date")),
+    amount,
+    receivedBy: String(formData.get("receivedBy")) as "Monis" | "Saad",
+    notes: String(formData.get("notes") || "") || undefined,
+  });
+  const id = Number(formData.get("animalId"));
+  revalidatePath(`/animals/${id}`);
   revalidateTxnPaths();
 }
 

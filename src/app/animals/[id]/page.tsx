@@ -8,6 +8,10 @@ import { BottomNav } from "@/components/BottomNav";
 import { QuickEntryLoader } from "@/components/QuickEntryLoader";
 import { AnimalEditor } from "@/components/AnimalEditor";
 import { AnimalMediaGallery } from "@/components/AnimalMediaGallery";
+import {
+  PurchaseInstallmentCard,
+  SaleInstallmentCard,
+} from "@/components/InstallmentCards";
 
 export const dynamic = "force-dynamic";
 
@@ -41,6 +45,9 @@ export default async function AnimalProfilePage({
   const vendorName = animal.purchased_from
     ? contactNameFrom(data.contacts, animal.purchased_from)
     : null;
+  const ownerContact = data.contacts.find((c) => c.id === animal.owner_id);
+  const isCustomerOwner = ownerContact?.type === "Customer";
+  const sale = saleMeta[0];
 
   return (
     <main className="px-4 pt-6">
@@ -80,6 +87,31 @@ export default async function AnimalProfilePage({
         animalId={animalId}
         supabaseEnabled={supabaseEnabled}
       />
+
+      {data.purchase_agreement ? (
+        <PurchaseInstallmentCard
+          animalId={animalId}
+          agreement={data.purchase_agreement}
+          balance={data.purchase_balance}
+          isCustomerOwner={isCustomerOwner}
+        />
+      ) : data.purchase_balance > 0 ? (
+        <section className="mb-3 rounded-2xl bg-amber-50 p-4 text-sm text-amber-900 ring-1 ring-amber-200">
+          <p className="font-semibold">Outstanding purchase balance</p>
+          <p>{formatPkr(data.purchase_balance)} remaining on agreed price {formatPkr(animal.price)}</p>
+          <p className="mt-1 text-xs text-amber-800">
+            Log further livestock purchase payments from Transactions or Quick Entry.
+          </p>
+        </section>
+      ) : null}
+
+      {sale && (
+        <SaleInstallmentCard
+          animalId={animalId}
+          sale={sale}
+          balance={data.sale_balance ?? 0}
+        />
+      )}
 
       <section className="mb-3 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-stone-200">
         <h2 className="mb-2 text-sm font-bold">Purchase</h2>
