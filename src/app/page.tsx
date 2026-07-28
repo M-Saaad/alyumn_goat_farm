@@ -1,17 +1,12 @@
 import Link from "next/link";
-import nextDynamic from "next/dynamic";
 import { loadHomeData, contactNameFrom } from "@/lib/db/queries";
 import { computeSettlement } from "@/lib/partner-equity/settlement";
 import { formatPkr } from "@/lib/format";
 import { BottomNav } from "@/components/BottomNav";
 import { SignOutButton } from "@/components/SignOutButton";
+import { QuickEntry } from "@/components/QuickEntryDynamic";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 import type { FarmDatabase } from "@/lib/types";
-
-const QuickEntry = nextDynamic(
-  () => import("@/components/QuickEntry").then((m) => m.QuickEntry),
-  { ssr: false }
-);
 
 export const dynamic = "force-dynamic";
 

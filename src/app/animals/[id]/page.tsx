@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import nextDynamic from "next/dynamic";
 import { animalLabel } from "@/lib/actions";
 import { formatPkr } from "@/lib/format";
 import { isSupabaseDb } from "@/lib/db";
@@ -8,11 +7,7 @@ import { loadAnimalProfileData, contactNameFrom } from "@/lib/db/queries";
 import { BottomNav } from "@/components/BottomNav";
 import { AnimalEditor } from "@/components/AnimalEditor";
 import { AnimalMediaGallery } from "@/components/AnimalMediaGallery";
-
-const QuickEntry = nextDynamic(
-  () => import("@/components/QuickEntry").then((m) => m.QuickEntry),
-  { ssr: false }
-);
+import { QuickEntry } from "@/components/QuickEntryDynamic";
 
 export const dynamic = "force-dynamic";
 

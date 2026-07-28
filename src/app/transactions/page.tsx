@@ -1,5 +1,4 @@
 import { Suspense } from "react";
-import nextDynamic from "next/dynamic";
 import { animalLabel } from "@/lib/actions";
 import { LEDGER_CATEGORIES, slugToCategory } from "@/lib/constants";
 import { loadTransactionsData, contactNameFrom } from "@/lib/db/queries";
@@ -11,12 +10,8 @@ import {
 } from "@/components/TransactionEditor";
 import { resolveTransactionKind } from "@/lib/transactions/mutate";
 import { getPartnerIds } from "@/lib/partner-equity/settlement";
+import { QuickEntry } from "@/components/QuickEntryDynamic";
 import type { FarmDatabase } from "@/lib/types";
-
-const QuickEntry = nextDynamic(
-  () => import("@/components/QuickEntry").then((m) => m.QuickEntry),
-  { ssr: false }
-);
 
 export const dynamic = "force-dynamic";
 
