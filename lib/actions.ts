@@ -8,7 +8,7 @@ import {
   getPartnerIds,
 } from "./partner-equity/settlement";
 import { recognizePalaiPayment, applyPalaiToDb } from "./palai/recognize-payment";
-import { applyLivestockSaleToDb, applySaleReceiptToDb } from "./livestock/record-sale";
+import { applyLivestockSaleToDb, applySaleReceiptToDb, beginLivestockSale, buildSaleReceipt } from "./livestock/record-sale";
 import {
   applyPurchasePayment,
   createPurchaseAgreement,
@@ -386,6 +386,26 @@ export async function addSaleReceipt(input: {
   const before = await fetchDb();
   const sale = (before.livestock_sales ?? []).find((s) => s.animal_ids.includes(input.animalId));
   if (!sale) throw new Error("No sale agreement for this goat");
+
+  if (isSupabaseDb()) {
+    const { tx, ledger, sale: updatedSale } = buildSaleReceipt(before, sale, {
+      date: input.date,
+      amount: input.amount,
+      receivedBy: input.receivedBy,
+      notes: input.notes,
+    });
+    const entries = withLedgerIds(ledger);
+    await insertTransactionWithLedger(tx, entries, { sales: [updatedSale] });
+    return {
+      ...before,
+      transactions: [...before.transactions, tx],
+      partner_ledger_entries: [...before.partner_ledger_entries, ...entries],
+      livestock_sales: (before.livestock_sales ?? []).map((s) =>
+        s.id === updatedSale.id ? updatedSale : s
+      ),
+    };
+  }
+
   const after = applySaleReceiptToDb(before, sale.id, {
     date: input.date,
     amount: input.amount,
@@ -562,6 +582,28 @@ export async function recordLivestockSale(input: {
   notes?: string;
 }) {
   const before = await fetchDb();
+  const result = beginLivestockSale(before, input);
+
+  if (isSupabaseDb()) {
+    const animalIds = new Set(result.sale.animal_ids);
+    const entries = result.tx ? withLedgerIds(result.ledger) : [];
+    await applyWritePlan({
+      upsertAnimals: result.animals.filter((a) => animalIds.has(a.id)),
+      upsertTransactions: result.tx ? [result.tx] : undefined,
+      upsertLedger: entries.length ? entries : undefined,
+      upsertSales: [result.sale],
+    });
+    return {
+      ...before,
+      animals: result.animals,
+      transactions: result.tx ? [...before.transactions, result.tx] : before.transactions,
+      partner_ledger_entries: result.tx
+        ? [...before.partner_ledger_entries, ...entries]
+        : before.partner_ledger_entries,
+      livestock_sales: [...(before.livestock_sales ?? []), result.sale],
+    };
+  }
+
   const after = applyLivestockSaleToDb(before, input);
   return persistMutation(before, after);
 }

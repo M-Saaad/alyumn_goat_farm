@@ -82,7 +82,8 @@ function validateReceiptAmount(sale: LivestockSale, amount: number) {
 export function buildSaleReceipt(
   db: FarmDatabase,
   sale: LivestockSale,
-  input: SaleReceiptInput
+  input: SaleReceiptInput,
+  opts?: { initialLink?: boolean }
 ): SaleReceiptResult {
   validateReceiptAmount(sale, input.amount);
   const animal = db.animals.find((a) => sale.animal_ids.includes(a.id));
@@ -100,7 +101,9 @@ export function buildSaleReceipt(
     monisId,
     animalId: sale.animal_ids[0] ?? null,
     notes,
-    livestockSaleId: sale.id,
+    // Initial sale receipt links via livestock_sales.transaction_id only — both rows
+    // are inserted together and livestock_sale_id would violate FK ordering on Supabase.
+    livestockSaleId: opts?.initialLink ? null : sale.id,
   });
 
   const nextReceived = sale.amount_received + input.amount;
@@ -162,12 +165,17 @@ export function beginLivestockSale(
   let ledger: Omit<PartnerLedgerEntry, "id" | "created_at">[] = [];
 
   if (receivedNow > 0) {
-    const receipt = buildSaleReceipt(db, { ...sale, amount_received: 0 }, {
-      date: input.date,
-      amount: receivedNow,
-      receivedBy: input.receivedBy ?? "Monis",
-      notes: input.notes ?? undefined,
-    });
+    const receipt = buildSaleReceipt(
+      db,
+      { ...sale, amount_received: 0 },
+      {
+        date: input.date,
+        amount: receivedNow,
+        receivedBy: input.receivedBy ?? "Monis",
+        notes: input.notes ?? undefined,
+      },
+      { initialLink: true }
+    );
     tx = receipt.tx;
     ledger = receipt.ledger;
     sale.amount_received = receipt.sale.amount_received;
