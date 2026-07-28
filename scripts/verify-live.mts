@@ -5,7 +5,8 @@ import { loadDb, saveDb } from "../lib/db";
 import { computeSettlement, assertCanonicalSettlement } from "../lib/partner-equity/settlement";
 import { recognizePalaiPayment, applyPalaiToDb } from "../lib/palai/recognize-payment";
 import { computeSaleSplit, saleAdjustmentAmount } from "../lib/livestock/record-sale";
-import { buyGoat, logExpense, logMedical, recordBreeding, recordLivestockSale, addSaleReceipt, updateAnimal } from "../lib/actions";
+import { buyGoat, logExpense, logMedical, recordBreeding, recordLivestockSale, addSaleReceipt, updateAnimal, deleteSaleReceipt, undoLivestockSale } from "../lib/actions";
+import { isSoldOnPalaiSale } from "../lib/livestock/cancel-sale";
 import fs from "fs";
 import path from "path";
 
@@ -134,6 +135,55 @@ async function main() {
       throw new Error("follow-up receipt should link via livestock_sale_id");
     }
     console.log("PASS partial sale + follow-up receipt");
+
+    const receiptTxId = receiptTx!.id;
+    await deleteSaleReceipt(receiptTxId);
+    const afterDelReceipt = loadDb();
+    const saleAfterDel = (afterDelReceipt.livestock_sales ?? []).find((s) => s.id === partialSale!.id);
+    if (!saleAfterDel || saleAfterDel.amount_received !== 10000) {
+      throw new Error(`delete follow-up receipt failed: ${saleAfterDel?.amount_received}`);
+    }
+    console.log("PASS delete sale installment receipt");
+
+    await undoLivestockSale(partialGoat.id);
+    const afterUndo = loadDb();
+    const undone = afterUndo.animals.find((a) => a.id === partialGoat.id);
+    if (undone?.status !== "Active" || undone.sold_price != null) {
+      throw new Error("undo sale did not revert goat");
+    }
+    if ((afterUndo.livestock_sales ?? []).some((s) => s.animal_ids.includes(partialGoat.id))) {
+      throw new Error("undo sale left livestock_sales row");
+    }
+    console.log("PASS undo entire livestock sale");
+
+    restore();
+    const dbPalaiSell = loadDb();
+    const palaiGoat = dbPalaiSell.animals.find((a) => a.status === "Active");
+    if (!palaiGoat) throw new Error("no goat for palai sale test");
+    await recordLivestockSale({
+      date: "2026-07-28",
+      animalId: palaiGoat.id,
+      grossSalePrice: 40000,
+      receivedBy: "Monis",
+      amountReceivedNow: 5000,
+      soldOnPalai: true,
+      buyerName: "Awais",
+      palaiRatePerGoat: 6000,
+      notes: "palai sale test",
+    });
+    const afterPalaiSell = loadDb();
+    const palaiSold = afterPalaiSell.animals.find((a) => a.id === palaiGoat.id);
+    const awaisContact = afterPalaiSell.contacts.find((c) => c.name === "Awais");
+    const palaiSale = (afterPalaiSell.livestock_sales ?? []).find((s) =>
+      s.animal_ids.includes(palaiGoat.id)
+    );
+    if (!palaiSold || palaiSold.status !== "Active") throw new Error("sold-on-palai should stay Active");
+    if (!awaisContact || palaiSold.owner_id !== awaisContact.id) {
+      throw new Error("sold-on-palai should set buyer as owner");
+    }
+    if (palaiSold.palai_rate !== 6000) throw new Error("sold-on-palai palai rate missing");
+    if (!palaiSale || !isSoldOnPalaiSale(palaiSale)) throw new Error("sold-on-palai sale tag missing");
+    console.log("PASS sold on palai keeps goat Active under buyer");
 
     restore();
     await buyGoat({

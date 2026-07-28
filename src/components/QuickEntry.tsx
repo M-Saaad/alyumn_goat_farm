@@ -199,41 +199,7 @@ export function QuickEntry({
             )}
 
             {mode === "sell" && (
-              <ActionForm action={actionRecordLivestockSale} onSuccess={close}>
-                <AnimalSelect animals={animals} />
-                <AnimalSelect
-                  animals={animals}
-                  optional
-                  name="additionalAnimalId"
-                  fieldLabel="Second goat (optional)"
-                />
-                <Field label="Sale date" name="date" type="date" defaultValue={todayIso()} required />
-                <Field label="Gross sale price (PKR)" name="grossSalePrice" type="number" required />
-                <Field
-                  label="Received now (PKR, optional — leave blank for full net)"
-                  name="amountReceivedNow"
-                  type="number"
-                />
-                <Field
-                  label="Delivery deducted from proceeds"
-                  name="deliveryCost"
-                  type="number"
-                  defaultValue="0"
-                />
-                <div>
-                  <label className={label}>Cash received by</label>
-                  <select name="receivedBy" className={field} required>
-                    <option value="Monis">Monis</option>
-                    <option value="Saad">Saad</option>
-                  </select>
-                </div>
-                <Field label="Notes" name="notes" />
-                <p className="text-xs text-stone-500">
-                  Goat is marked sold immediately. Each receipt splits 50/50 in the ledger. Leave
-                  received blank to record full net proceeds now.
-                </p>
-                <SubmitButton />
-              </ActionForm>
+              <SellGoatForm animals={animals} customers={customers} onSuccess={close} />
             )}
 
             {mode === "status" && (
@@ -275,6 +241,85 @@ export function QuickEntry({
         </div>
       )}
     </>
+  );
+}
+
+function SellGoatForm({
+  animals,
+  customers,
+  onSuccess,
+}: {
+  animals: AnimalOption[];
+  customers: ContactOption[];
+  onSuccess: () => void;
+}) {
+  const [soldOnPalai, setSoldOnPalai] = useState(false);
+
+  return (
+    <ActionForm action={actionRecordLivestockSale} onSuccess={onSuccess}>
+      <AnimalSelect animals={animals} />
+      <AnimalSelect
+        animals={animals}
+        optional
+        name="additionalAnimalId"
+        fieldLabel="Second goat (optional)"
+      />
+      <Field label="Sale date" name="date" type="date" defaultValue={todayIso()} required />
+      <Field label="Gross sale price (PKR)" name="grossSalePrice" type="number" required />
+      <Field
+        label="Received now (PKR, optional — leave blank for full net)"
+        name="amountReceivedNow"
+        type="number"
+      />
+      <Field
+        label="Delivery deducted from proceeds"
+        name="deliveryCost"
+        type="number"
+        defaultValue="0"
+      />
+      <div>
+        <label className={label}>Cash received by</label>
+        <select name="receivedBy" className={field} required>
+          <option value="Monis">Monis</option>
+          <option value="Saad">Saad</option>
+        </select>
+      </div>
+      <label className="flex items-center gap-2 text-sm text-stone-700">
+        <input
+          type="checkbox"
+          name="soldOnPalai"
+          value="true"
+          checked={soldOnPalai}
+          onChange={(e) => setSoldOnPalai(e.target.checked)}
+          className="h-4 w-4 rounded border-stone-300"
+        />
+        Sold on palai (buyer owns goats but they stay at the farm)
+      </label>
+      {soldOnPalai && (
+        <>
+          <ContactSelect
+            label="Buyer (customer)"
+            name="buyerName"
+            options={customers}
+            required
+            addNewLabel="+ Add new customer"
+          />
+          <Field
+            label="Palai rate per goat (PKR / month)"
+            name="palaiRatePerGoat"
+            type="number"
+            required
+          />
+        </>
+      )}
+      <Field label="Notes" name="notes" />
+      <p className="text-xs text-stone-500">
+        {soldOnPalai
+          ? "Goats stay Active under the buyer for palai. Sale installments and partner split still apply."
+          : "Goat is marked sold immediately. Each receipt splits 50/50 in the ledger. Leave received blank to record full net proceeds now."}
+      </p>
+      <SubmitButton />
+    </ActionForm>
   );
 }
 

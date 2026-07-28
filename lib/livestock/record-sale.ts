@@ -18,6 +18,7 @@ import type {
 } from "../types";
 import { createAdjustmentTransaction, getPartnerIds } from "../partner-equity/settlement";
 import { agreementStatus } from "./purchase-agreement";
+import { tagSoldOnPalai } from "./cancel-sale";
 
 export interface RecordLivestockSaleInput {
   date: string;
@@ -29,6 +30,10 @@ export interface RecordLivestockSaleInput {
   /** Cash received now toward net proceeds. Defaults to full net. Use 0 for sold-with-no-cash-yet. */
   amountReceivedNow?: number | null;
   notes?: string | null;
+  /** Buyer keeps goats at farm for palai — sets customer owner + palai rate, stays Active. */
+  soldOnPalai?: boolean;
+  buyerName?: string | null;
+  palaiRatePerGoat?: number | null;
 }
 
 export interface SaleReceiptInput {
@@ -126,6 +131,7 @@ export function beginLivestockSale(
   tx: Transaction | null;
   ledger: Omit<PartnerLedgerEntry, "id" | "created_at">[];
   animals: FarmDatabase["animals"];
+  newContacts: FarmDatabase["contacts"];
 } {
   const animal = db.animals.find((a) => a.id === input.animalId);
   if (!animal) throw new Error("Animal not found");
@@ -158,7 +164,7 @@ export function beginLivestockSale(
     transaction_id: null,
     amount_received: 0,
     status: receivedNow >= netReceived - 0.005 ? "settled" : "open",
-    notes: input.notes ?? null,
+    notes: input.soldOnPalai ? tagSoldOnPalai(input.notes) : (input.notes ?? null),
   };
 
   let tx: Transaction | null = null;
@@ -188,17 +194,56 @@ export function beginLivestockSale(
   }
 
   const idSet = new Set(animalIds);
-  const animals = db.animals.map((a) => {
+  const pricePerGoat = input.grossSalePrice / animalIds.length;
+  const newContacts: FarmDatabase["contacts"] = [];
+  let dbForOwner = db;
+
+  let buyerId: string | null = null;
+  if (input.soldOnPalai) {
+    const buyerName = input.buyerName?.trim();
+    if (!buyerName) throw new Error("Select the buyer for sold-on-palai");
+    const palaiRate = input.palaiRatePerGoat;
+    if (palaiRate == null || Number.isNaN(palaiRate) || palaiRate <= 0) {
+      throw new Error("Palai rate per goat is required for sold-on-palai");
+    }
+    let buyer = db.contacts.find(
+      (c) => c.name.toLowerCase() === buyerName.toLowerCase() && c.type === "Customer"
+    );
+    if (!buyer) {
+      buyer = {
+        id: crypto.randomUUID(),
+        name: buyerName,
+        type: "Customer",
+        phone: null,
+        notes: null,
+      };
+      newContacts.push(buyer);
+      dbForOwner = { ...dbForOwner, contacts: [...dbForOwner.contacts, buyer] };
+    }
+    buyerId = buyer.id;
+  }
+
+  const animals = dbForOwner.animals.map((a) => {
     if (!idSet.has(a.id)) return a;
+    if (input.soldOnPalai && buyerId) {
+      return {
+        ...a,
+        status: "Active" as const,
+        out_date: null,
+        sold_price: pricePerGoat,
+        owner_id: buyerId,
+        palai_rate: input.palaiRatePerGoat ?? null,
+      };
+    }
     return {
       ...a,
       status: "Sold" as const,
       out_date: input.date,
-      sold_price: input.grossSalePrice,
+      sold_price: pricePerGoat,
     };
   });
 
-  return { sale, tx, ledger, animals };
+  return { sale, tx, ledger, animals, newContacts };
 }
 
 export function applyLivestockSaleToDb(
@@ -210,6 +255,7 @@ export function applyLivestockSaleToDb(
 
   return {
     ...db,
+    contacts: result.newContacts.length ? [...db.contacts, ...result.newContacts] : db.contacts,
     animals: result.animals,
     transactions: result.tx ? [...db.transactions, result.tx] : db.transactions,
     partner_ledger_entries: result.tx
