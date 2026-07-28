@@ -12,6 +12,7 @@ import {
   PurchaseInstallmentCard,
   SaleInstallmentCard,
 } from "@/components/InstallmentCards";
+import { DeleteAnimalButton } from "@/components/DeleteAnimalButton";
 
 export const dynamic = "force-dynamic";
 
@@ -55,13 +56,16 @@ export default async function AnimalProfilePage({
         ← Goats
       </Link>
 
-      <header className="mt-2 mb-4">
-        <h1 className="text-2xl font-bold">{animalLabel(animal)}</h1>
-        <p className="text-stone-500">
-          {[animal.breed, animal.sex, animal.status, ownerName]
-            .filter(Boolean)
-            .join(" · ")}
-        </p>
+      <header className="mt-2 mb-4 flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold">{animalLabel(animal)}</h1>
+          <p className="text-stone-500">
+            {[animal.breed, animal.sex, animal.status, ownerName]
+              .filter(Boolean)
+              .join(" · ")}
+          </p>
+        </div>
+        <DeleteAnimalButton animalId={animal.id} label={animalLabel(animal)} />
       </header>
 
       <AnimalEditor
