@@ -1,16 +1,17 @@
 import { Suspense } from "react";
-import { animalLabel } from "@/lib/actions";
+import { animalLabel } from "@/lib/labels";
 import { LEDGER_CATEGORIES, slugToCategory } from "@/lib/constants";
 import { loadTransactionsData, contactNameFrom } from "@/lib/db/queries";
 import { BottomNav } from "@/components/BottomNav";
+import { QuickEntryLoader } from "@/components/QuickEntryLoader";
 import { TransactionsFilters } from "@/components/TransactionsFilters";
 import {
   TransactionEditor,
   type EditableTransaction,
 } from "@/components/TransactionEditor";
+import { formatDate } from "@/lib/format";
 import { resolveTransactionKind } from "@/lib/transactions/mutate";
 import { getPartnerIds } from "@/lib/partner-equity/settlement";
-import { QuickEntry } from "@/components/QuickEntryDynamic";
 import type { FarmDatabase } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -49,7 +50,8 @@ export default async function TransactionsPage({
       (t) =>
         (t.notes || "").toLowerCase().includes(q) ||
         t.category.toLowerCase().includes(q) ||
-        t.date.includes(q)
+        t.date.includes(q) ||
+        formatDate(t.date).toLowerCase().includes(q)
     );
   }
 
@@ -182,7 +184,7 @@ export default async function TransactionsPage({
         )}
       </section>
 
-      <QuickEntry {...data.quickEntry} />
+      <QuickEntryLoader {...data.quickEntry} />
       <BottomNav active="txns" />
     </main>
   );

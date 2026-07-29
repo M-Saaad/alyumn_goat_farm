@@ -7,7 +7,7 @@ import {
   actionUpdateTransaction,
 } from "@/lib/server-actions";
 import { LEDGER_CATEGORIES } from "@/lib/constants";
-import { formatPkr } from "@/lib/format";
+import { formatPkr, formatDate } from "@/lib/format";
 import type { TransactionEditVariant } from "@/lib/transactions/mutate";
 import { ActionForm, SubmitButton } from "@/components/ActionForm";
 import { ContactSelect, type ContactOption } from "@/components/ContactSelect";
@@ -88,7 +88,7 @@ export function TransactionEditor({
   function onDelete(tx: EditableTransaction) {
     setMenuOpenId(null);
     const ok = window.confirm(
-      `Delete ${tx.category} · ${formatPkr(Math.abs(tx.amount))} on ${tx.date}? This cannot be undone.`
+      `Delete ${tx.category} · ${formatPkr(Math.abs(tx.amount))} on ${formatDate(tx.date)}? This cannot be undone.`
     );
     if (!ok) return;
     setError(null);
@@ -125,7 +125,7 @@ export function TransactionEditor({
             <div className="min-w-0 flex-1">
               <p className="font-medium text-stone-800">{tx.category}</p>
               <p className="text-xs text-stone-500">
-                {tx.date} ·{" "}
+                {formatDate(tx.date)} ·{" "}
                 {tx.kind === "cost"
                   ? `paid by ${tx.paidBy ?? "—"}`
                   : "adjustment"}

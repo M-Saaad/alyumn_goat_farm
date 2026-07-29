@@ -19,6 +19,7 @@ import {
   computeSaleSplit,
   saleAdjustmentAmount,
 } from "../livestock/record-sale";
+import { applyDeleteSaleReceipt, findSaleForReceipt } from "../livestock/cancel-sale";
 import { diffDb, type WritePlan } from "../db/writes";
 
 export type TransactionEditVariant =
@@ -312,7 +313,9 @@ export function applyUpdateTransaction(
         adjustment_partner_id: monisId,
       };
 
-      const existingSale = db.livestock_sales.find((s) => s.transaction_id === tx.id);
+      const existingSale = (db.livestock_sales ?? []).find(
+        (s) => s.transaction_id === tx.id || s.id === tx.livestock_sale_id
+      );
       const prevAnimalIds = new Set(existingSale?.animal_ids ?? (tx.animal_id != null ? [tx.animal_id] : []));
       const newAnimalIds = new Set(animalIds);
 
@@ -332,6 +335,10 @@ export function applyUpdateTransaction(
         return a;
       });
 
+      const amountReceived = existingSale
+        ? Math.min(existingSale.amount_received, netReceived)
+        : netReceived;
+
       const sale: LivestockSale = existingSale
         ? {
             ...existingSale,
@@ -342,6 +349,8 @@ export function applyUpdateTransaction(
             net_received: netReceived,
             partner_share: partnerShare,
             received_by_partner_id: receivedByPartnerId,
+            amount_received: amountReceived,
+            status: amountReceived >= netReceived - 0.005 ? "settled" : "open",
             notes: input.notes || null,
           }
         : {
@@ -354,6 +363,8 @@ export function applyUpdateTransaction(
             partner_share: partnerShare,
             received_by_partner_id: receivedByPartnerId,
             transaction_id: tx.id,
+            amount_received: netReceived,
+            status: "settled",
             notes: input.notes || null,
           };
 
@@ -392,20 +403,11 @@ export function applyDeleteTransaction(db: FarmDatabase, id: string): FarmDataba
     }
 
     case "livestock_sale": {
-      const sale = db.livestock_sales.find((s) => s.transaction_id === id);
-      const animalIds = new Set(
-        sale?.animal_ids ?? (tx.animal_id != null ? [tx.animal_id] : [])
-      );
-      const animals = db.animals.map((a) => {
-        if (!animalIds.has(a.id)) return a;
-        return { ...a, status: "Active" as const, sold_price: null, out_date: null };
-      });
-      const next = removeTxAndLedger(db, id);
-      return {
-        ...next,
-        animals,
-        livestock_sales: (next.livestock_sales ?? []).filter((s) => s.transaction_id !== id),
-      };
+      const linkedSale = findSaleForReceipt(db, id);
+      if (linkedSale) {
+        return applyDeleteSaleReceipt(db, id);
+      }
+      return removeTxAndLedger(db, id);
     }
 
     case "livestock_purchase": {

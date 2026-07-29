@@ -1,20 +1,30 @@
 "use server";
 
+import { redirect } from "next/navigation";
 import {
+  addPurchasePayment,
+  addSaleReceipt,
   buyGoat,
   changeStatus,
   deleteTransaction,
+  deleteAnimal,
+  deleteSaleReceipt,
   logExpense,
   logMedical,
+  logWeight,
   partnerTransfer,
   recordBreeding,
+  updateBreeding,
+  deleteBreeding,
   recordLivestockSale,
   recordPalai,
   updateAnimal,
   updateTransaction,
+  undoLivestockSale,
 } from "@/lib/actions";
 import { revalidatePath } from "next/cache";
 import type { AnimalBreed, AnimalSex, AnimalStatus, LedgerCategory, MedicalEventType } from "@/lib/types";
+import { LEDGER_CATEGORIES } from "@/lib/types";
 import { uploadAnimalMedia } from "@/lib/media/upload";
 import type { TransactionEditVariant } from "@/lib/transactions/mutate";
 
@@ -22,16 +32,36 @@ function revalidateTxnPaths() {
   revalidatePath("/");
   revalidatePath("/transactions");
   revalidatePath("/animals");
+  revalidatePath("/health");
 }
 
 export async function actionLogExpense(formData: FormData) {
+  const date = String(formData.get("date") || "").trim();
+  const amountRaw = String(formData.get("amount") || "").trim();
+  const category = String(formData.get("category") || "").trim();
+  const paidBy = String(formData.get("paidBy") || "").trim();
+  const animalRaw = String(formData.get("animalId") || "").trim();
+  const notes = String(formData.get("notes") || "");
+
+  if (!date) throw new Error("Date is required");
+  const amount = Number(amountRaw);
+  if (!amountRaw || Number.isNaN(amount) || amount <= 0) {
+    throw new Error("Amount must be a positive number");
+  }
+  if (!(LEDGER_CATEGORIES as readonly string[]).includes(category)) {
+    throw new Error("Invalid category");
+  }
+  if (paidBy !== "Monis" && paidBy !== "Saad") {
+    throw new Error("Select who paid (Monis or Saad)");
+  }
+
   await logExpense({
-    date: String(formData.get("date")),
-    amount: Number(formData.get("amount")),
-    category: String(formData.get("category")) as LedgerCategory,
-    paidBy: String(formData.get("paidBy")) as "Monis" | "Saad",
-    animalId: formData.get("animalId") ? Number(formData.get("animalId")) : null,
-    notes: String(formData.get("notes") || ""),
+    date,
+    amount,
+    category: category as LedgerCategory,
+    paidBy,
+    animalId: animalRaw ? Number(animalRaw) : null,
+    notes,
   });
   revalidateTxnPaths();
 }
@@ -52,12 +82,14 @@ export async function actionBuyGoat(formData: FormData) {
   const palaiRaw = String(formData.get("palaiRate") || "").trim();
   const paidBy = String(formData.get("paidBy")) as "Monis" | "Saad" | "Customer";
   const priceRaw = String(formData.get("price") || "").trim();
+  const paidNowRaw = String(formData.get("paidNow") || "").trim();
   if (paidBy !== "Customer" && !priceRaw) {
     throw new Error("Price is required");
   }
   await buyGoat({
     date: String(formData.get("date")),
     price: priceRaw ? Number(priceRaw) : null,
+    paidNow: paidNowRaw ? Number(paidNowRaw) : null,
     breed: String(formData.get("breed")) as AnimalBreed,
     sex: String(formData.get("sex")) as AnimalSex,
     description: String(formData.get("description")),
@@ -80,6 +112,21 @@ export async function actionLogMedical(formData: FormData) {
   revalidateTxnPaths();
 }
 
+export async function actionLogWeight(formData: FormData) {
+  const weightRaw = String(formData.get("weightKg") || "").trim();
+  const weightKg = Number(weightRaw);
+  if (!weightRaw || Number.isNaN(weightKg) || weightKg <= 0) {
+    throw new Error("Weight must be a positive number");
+  }
+  await logWeight({
+    animalId: Number(formData.get("animalId")),
+    weighedOn: String(formData.get("date")),
+    weightKg,
+    notes: String(formData.get("notes") || ""),
+  });
+  revalidateTxnPaths();
+}
+
 export async function actionRecordBreeding(formData: FormData) {
   const maleRaw = String(formData.get("maleAnimalId") || "").trim();
   await recordBreeding({
@@ -89,6 +136,37 @@ export async function actionRecordBreeding(formData: FormData) {
     dateCrossed: String(formData.get("dateCrossed")),
     notes: String(formData.get("notes") || ""),
   });
+  revalidateTxnPaths();
+}
+
+export async function actionUpdateBreeding(formData: FormData) {
+  const maleRaw = String(formData.get("maleAnimalId") || "").trim();
+  const statusRaw = String(formData.get("status") || "").trim();
+  const deliveredRaw = String(formData.get("deliveredDate") || "").trim();
+  await updateBreeding({
+    id: String(formData.get("id")),
+    buckName: String(formData.get("buckName") || ""),
+    maleAnimalId: maleRaw ? Number(maleRaw) : null,
+    dateCrossed: String(formData.get("dateCrossed")),
+    outcome: String(formData.get("outcome")) as import("@/lib/types").BreedingOutcome,
+    status: statusRaw as import("@/lib/types").BreedingStatus | "",
+    deliveredDate: deliveredRaw || null,
+    notes: String(formData.get("notes") || "") || null,
+  });
+  const femaleId = Number(formData.get("femaleId"));
+  if (femaleId && !Number.isNaN(femaleId)) {
+    revalidatePath(`/animals/${femaleId}`);
+  }
+  revalidateTxnPaths();
+}
+
+export async function actionDeleteBreeding(formData: FormData) {
+  const id = String(formData.get("id"));
+  const femaleId = Number(formData.get("femaleId"));
+  await deleteBreeding(id);
+  if (femaleId && !Number.isNaN(femaleId)) {
+    revalidatePath(`/animals/${femaleId}`);
+  }
   revalidateTxnPaths();
 }
 
@@ -102,16 +180,112 @@ export async function actionChangeStatus(formData: FormData) {
 }
 
 export async function actionRecordLivestockSale(formData: FormData) {
+  const date = String(formData.get("date") || "").trim();
+  const animalId = Number(formData.get("animalId"));
+  const grossSalePrice = Number(String(formData.get("grossSalePrice") || "").trim());
+  const deliveryRaw = String(formData.get("deliveryCost") || "").trim();
+  const receivedBy = String(formData.get("receivedBy") || "").trim();
   const additional = String(formData.get("additionalAnimalId") || "").trim();
+  const receivedNowRaw = String(formData.get("amountReceivedNow") || "").trim();
+
+  if (!date) throw new Error("Sale date is required");
+  if (!animalId || Number.isNaN(animalId)) throw new Error("Select a goat");
+  if (!grossSalePrice || Number.isNaN(grossSalePrice) || grossSalePrice <= 0) {
+    throw new Error("Gross sale price must be a positive number");
+  }
+  if (receivedBy !== "Monis" && receivedBy !== "Saad") {
+    throw new Error("Select who received cash (Monis or Saad)");
+  }
+  if (receivedNowRaw) {
+    const receivedNow = Number(receivedNowRaw);
+    if (Number.isNaN(receivedNow) || receivedNow < 0) {
+      throw new Error("Received now must be zero or a positive number");
+    }
+  }
+
+  const soldOnPalai =
+    formData.get("soldOnPalai") === "on" || formData.get("soldOnPalai") === "true";
+  const buyerName = String(formData.get("buyerName") || "").trim();
+  const palaiRateRaw = String(formData.get("palaiRatePerGoat") || "").trim();
+
+  if (soldOnPalai) {
+    if (!buyerName) throw new Error("Select the buyer for sold-on-palai");
+    const palaiRate = Number(palaiRateRaw);
+    if (!palaiRateRaw || Number.isNaN(palaiRate) || palaiRate <= 0) {
+      throw new Error("Palai rate per goat is required for sold-on-palai");
+    }
+  }
+
   await recordLivestockSale({
-    date: String(formData.get("date")),
-    animalId: Number(formData.get("animalId")),
+    date,
+    animalId,
     additionalAnimalIds: additional ? [Number(additional)] : undefined,
-    grossSalePrice: Number(formData.get("grossSalePrice")),
-    deliveryCost: formData.get("deliveryCost") ? Number(formData.get("deliveryCost")) : undefined,
+    grossSalePrice,
+    deliveryCost: deliveryRaw ? Number(deliveryRaw) : undefined,
+    receivedBy: receivedBy as "Monis" | "Saad",
+    amountReceivedNow: receivedNowRaw ? Number(receivedNowRaw) : null,
+    notes: String(formData.get("notes") || "") || undefined,
+    soldOnPalai,
+    buyerName: soldOnPalai ? buyerName : null,
+    palaiRatePerGoat: soldOnPalai ? Number(palaiRateRaw) : null,
+  });
+  revalidateTxnPaths();
+}
+
+export async function actionDeleteSaleReceipt(formData: FormData) {
+  const txId = String(formData.get("txId") || "").trim();
+  const animalId = Number(formData.get("animalId"));
+  if (!txId) throw new Error("Receipt id is required");
+  await deleteSaleReceipt(txId);
+  if (animalId && !Number.isNaN(animalId)) {
+    revalidatePath(`/animals/${animalId}`);
+  }
+  revalidateTxnPaths();
+}
+
+export async function actionUndoLivestockSale(formData: FormData) {
+  const animalId = Number(formData.get("animalId"));
+  if (!animalId || Number.isNaN(animalId)) throw new Error("Animal id is required");
+  await undoLivestockSale(animalId);
+  revalidatePath(`/animals/${animalId}`);
+  revalidateTxnPaths();
+}
+
+export async function actionAddPurchasePayment(formData: FormData) {
+  const amount = Number(formData.get("amount"));
+  if (!amount || Number.isNaN(amount) || amount <= 0) {
+    throw new Error("Amount must be positive");
+  }
+  const paidBy = String(formData.get("paidBy"));
+  if (paidBy !== "Monis" && paidBy !== "Saad" && paidBy !== "Customer") {
+    throw new Error("Select who paid");
+  }
+  await addPurchasePayment({
+    animalId: Number(formData.get("animalId")),
+    date: String(formData.get("date")),
+    amount,
+    paidBy,
+    notes: String(formData.get("notes") || "") || undefined,
+  });
+  const id = Number(formData.get("animalId"));
+  revalidatePath(`/animals/${id}`);
+  revalidateTxnPaths();
+}
+
+export async function actionAddSaleReceipt(formData: FormData) {
+  const amount = Number(formData.get("amount"));
+  if (!amount || Number.isNaN(amount) || amount <= 0) {
+    throw new Error("Amount must be positive");
+  }
+  await addSaleReceipt({
+    animalId: Number(formData.get("animalId")),
+    date: String(formData.get("date")),
+    amount,
     receivedBy: String(formData.get("receivedBy")) as "Monis" | "Saad",
     notes: String(formData.get("notes") || "") || undefined,
   });
+  const id = Number(formData.get("animalId"));
+  revalidatePath(`/animals/${id}`);
   revalidateTxnPaths();
 }
 
@@ -202,6 +376,16 @@ export async function actionUpdateAnimal(formData: FormData) {
   const palaiRaw = String(formData.get("palaiRate") || "").trim();
   const breedRaw = String(formData.get("breed") || "").trim();
   const sexRaw = String(formData.get("sex") || "").trim();
+  const statusRaw = String(formData.get("status") || "").trim();
+  const purchasePriceRaw = String(formData.get("purchasePrice") || "").trim();
+  const purchasePaidRaw = String(formData.get("purchasePaid") || "").trim();
+  const soldPriceRaw = String(formData.get("soldPrice") || "").trim();
+  const saleDateRaw = String(formData.get("saleDate") || "").trim();
+  const deliveryRaw = String(formData.get("deliveryCost") || "").trim();
+  const receivedRaw = String(formData.get("amountReceived") || "").trim();
+  const purchaseDateRaw = String(formData.get("purchaseDate") || "").trim();
+  const outDateRaw = String(formData.get("outDate") || "").trim();
+
   await updateAnimal({
     id,
     name: String(formData.get("name") || "") || null,
@@ -214,9 +398,29 @@ export async function actionUpdateAnimal(formData: FormData) {
     palai_rate: palaiRaw ? Number(palaiRaw) : null,
     age_at_purchase: String(formData.get("ageAtPurchase") || "") || null,
     home_bred: formData.get("homeBred") === "on" || formData.get("homeBred") === "true",
+    status: statusRaw ? (statusRaw as AnimalStatus) : undefined,
+    date_of_purchase: purchaseDateRaw || null,
+    purchase_price: purchasePriceRaw ? Number(purchasePriceRaw) : null,
+    purchase_paid: purchasePaidRaw ? Number(purchasePaidRaw) : null,
+    out_date: outDateRaw || null,
+    sold_price: soldPriceRaw ? Number(soldPriceRaw) : null,
+    sale_date: saleDateRaw || null,
+    gross_sale_price: soldPriceRaw ? Number(soldPriceRaw) : null,
+    delivery_cost: deliveryRaw ? Number(deliveryRaw) : null,
+    amount_received: receivedRaw ? Number(receivedRaw) : null,
   });
   revalidatePath(`/animals/${id}`);
   revalidateTxnPaths();
+}
+
+export async function actionDeleteAnimal(formData: FormData) {
+  const animalId = Number(formData.get("animalId"));
+  if (!animalId || Number.isNaN(animalId)) {
+    throw new Error("Animal id is required");
+  }
+  await deleteAnimal(animalId);
+  revalidateTxnPaths();
+  redirect("/animals");
 }
 
 export async function actionUploadAnimalMedia(formData: FormData) {

@@ -1,5 +1,6 @@
 import type { FarmDatabase } from "./types";
 import { fetchDb, isSupabaseDb } from "./db";
+import { loadPartnerIds } from "./db/queries";
 import { computeSettlement } from "./partner-equity/settlement";
 import {
   createCostTransaction,
@@ -7,7 +8,23 @@ import {
   getPartnerIds,
 } from "./partner-equity/settlement";
 import { recognizePalaiPayment, applyPalaiToDb } from "./palai/recognize-payment";
-import { applyLivestockSaleToDb } from "./livestock/record-sale";
+import { applyLivestockSaleToDb, applySaleReceiptToDb, beginLivestockSale, buildSaleReceipt, findSaleForAnimal } from "./livestock/record-sale";
+import {
+  applyDeleteSaleReceipt,
+  applyUndoLivestockSaleForAnimal,
+} from "./livestock/cancel-sale";
+import {
+  applyPurchasePayment,
+  createPurchaseAgreement,
+  findPurchaseAgreement,
+  validatePurchasePaymentAmount,
+} from "./livestock/purchase-agreement";
+import {
+  assertFemaleAvailableForBreeding,
+  expectedDueDate,
+} from "./livestock/breeding";
+import { applyDeleteAnimal } from "./animals/delete";
+import { applyUpdateAnimalDetails, type UpdateAnimalInput } from "./animals/update";
 import {
   applyDeleteTransaction,
   applyUpdateTransaction,
@@ -18,7 +35,18 @@ import {
   insertTransactionWithLedger,
   applyWritePlan,
 } from "./db/writes";
-import type { LedgerCategory, AnimalStatus, AnimalBreed, AnimalSex, MedicalEventType } from "./types";
+import type {
+  LedgerCategory,
+  AnimalStatus,
+  AnimalBreed,
+  AnimalSex,
+  MedicalEventType,
+  BreedingOutcome,
+  BreedingStatus,
+} from "./types";
+import { animalLabel } from "./labels";
+
+export { animalLabel };
 
 export async function getDb(): Promise<FarmDatabase> {
   return fetchDb();
@@ -31,10 +59,6 @@ export async function getSettlement() {
 export function contactName(db: FarmDatabase, id: string | null | undefined) {
   if (!id) return "—";
   return db.contacts.find((c) => c.id === id)?.name ?? "—";
-}
-
-export function animalLabel(a: { name: string | null; description: string | null; id: number }) {
-  return a.name || a.description?.slice(0, 40) || `Goat #${a.id}`;
 }
 
 function withLedgerIds(
@@ -52,6 +76,21 @@ export async function logExpense(input: {
   animalId?: number | null;
   notes?: string;
 }) {
+  if (isSupabaseDb()) {
+    const { monisId, saadId } = await loadPartnerIds();
+    const paidById = input.paidBy === "Monis" ? monisId : saadId;
+    const { tx, ledger } = createCostTransaction({
+      date: input.date,
+      amount: input.amount,
+      category: input.category,
+      paidByPartnerId: paidById,
+      animalId: input.animalId,
+      notes: input.notes,
+    });
+    await insertTransactionWithLedger(tx, withLedgerIds(ledger));
+    return;
+  }
+
   const db = await fetchDb();
   const { monisId, saadId } = getPartnerIds(db);
   const paidById = input.paidBy === "Monis" ? monisId : saadId;
@@ -64,10 +103,6 @@ export async function logExpense(input: {
     notes: input.notes,
   });
   const entries = withLedgerIds(ledger);
-  if (isSupabaseDb()) {
-    await insertTransactionWithLedger(tx, entries);
-    return db;
-  }
   const after = {
     ...db,
     transactions: [...db.transactions, tx],
@@ -162,6 +197,7 @@ function resolveVendor(
 export async function buyGoat(input: {
   date: string;
   price?: number | null;
+  paidNow?: number | null;
   breed: AnimalBreed;
   sex: AnimalSex;
   description: string;
@@ -228,102 +264,187 @@ export async function buyGoat(input: {
   };
   db = { ...db, animals: [...db.animals, animal] };
 
+  const defaultPaidNow = customerPaid ? 0 : price;
+  const paidNow =
+    input.paidNow == null || Number.isNaN(input.paidNow) ? defaultPaidNow : input.paidNow;
+  if (paidNow < 0) throw new Error("Amount paid cannot be negative");
+  if (paidNow > price + 0.005) throw new Error("Amount paid cannot exceed total price");
+
+  const agreement = createPurchaseAgreement({
+    animalId: nextId,
+    vendorId,
+    totalAmount: price,
+    amountPaid: customerPaid ? paidNow : 0,
+    notes: `Buy ${input.name || input.description}`,
+  });
+
+  let after = {
+    ...db,
+    purchase_agreements: [...(db.purchase_agreements ?? []), agreement],
+  };
+
   if (customerPaid) {
     if (isSupabaseDb()) {
       await applyWritePlan({
         upsertContacts: newContacts.length ? newContacts : undefined,
         upsertAnimals: [animal],
+        upsertPurchaseAgreements: [agreement],
       });
-      return db;
+      return after;
     }
-    return persistMutation(before, db);
+    return persistMutation(before, after);
   }
 
-  const { monisId, saadId } = getPartnerIds(db);
-  const paidById = input.paidBy === "Monis" ? monisId : saadId;
-  const { tx, ledger } = createCostTransaction({
-    date: input.date,
-    amount: price,
-    category: "Livestock Purchase",
-    paidByPartnerId: paidById,
-    animalId: nextId,
-    vendorId,
-    notes: `Buy ${input.name || input.description}`,
-  });
-  const entries = withLedgerIds(ledger);
-  const after = {
-    ...db,
-    transactions: [...db.transactions, tx],
-    partner_ledger_entries: [...db.partner_ledger_entries, ...entries],
-  };
+  if (paidNow > 0) {
+    const { monisId, saadId } = getPartnerIds(after);
+    const paidById = input.paidBy === "Monis" ? monisId : saadId;
+    const { tx, ledger } = createCostTransaction({
+      date: input.date,
+      amount: paidNow,
+      category: "Livestock Purchase",
+      paidByPartnerId: paidById,
+      animalId: nextId,
+      vendorId,
+      notes: `Buy ${input.name || input.description}`,
+      purchaseAgreementId: agreement.id,
+    });
+    const entries = withLedgerIds(ledger);
+    const settledAgreement = applyPurchasePayment(agreement, paidNow);
+    after = {
+      ...after,
+      transactions: [...after.transactions, tx],
+      partner_ledger_entries: [...after.partner_ledger_entries, ...entries],
+      purchase_agreements: (after.purchase_agreements ?? []).map((a) =>
+        a.id === agreement.id ? settledAgreement : a
+      ),
+    };
+    if (isSupabaseDb()) {
+      await insertTransactionWithLedger(tx, entries, {
+        contacts: newContacts.length ? newContacts : undefined,
+        animals: [animal],
+        purchaseAgreements: [settledAgreement],
+      });
+      return after;
+    }
+    return persistMutation(before, after);
+  }
+
   if (isSupabaseDb()) {
-    await insertTransactionWithLedger(tx, entries, {
-      contacts: newContacts.length ? newContacts : undefined,
-      animals: [animal],
+    await applyWritePlan({
+      upsertContacts: newContacts.length ? newContacts : undefined,
+      upsertAnimals: [animal],
+      upsertPurchaseAgreements: [agreement],
     });
     return after;
   }
   return persistMutation(before, after);
 }
 
-export async function updateAnimal(input: {
-  id: number;
-  name?: string | null;
-  breed?: AnimalBreed | null;
-  sex?: AnimalSex | null;
-  description?: string | null;
-  comment?: string | null;
-  ownerName: string;
-  vendorName?: string | null;
-  palai_rate?: number | null;
-  age_at_purchase?: string | null;
-  home_bred?: boolean;
+export async function addPurchasePayment(input: {
+  animalId: number;
+  date: string;
+  amount: number;
+  paidBy: "Monis" | "Saad" | "Customer";
+  notes?: string;
 }) {
   const before = await fetchDb();
-  let db = before;
-  const animal = db.animals.find((a) => a.id === input.id);
-  if (!animal) throw new Error("Animal not found");
+  const agreement = findPurchaseAgreement(before, input.animalId);
+  if (!agreement) throw new Error("No purchase agreement for this goat");
+  validatePurchasePaymentAmount(agreement, input.amount);
 
-  const ownerRes = resolveOwnerContact(db, input.ownerName);
-  const newContacts: FarmDatabase["contacts"] = [];
-  if (ownerRes.created) {
-    newContacts.push(ownerRes.contact);
-    db = { ...db, contacts: [...db.contacts, ownerRes.contact] };
-  }
-  const vendorRes = resolveVendor(db, input.vendorName);
-  if (vendorRes.contact) {
-    newContacts.push(vendorRes.contact);
-    db = { ...db, contacts: [...db.contacts, vendorRes.contact] };
-  }
-  const owner = ownerRes.contact;
-
-  const updated = {
-    ...animal,
-    name: input.name?.trim() || null,
-    breed: input.breed ?? null,
-    sex: input.sex ?? null,
-    description: input.description?.trim() || null,
-    comment: input.comment?.trim() || null,
-    owner_id: owner.id,
-    purchased_from: vendorRes.id,
-    age_at_purchase: input.age_at_purchase?.trim() || null,
-    home_bred: Boolean(input.home_bred),
-    palai_rate:
-      owner.type === "Customer" && input.palai_rate != null && !Number.isNaN(input.palai_rate)
-        ? input.palai_rate
-        : owner.type === "Customer"
-          ? animal.palai_rate
-          : null,
+  const updatedAgreement = applyPurchasePayment(agreement, input.amount);
+  let after: FarmDatabase = {
+    ...before,
+    purchase_agreements: (before.purchase_agreements ?? []).map((a) =>
+      a.id === agreement.id ? updatedAgreement : a
+    ),
   };
 
-  const after = {
-    ...db,
-    animals: db.animals.map((a) => (a.id === updated.id ? updated : a)),
+  if (input.paidBy === "Customer") {
+    return persistMutation(before, after);
+  }
+
+  const { monisId, saadId } = getPartnerIds(before);
+  const paidById = input.paidBy === "Monis" ? monisId : saadId;
+  const animal = before.animals.find((a) => a.id === input.animalId);
+  const { tx, ledger } = createCostTransaction({
+    date: input.date,
+    amount: input.amount,
+    category: "Livestock Purchase",
+    paidByPartnerId: paidById,
+    animalId: input.animalId,
+    vendorId: agreement.vendor_id,
+    notes: input.notes || `Purchase payment — ${animal?.name || animal?.description || "goat"}`,
+    purchaseAgreementId: agreement.id,
+  });
+  const entries = withLedgerIds(ledger);
+  after = {
+    ...after,
+    transactions: [...after.transactions, tx],
+    partner_ledger_entries: [...after.partner_ledger_entries, ...entries],
   };
+
+  if (isSupabaseDb()) {
+    await insertTransactionWithLedger(tx, entries, {
+      purchaseAgreements: [updatedAgreement],
+    });
+    return after;
+  }
+  return persistMutation(before, after);
+}
+
+export async function addSaleReceipt(input: {
+  animalId: number;
+  date: string;
+  amount: number;
+  receivedBy: "Monis" | "Saad";
+  notes?: string;
+}) {
+  const before = await fetchDb();
+  const sale = (before.livestock_sales ?? []).find((s) => s.animal_ids.includes(input.animalId));
+  if (!sale) throw new Error("No sale agreement for this goat");
+
+  if (isSupabaseDb()) {
+    const { tx, ledger, sale: updatedSale } = buildSaleReceipt(before, sale, {
+      date: input.date,
+      amount: input.amount,
+      receivedBy: input.receivedBy,
+      notes: input.notes,
+    });
+    const entries = withLedgerIds(ledger);
+    await insertTransactionWithLedger(tx, entries, { sales: [updatedSale] });
+    return {
+      ...before,
+      transactions: [...before.transactions, tx],
+      partner_ledger_entries: [...before.partner_ledger_entries, ...entries],
+      livestock_sales: (before.livestock_sales ?? []).map((s) =>
+        s.id === updatedSale.id ? updatedSale : s
+      ),
+    };
+  }
+
+  const after = applySaleReceiptToDb(before, sale.id, {
+    date: input.date,
+    amount: input.amount,
+    receivedBy: input.receivedBy,
+    notes: input.notes,
+  });
+  return persistMutation(before, after);
+}
+
+export async function updateAnimal(input: UpdateAnimalInput) {
+  const before = await fetchDb();
+  const { db: after, newContacts } = applyUpdateAnimalDetails(before, input);
+  const updated = after.animals.find((a) => a.id === input.id)!;
+  const agreement = findPurchaseAgreement(after, input.id);
+  const sale = findSaleForAnimal(after, input.id);
+
   if (isSupabaseDb()) {
     await applyWritePlan({
       upsertContacts: newContacts.length ? newContacts : undefined,
       upsertAnimals: [updated],
+      upsertPurchaseAgreements: agreement ? [agreement] : undefined,
+      upsertSales: sale ? [sale] : undefined,
     });
     return after;
   }
@@ -364,8 +485,7 @@ export async function recordBreeding(input: {
   notes?: string;
 }) {
   const before = await fetchDb();
-  const d = new Date(input.dateCrossed);
-  d.setUTCDate(d.getUTCDate() + 150);
+  assertFemaleAvailableForBreeding(before.breeding_events, input.femaleId);
   let maleAnimalId: number | null = input.maleAnimalId ?? null;
   let buckName = input.buckName.trim();
   if (maleAnimalId != null) {
@@ -381,7 +501,7 @@ export async function recordBreeding(input: {
     male_animal_id: maleAnimalId,
     buck_name: buckName || null,
     date_crossed: input.dateCrossed,
-    expected_due_date: d.toISOString().slice(0, 10),
+    expected_due_date: expectedDueDate(input.dateCrossed),
     delivered_date: null,
     outcome: "Pending" as const,
     status: "Doubt" as const,
@@ -393,6 +513,113 @@ export async function recordBreeding(input: {
   };
   if (isSupabaseDb()) {
     await applyWritePlan({ upsertBreeding: [event] });
+    return after;
+  }
+  return persistMutation(before, after);
+}
+
+export async function updateBreeding(input: {
+  id: string;
+  buckName: string;
+  maleAnimalId?: number | null;
+  dateCrossed: string;
+  outcome: BreedingOutcome;
+  status: BreedingStatus | "";
+  deliveredDate?: string | null;
+  notes?: string | null;
+}) {
+  const before = await fetchDb();
+  const existing = before.breeding_events.find((b) => b.id === input.id);
+  if (!existing) throw new Error("Breeding record not found");
+
+  const nextOutcome = input.outcome;
+  const nextStatus = input.status || null;
+  const willBeInPipeline =
+    nextOutcome !== "Delivered" &&
+    nextOutcome !== "Stillbirth" &&
+    nextOutcome !== "Miscarriage" &&
+    (nextOutcome === "Pending" || nextOutcome === "Doubt" || nextStatus === "Doubt");
+
+  if (willBeInPipeline) {
+    assertFemaleAvailableForBreeding(before.breeding_events, existing.female_animal_id, input.id);
+  }
+
+  const maleAnimalId: number | null = input.maleAnimalId ?? null;
+  let buckName = input.buckName.trim();
+  if (maleAnimalId != null) {
+    const male = before.animals.find((a) => a.id === maleAnimalId);
+    if (!male) throw new Error("Buck animal not found");
+    if (!buckName) buckName = animalLabel(male);
+  }
+
+  const deliveredDate =
+    input.deliveredDate?.trim() ||
+    (nextOutcome === "Delivered" ? existing.delivered_date : null) ||
+    null;
+
+  const updated = {
+    ...existing,
+    male_animal_id: maleAnimalId,
+    buck_name: buckName || null,
+    date_crossed: input.dateCrossed,
+    expected_due_date: expectedDueDate(input.dateCrossed),
+    delivered_date: nextOutcome === "Delivered" ? deliveredDate : null,
+    outcome: nextOutcome,
+    status: nextStatus,
+    notes: input.notes?.trim() || null,
+  };
+
+  const after = {
+    ...before,
+    breeding_events: before.breeding_events.map((b) => (b.id === updated.id ? updated : b)),
+  };
+  if (isSupabaseDb()) {
+    await applyWritePlan({ upsertBreeding: [updated] });
+    return after;
+  }
+  return persistMutation(before, after);
+}
+
+export async function deleteBreeding(id: string) {
+  const before = await fetchDb();
+  const existing = before.breeding_events.find((b) => b.id === id);
+  if (!existing) throw new Error("Breeding record not found");
+
+  const after = {
+    ...before,
+    breeding_events: before.breeding_events.filter((b) => b.id !== id),
+  };
+  if (isSupabaseDb()) {
+    await applyWritePlan({ deleteBreedingIds: [id] });
+    return after;
+  }
+  return persistMutation(before, after);
+}
+
+export async function logWeight(input: {
+  animalId: number;
+  weighedOn: string;
+  weightKg: number;
+  notes?: string;
+}) {
+  const before = await fetchDb();
+  const animal = before.animals.find((a) => a.id === input.animalId);
+  if (!animal) throw new Error("Animal not found");
+  if (!input.weightKg || input.weightKg <= 0) throw new Error("Weight must be positive");
+
+  const entry = {
+    id: crypto.randomUUID(),
+    animal_id: input.animalId,
+    weighed_on: input.weighedOn,
+    weight_kg: input.weightKg,
+    notes: input.notes || null,
+  };
+  const after = {
+    ...before,
+    weight_logs: [...(before.weight_logs ?? []), entry],
+  };
+  if (isSupabaseDb()) {
+    await applyWritePlan({ upsertWeights: [entry] });
     return after;
   }
   return persistMutation(before, after);
@@ -422,6 +649,18 @@ export async function changeStatus(input: {
   return persistMutation(before, after);
 }
 
+export async function deleteSaleReceipt(txId: string) {
+  const before = await fetchDb();
+  const after = applyDeleteSaleReceipt(before, txId);
+  return persistMutation(before, after);
+}
+
+export async function undoLivestockSale(animalId: number) {
+  const before = await fetchDb();
+  const after = applyUndoLivestockSaleForAnimal(before, animalId);
+  return persistMutation(before, after);
+}
+
 export async function recordLivestockSale(input: {
   date: string;
   animalId: number;
@@ -429,9 +668,39 @@ export async function recordLivestockSale(input: {
   grossSalePrice: number;
   deliveryCost?: number;
   receivedBy?: "Monis" | "Saad";
+  amountReceivedNow?: number | null;
   notes?: string;
+  soldOnPalai?: boolean;
+  buyerName?: string | null;
+  palaiRatePerGoat?: number | null;
 }) {
   const before = await fetchDb();
+  const result = beginLivestockSale(before, input);
+
+  if (isSupabaseDb()) {
+    const animalIds = new Set(result.sale.animal_ids);
+    const entries = result.tx ? withLedgerIds(result.ledger) : [];
+    await applyWritePlan({
+      upsertContacts: result.newContacts.length ? result.newContacts : undefined,
+      upsertAnimals: result.animals.filter((a) => animalIds.has(a.id)),
+      upsertTransactions: result.tx ? [result.tx] : undefined,
+      upsertLedger: entries.length ? entries : undefined,
+      upsertSales: [result.sale],
+    });
+    return {
+      ...before,
+      contacts: result.newContacts.length
+        ? [...before.contacts, ...result.newContacts]
+        : before.contacts,
+      animals: result.animals,
+      transactions: result.tx ? [...before.transactions, result.tx] : before.transactions,
+      partner_ledger_entries: result.tx
+        ? [...before.partner_ledger_entries, ...entries]
+        : before.partner_ledger_entries,
+      livestock_sales: [...(before.livestock_sales ?? []), result.sale],
+    };
+  }
+
   const after = applyLivestockSaleToDb(before, input);
   return persistMutation(before, after);
 }
@@ -474,5 +743,11 @@ export async function updateTransaction(input: UpdateTransactionInput) {
 export async function deleteTransaction(id: string) {
   const before = await fetchDb();
   const after = applyDeleteTransaction(before, id);
+  return persistMutation(before, after);
+}
+
+export async function deleteAnimal(animalId: number) {
+  const before = await fetchDb();
+  const after = applyDeleteAnimal(before, animalId);
   return persistMutation(before, after);
 }

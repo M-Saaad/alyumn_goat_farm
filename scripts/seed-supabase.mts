@@ -19,6 +19,7 @@ async function clearTables(client: ReturnType<typeof createServiceClient>) {
     "animal_media",
     "livestock_sales",
     "partner_ledger_entries",
+    "purchase_agreements",
     "palai_payments",
     "medical_events",
     "breeding_events",

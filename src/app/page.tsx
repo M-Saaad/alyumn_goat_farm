@@ -1,10 +1,10 @@
 import Link from "next/link";
 import { loadHomeData, contactNameFrom } from "@/lib/db/queries";
 import { computeSettlement } from "@/lib/partner-equity/settlement";
-import { formatPkr } from "@/lib/format";
+import { formatPkr, formatDate } from "@/lib/format";
 import { BottomNav } from "@/components/BottomNav";
+import { QuickEntryLoader } from "@/components/QuickEntryLoader";
 import { SignOutButton } from "@/components/SignOutButton";
-import { QuickEntry } from "@/components/QuickEntryDynamic";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 import type { FarmDatabase } from "@/lib/types";
 
@@ -124,7 +124,7 @@ export default async function HomePage() {
               <div>
                 <p className="font-medium text-stone-800">{tx.category}</p>
                 <p className="text-xs text-stone-500">
-                  {tx.date} ·{" "}
+                  {formatDate(tx.date)} ·{" "}
                   {tx.kind === "cost"
                     ? `paid by ${contactNameFrom(data.contacts, tx.paid_by_partner_id)}`
                     : "adjustment"}
@@ -137,7 +137,7 @@ export default async function HomePage() {
         </ul>
       </section>
 
-      <QuickEntry {...data.quickEntry} />
+      <QuickEntryLoader {...data.quickEntry} />
       <BottomNav active="finance" />
     </main>
   );

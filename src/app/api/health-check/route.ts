@@ -1,0 +1,65 @@
+import { NextResponse } from "next/server";
+import {
+  loadAnimalProfileData,
+  loadHomeData,
+  loadAnimalsListData,
+  loadHerdHealthData,
+  loadTransactionsData,
+} from "@/lib/db/queries";
+import { isSupabaseDb } from "@/lib/db";
+
+export const dynamic = "force-dynamic";
+
+/** Public diagnostics — no secrets. Hit /api/health-check when pages fail. */
+export async function GET() {
+  const checks: Record<string, string> = {
+    mode: isSupabaseDb() ? "supabase" : "json",
+    env_url: process.env.NEXT_PUBLIC_SUPABASE_URL ? "set" : "missing",
+    env_anon: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ? "set" : "missing",
+    env_service: process.env.SUPABASE_SERVICE_ROLE_KEY ? "set" : "missing",
+  };
+
+  const loaders = [
+    ["home", loadHomeData],
+    ["animals", loadAnimalsListData],
+    ["health", loadHerdHealthData],
+    ["transactions", loadTransactionsData],
+  ] as const;
+
+  let loadersOk = true;
+  for (const [name, fn] of loaders) {
+    try {
+      await fn();
+      checks[name] = "ok";
+    } catch (e) {
+      loadersOk = false;
+      checks[name] = e instanceof Error ? e.message : "error";
+    }
+  }
+
+  try {
+    const { herd } = await loadHerdHealthData();
+    const samples = herd.breeding.slice(0, 5);
+    for (const row of samples) {
+      const profile = await loadAnimalProfileData(row.event.female_animal_id);
+      if (!profile) {
+        throw new Error(`animal ${row.event.female_animal_id} not found`);
+      }
+      if (!profile.breeding_events.some((b) => b.id === row.event.id)) {
+        throw new Error(`breeding ${row.event.id} missing on profile`);
+      }
+    }
+    checks.breeding_profiles = samples.length > 0 ? `ok (${samples.length} sampled)` : "ok (none)";
+  } catch (e) {
+    loadersOk = false;
+    checks.breeding_profiles = e instanceof Error ? e.message : "error";
+  }
+
+  const envOk =
+    checks.env_url === "set" &&
+    checks.env_anon === "set" &&
+    (checks.mode === "json" || checks.env_service === "set");
+
+  const ok = loadersOk && envOk;
+  return NextResponse.json({ ok, checks }, { status: ok ? 200 : 500 });
+}

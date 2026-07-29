@@ -12,6 +12,7 @@ import type {
   LivestockSale,
   MedicalEvent,
   PalaiPayment,
+  PurchaseAgreement,
   Transaction,
   WeightLog,
 } from "../types";
@@ -26,12 +27,16 @@ import {
   mapMedical,
   mapMeta,
   mapPalai,
+  mapPurchaseAgreement,
   mapSale,
   mapTx,
   mapWeight,
   selectAll,
+  selectAllOptional,
 } from "./supabase";
+import { getPartnerIds } from "../partner-equity/settlement";
 import { quickEntryPropsFromDb } from "../quick-entry-props";
+import { computeHerdHealth, type HerdHealthData } from "../livestock/herd-health";
 import type { QuickEntryProps } from "@/components/QuickEntry";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
@@ -61,6 +66,16 @@ function filterLedgerTxs(rows: Record<string, unknown>[]): Transaction[] {
   return rows
     .map(mapTx)
     .filter((t) => t.kind === "cost" || t.kind === "partner_adjustment");
+}
+
+/** Resolve Monis/Saad partner IDs without loading the full database. */
+export async function loadPartnerIds(): Promise<{ monisId: string; saadId: string }> {
+  if (!isSupabaseDb()) {
+    return getPartnerIds(await getCachedDb());
+  }
+  const client = createServiceClient();
+  const contacts = await selectAll(client, "contacts");
+  return getPartnerIds({ contacts: contacts.map(mapContact) } as FarmDatabase);
 }
 
 /** Shared QuickEntry props — active animals, contacts, buck names. */
@@ -167,10 +182,57 @@ export type AnimalProfileData = {
   breeding_events: BreedingEvent[];
   transactions: Transaction[];
   livestock_sales: LivestockSale[];
+  purchase_agreement: PurchaseAgreement | null;
+  purchase_balance: number;
+  sale_balance: number | null;
   weight_logs: WeightLog[];
   animal_media: AnimalMedia[];
   quickEntry: QuickEntryProps;
 };
+
+function profileTransactions(
+  db: FarmDatabase,
+  animalId: number,
+  sales: LivestockSale[]
+): Transaction[] {
+  const saleIds = new Set(sales.map((s) => s.id));
+  const legacyTxIds = new Set(
+    sales.map((s) => s.transaction_id).filter((id): id is string => Boolean(id))
+  );
+  return db.transactions.filter(
+    (t) =>
+      t.animal_id === animalId ||
+      legacyTxIds.has(t.id) ||
+      (t.livestock_sale_id != null && saleIds.has(t.livestock_sale_id)) ||
+      (t.purchase_agreement_id != null &&
+        db.purchase_agreements?.some(
+          (a) => a.id === t.purchase_agreement_id && a.animal_id === animalId
+        ))
+  );
+}
+
+function resolvePurchaseAgreement(
+  db: FarmDatabase,
+  animal: Animal
+): { agreement: PurchaseAgreement | null; balance: number } {
+  const agreement = db.purchase_agreements?.find((a) => a.animal_id === animal.id) ?? null;
+  if (agreement) {
+    return {
+      agreement,
+      balance: Math.max(0, agreement.total_amount - agreement.amount_paid),
+    };
+  }
+  const paid = db.transactions
+    .filter(
+      (t) =>
+        t.kind === "cost" &&
+        t.category === "Livestock Purchase" &&
+        t.animal_id === animal.id
+    )
+    .reduce((sum, t) => sum + t.amount, 0);
+  if (animal.price <= 0) return { agreement: null, balance: 0 };
+  return { agreement: null, balance: Math.max(0, animal.price - paid) };
+}
 
 export const loadAnimalProfileData = cache(
   async (animalId: number): Promise<AnimalProfileData | null> => {
@@ -179,16 +241,18 @@ export const loadAnimalProfileData = cache(
       const animal = db.animals.find((a) => a.id === animalId);
       if (!animal) return null;
       const saleMeta = (db.livestock_sales ?? []).filter((s) => s.animal_ids.includes(animalId));
-      const saleTxIds = new Set(saleMeta.map((s) => s.transaction_id));
+      const purchase = resolvePurchaseAgreement(db, animal);
+      const sale = saleMeta[0];
       return {
         animal,
         contacts: db.contacts,
         medical_events: db.medical_events.filter((m) => m.animal_id === animalId),
         breeding_events: db.breeding_events.filter((b) => b.female_animal_id === animalId),
-        transactions: db.transactions.filter(
-          (t) => t.animal_id === animalId || saleTxIds.has(t.id)
-        ),
+        transactions: profileTransactions(db, animalId, saleMeta),
         livestock_sales: saleMeta,
+        purchase_agreement: purchase.agreement,
+        purchase_balance: purchase.balance,
+        sale_balance: sale ? Math.max(0, sale.net_received - sale.amount_received) : null,
         weight_logs: db.weight_logs.filter((w) => w.animal_id === animalId),
         animal_media: (db.animal_media ?? []).filter((m) => m.animal_id === animalId),
         quickEntry: quickEntryPropsFromDb(db),
@@ -196,13 +260,14 @@ export const loadAnimalProfileData = cache(
     }
 
     const client = createServiceClient();
-    const [animalRow, contacts, medical, breeding, sales, weights, media, quickEntry] =
+    const [animalRow, contacts, medical, breeding, sales, purchaseRows, weights, media, quickEntry] =
       await Promise.all([
         selectOne(client, "animals", "id", animalId),
         selectAll(client, "contacts"),
         selectWhere(client, "medical_events", "animal_id", animalId),
         selectWhere(client, "breeding_events", "female_animal_id", animalId),
         selectAll(client, "livestock_sales"),
+        selectWhere(client, "purchase_agreements", "animal_id", animalId),
         selectWhere(client, "weight_logs", "animal_id", animalId),
         selectWhere(client, "animal_media", "animal_id", animalId),
         getQuickEntryData(),
@@ -211,7 +276,12 @@ export const loadAnimalProfileData = cache(
     if (!animalRow) return null;
 
     const mappedSales = sales.map(mapSale).filter((s) => s.animal_ids.includes(animalId));
-    const saleTxIds = mappedSales.map((s) => s.transaction_id);
+    const mappedAgreements = purchaseRows.map(mapPurchaseAgreement);
+    const saleIds = mappedSales.map((s) => s.id);
+    const agreementIds = mappedAgreements.map((a) => a.id);
+    const legacySaleTxIds = mappedSales
+      .map((s) => s.transaction_id)
+      .filter((id): id is string => Boolean(id));
 
     const { data: animalTxRows, error: animalTxErr } = await client
       .from("transactions")
@@ -219,28 +289,72 @@ export const loadAnimalProfileData = cache(
       .eq("animal_id", animalId);
     if (animalTxErr) throw new Error(`transactions: ${animalTxErr.message}`);
 
-    let saleTxRows: Record<string, unknown>[] = [];
-    if (saleTxIds.length > 0) {
-      const { data, error } = await client.from("transactions").select("*").in("id", saleTxIds);
-      if (error) throw new Error(`transactions: ${error.message}`);
-      saleTxRows = (data ?? []) as Record<string, unknown>[];
+    const extraTxPromises: Promise<Record<string, unknown>[]>[] = [];
+    if (legacySaleTxIds.length > 0) {
+      extraTxPromises.push(
+        (async () => {
+          const { data, error } = await client
+            .from("transactions")
+            .select("*")
+            .in("id", legacySaleTxIds);
+          if (error) throw new Error(`transactions: ${error.message}`);
+          return (data ?? []) as Record<string, unknown>[];
+        })()
+      );
     }
+    if (saleIds.length > 0) {
+      extraTxPromises.push(
+        (async () => {
+          const { data, error } = await client
+            .from("transactions")
+            .select("*")
+            .in("livestock_sale_id", saleIds);
+          if (error) throw new Error(`transactions: ${error.message}`);
+          return (data ?? []) as Record<string, unknown>[];
+        })()
+      );
+    }
+    if (agreementIds.length > 0) {
+      extraTxPromises.push(
+        (async () => {
+          const { data, error } = await client
+            .from("transactions")
+            .select("*")
+            .in("purchase_agreement_id", agreementIds);
+          if (error) throw new Error(`transactions: ${error.message}`);
+          return (data ?? []) as Record<string, unknown>[];
+        })()
+      );
+    }
+    const extraTxRows = (await Promise.all(extraTxPromises)).flat();
 
     const txById = new Map<string, Transaction>();
-    for (const row of [...(animalTxRows ?? []), ...saleTxRows]) {
+    for (const row of [...(animalTxRows ?? []), ...extraTxRows]) {
       const tx = mapTx(row as Record<string, unknown>);
       if (tx.kind === "cost" || tx.kind === "partner_adjustment") {
         txById.set(tx.id, tx);
       }
     }
 
+    const animal = mapAnimal(animalRow);
+    const miniDb = emptyDb();
+    miniDb.animals = [animal];
+    miniDb.transactions = [...txById.values()];
+    miniDb.purchase_agreements = mappedAgreements;
+    miniDb.livestock_sales = mappedSales;
+    const purchase = resolvePurchaseAgreement(miniDb, animal);
+    const sale = mappedSales[0];
+
     return {
-      animal: mapAnimal(animalRow),
+      animal,
       contacts: contacts.map(mapContact),
       medical_events: medical.map(mapMedical),
       breeding_events: breeding.map(mapBreeding),
-      transactions: [...txById.values()],
+      transactions: profileTransactions(miniDb, animalId, mappedSales),
       livestock_sales: mappedSales,
+      purchase_agreement: purchase.agreement,
+      purchase_balance: purchase.balance,
+      sale_balance: sale ? Math.max(0, sale.net_received - sale.amount_received) : null,
       weight_logs: weights.map(mapWeight),
       animal_media: media.map(mapMedia),
       quickEntry,
@@ -293,6 +407,51 @@ export const loadTransactionsData = cache(async (): Promise<TransactionsData> =>
     animals: mappedAnimals,
     palai_payments: palai.map(mapPalai),
     livestock_sales: sales.map(mapSale),
+    quickEntry: quickEntryPropsFromDb(db),
+  };
+});
+
+export type HerdHealthPageData = {
+  herd: HerdHealthData;
+  quickEntry: QuickEntryProps;
+};
+
+export const loadHerdHealthData = cache(async (): Promise<HerdHealthPageData> => {
+  if (!isSupabaseDb()) {
+    const db = await getCachedDb();
+    return {
+      herd: computeHerdHealth({
+        animals: db.animals,
+        medical_events: db.medical_events ?? [],
+        breeding_events: db.breeding_events ?? [],
+        weight_logs: db.weight_logs ?? [],
+      }),
+      quickEntry: quickEntryPropsFromDb(db),
+    };
+  }
+
+  const client = createServiceClient();
+  const [animals, medical, breeding, weights, contacts] = await Promise.all([
+    selectAll(client, "animals"),
+    selectAllOptional(client, "medical_events"),
+    selectAllOptional(client, "breeding_events"),
+    selectAllOptional(client, "weight_logs"),
+    selectAll(client, "contacts"),
+  ]);
+
+  const mappedAnimals = animals.map(mapAnimal);
+  const db = emptyDb();
+  db.animals = mappedAnimals;
+  db.contacts = contacts.map(mapContact);
+  db.breeding_events = breeding.map(mapBreeding);
+
+  return {
+    herd: computeHerdHealth({
+      animals: mappedAnimals,
+      medical_events: medical.map(mapMedical),
+      breeding_events: breeding.map(mapBreeding),
+      weight_logs: weights.map(mapWeight),
+    }),
     quickEntry: quickEntryPropsFromDb(db),
   };
 });

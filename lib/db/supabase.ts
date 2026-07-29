@@ -65,6 +65,8 @@ export function mapTx(r: Record<string, unknown>): Transaction {
     adjustment_partner_id: (r.adjustment_partner_id as string) ?? null,
     notes: (r.notes as string) ?? null,
     source_row: r.source_row == null ? null : num(r.source_row),
+    purchase_agreement_id: (r.purchase_agreement_id as string) ?? null,
+    livestock_sale_id: (r.livestock_sale_id as string) ?? null,
   };
 }
 
@@ -94,16 +96,33 @@ export function mapPalai(r: Record<string, unknown>): PalaiPayment {
 }
 
 export function mapSale(r: Record<string, unknown>): LivestockSale {
+  const net = num(r.net_received);
+  const amountReceived =
+    r.amount_received == null ? net : num(r.amount_received);
   return {
     id: String(r.id),
     date: String(r.date),
     animal_ids: Array.isArray(r.animal_ids) ? r.animal_ids.map(num) : [],
     gross_sale_price: num(r.gross_sale_price),
     delivery_cost: num(r.delivery_cost ?? 0),
-    net_received: num(r.net_received),
+    net_received: net,
     partner_share: num(r.partner_share),
-    received_by_partner_id: String(r.received_by_partner_id),
-    transaction_id: String(r.transaction_id),
+    received_by_partner_id: String(r.received_by_partner_id ?? ""),
+    transaction_id: r.transaction_id ? String(r.transaction_id) : null,
+    amount_received: amountReceived,
+    status: (r.status as LivestockSale["status"]) ?? (amountReceived >= net ? "settled" : "open"),
+    notes: (r.notes as string) ?? null,
+  };
+}
+
+export function mapPurchaseAgreement(r: Record<string, unknown>): import("../types").PurchaseAgreement {
+  return {
+    id: String(r.id),
+    animal_id: num(r.animal_id),
+    vendor_id: (r.vendor_id as string) ?? null,
+    total_amount: num(r.total_amount),
+    amount_paid: num(r.amount_paid ?? 0),
+    status: (r.status as import("../types").AgreementStatus) ?? "open",
     notes: (r.notes as string) ?? null,
   };
 }
@@ -161,6 +180,24 @@ export async function selectAll(client: SupabaseClient, table: string) {
   return (data ?? []) as Record<string, unknown>[];
 }
 
+/** Like selectAll but returns [] when a table is missing (e.g. migration not applied). */
+export async function selectAllOptional(client: SupabaseClient, table: string) {
+  try {
+    return await selectAll(client, table);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    if (
+      message.includes("does not exist") ||
+      message.includes("Could not find the table") ||
+      message.includes("permission denied")
+    ) {
+      console.warn(`[farm] optional table ${table} unavailable: ${message}`);
+      return [] as Record<string, unknown>[];
+    }
+    throw err;
+  }
+}
+
 export function mapMeta(meta: Record<string, unknown> | undefined): FarmDatabase["meta"] {
   return {
     importedAt: meta?.imported_at ? String(meta.imported_at) : null,
@@ -178,6 +215,7 @@ export async function loadFromSupabase(client: SupabaseClient): Promise<FarmData
     ledger,
     palai,
     sales,
+    purchaseAgreements,
     medical,
     breeding,
     weights,
@@ -190,6 +228,7 @@ export async function loadFromSupabase(client: SupabaseClient): Promise<FarmData
     selectAll(client, "partner_ledger_entries"),
     selectAll(client, "palai_payments"),
     selectAll(client, "livestock_sales"),
+    selectAll(client, "purchase_agreements"),
     selectAll(client, "medical_events"),
     selectAll(client, "breeding_events"),
     selectAll(client, "weight_logs"),
@@ -207,6 +246,7 @@ export async function loadFromSupabase(client: SupabaseClient): Promise<FarmData
   db.partner_ledger_entries = ledger.map(mapLedger);
   db.palai_payments = palai.map(mapPalai);
   db.livestock_sales = sales.map(mapSale);
+  db.purchase_agreements = purchaseAgreements.map(mapPurchaseAgreement);
   db.medical_events = medical.map(mapMedical);
   db.breeding_events = breeding.map(mapBreeding);
   db.weight_logs = weights.map(mapWeight);
@@ -305,7 +345,23 @@ export async function saveToSupabase(client: SupabaseClient, db: FarmDatabase): 
       partner_share: s.partner_share,
       received_by_partner_id: s.received_by_partner_id,
       transaction_id: s.transaction_id,
+      amount_received: s.amount_received,
+      status: s.status,
       notes: s.notes,
+    }))
+  );
+
+  await syncTable(
+    client,
+    "purchase_agreements",
+    (db.purchase_agreements ?? []).map((p) => ({
+      id: p.id,
+      animal_id: p.animal_id,
+      vendor_id: p.vendor_id,
+      total_amount: p.total_amount,
+      amount_paid: p.amount_paid,
+      status: p.status,
+      notes: p.notes,
     }))
   );
 
@@ -382,6 +438,8 @@ export async function saveToSupabase(client: SupabaseClient, db: FarmDatabase): 
       adjustment_partner_id: t.adjustment_partner_id,
       notes: t.notes,
       source_row: t.source_row,
+      purchase_agreement_id: t.purchase_agreement_id,
+      livestock_sale_id: t.livestock_sale_id,
     }))
   );
 

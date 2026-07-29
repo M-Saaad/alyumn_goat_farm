@@ -1,4 +1,5 @@
-import { animalLabel } from "@/lib/actions";
+import { animalLabel } from "@/lib/labels";
+import { femalesInBreedingPipeline } from "@/lib/livestock/breeding";
 import type { FarmDatabase } from "@/lib/types";
 import type { QuickEntryProps } from "@/components/QuickEntry";
 import type { ContactOption } from "@/components/ContactSelect";
@@ -46,9 +47,13 @@ export function quickEntryPropsFromDb(db: FarmDatabase): QuickEntryProps {
     ),
   ].sort((a, b) => a.localeCompare(b));
 
+  const inPipeline = femalesInBreedingPipeline(db.breeding_events);
+  const breedingEligibleFemales = femaleAnimals.filter((a) => !inPipeline.has(a.id));
+
   return {
     animals,
     femaleAnimals: femaleAnimals.length > 0 ? femaleAnimals : animals,
+    breedingEligibleFemales,
     vendors,
     customers,
     ownerOptions,

@@ -1,22 +1,34 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { animalLabel } from "@/lib/actions";
-import { formatPkr } from "@/lib/format";
+import { animalLabel } from "@/lib/labels";
+import { formatPkr, formatDate } from "@/lib/format";
 import { isSupabaseDb } from "@/lib/db";
+import { isSoldOnPalaiSale, saleReceiptAmount } from "@/lib/livestock/cancel-sale";
 import { loadAnimalProfileData, contactNameFrom } from "@/lib/db/queries";
 import { BottomNav } from "@/components/BottomNav";
+import { QuickEntryLoader } from "@/components/QuickEntryLoader";
 import { AnimalEditor } from "@/components/AnimalEditor";
 import { AnimalMediaGallery } from "@/components/AnimalMediaGallery";
-import { QuickEntry } from "@/components/QuickEntryDynamic";
+import {
+  PurchaseInstallmentCard,
+  SaleInstallmentCard,
+} from "@/components/InstallmentCards";
+import { DeleteAnimalButton } from "@/components/DeleteAnimalButton";
+import { BreedingEventEditor } from "@/components/BreedingEventEditor";
+import { backFromAnimalProfile } from "@/lib/livestock/health-nav";
 
 export const dynamic = "force-dynamic";
 
 export default async function AnimalProfilePage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ from?: string; tab?: string }>;
 }) {
   const { id } = await params;
+  const sp = await searchParams;
+  const back = backFromAnimalProfile(sp);
   const animalId = Number(id);
   const data = await loadAnimalProfileData(animalId);
   if (!data) notFound();
@@ -41,20 +53,53 @@ export default async function AnimalProfilePage({
   const vendorName = animal.purchased_from
     ? contactNameFrom(data.contacts, animal.purchased_from)
     : null;
+  const ownerContact = data.contacts.find((c) => c.id === animal.owner_id);
+  const isCustomerOwner = ownerContact?.type === "Customer";
+  const sale = saleMeta[0];
+  const purchasePaid =
+    data.purchase_agreement?.amount_paid ??
+    data.transactions
+      .filter(
+        (t) =>
+          t.kind === "cost" &&
+          t.category === "Livestock Purchase" &&
+          t.animal_id === animalId
+      )
+      .reduce((sum, t) => sum + t.amount, 0);
+
+  const saleReceipts = sale
+    ? txs
+        .filter(
+          (t) =>
+            t.category === "Livestock Sale" &&
+            (t.livestock_sale_id === sale.id || sale.transaction_id === t.id)
+        )
+        .map((t) => ({
+          id: t.id,
+          date: t.date,
+          amount: saleReceiptAmount(t.amount),
+          notes: t.notes,
+        }))
+        .sort((a, b) => b.date.localeCompare(a.date))
+    : [];
 
   return (
     <main className="px-4 pt-6">
-      <Link href="/animals" className="text-sm font-semibold text-emerald-700">
-        ← Goats
+      <Link href={back.href} className="text-sm font-semibold text-emerald-700">
+        ← {back.label}
       </Link>
 
-      <header className="mt-2 mb-4">
-        <h1 className="text-2xl font-bold">{animalLabel(animal)}</h1>
-        <p className="text-stone-500">
-          {[animal.breed, animal.sex, animal.status, ownerName]
-            .filter(Boolean)
-            .join(" · ")}
-        </p>
+      <header className="mt-2 mb-4 flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold">{animalLabel(animal)}</h1>
+          <p className="text-stone-500">
+            {[animal.breed, animal.sex, animal.status, ownerName]
+              .filter(Boolean)
+              .join(" · ")}
+            {sale && isSoldOnPalaiSale(sale) ? " · Sold on palai" : ""}
+          </p>
+        </div>
+        <DeleteAnimalButton animalId={animal.id} label={animalLabel(animal)} />
       </header>
 
       <AnimalEditor
@@ -70,6 +115,20 @@ export default async function AnimalProfilePage({
           palai_rate: animal.palai_rate,
           age_at_purchase: animal.age_at_purchase,
           home_bred: animal.home_bred,
+          status: animal.status,
+          date_of_purchase: animal.date_of_purchase,
+          price: animal.price,
+          purchase_paid: purchasePaid,
+          out_date: animal.out_date,
+          sold_price: animal.sold_price,
+          sale: sale
+            ? {
+                date: sale.date,
+                gross_sale_price: sale.gross_sale_price,
+                delivery_cost: sale.delivery_cost,
+                amount_received: sale.amount_received,
+              }
+            : null,
         }}
         vendors={data.quickEntry.vendors}
         ownerOptions={data.quickEntry.ownerOptions}
@@ -80,6 +139,33 @@ export default async function AnimalProfilePage({
         animalId={animalId}
         supabaseEnabled={supabaseEnabled}
       />
+
+      {data.purchase_agreement ? (
+        <PurchaseInstallmentCard
+          animalId={animalId}
+          agreement={data.purchase_agreement}
+          balance={data.purchase_balance}
+          isCustomerOwner={isCustomerOwner}
+        />
+      ) : data.purchase_balance > 0 ? (
+        <section className="mb-3 rounded-2xl bg-amber-50 p-4 text-sm text-amber-900 ring-1 ring-amber-200">
+          <p className="font-semibold">Outstanding purchase balance</p>
+          <p>{formatPkr(data.purchase_balance)} remaining on agreed price {formatPkr(animal.price)}</p>
+          <p className="mt-1 text-xs text-amber-800">
+            Log further livestock purchase payments from Transactions or Quick Entry.
+          </p>
+        </section>
+      ) : null}
+
+      {sale && (
+        <SaleInstallmentCard
+          animalId={animalId}
+          sale={sale}
+          balance={data.sale_balance ?? 0}
+          receipts={saleReceipts}
+          soldOnPalai={isSoldOnPalaiSale(sale)}
+        />
+      )}
 
       <section className="mb-3 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-stone-200">
         <h2 className="mb-2 text-sm font-bold">Purchase</h2>
@@ -98,7 +184,7 @@ export default async function AnimalProfilePage({
           </div>
           <div>
             <dt className="text-stone-500">Purchased</dt>
-            <dd>{animal.date_of_purchase || "—"}</dd>
+            <dd>{formatDate(animal.date_of_purchase)}</dd>
           </div>
           <div>
             <dt className="text-stone-500">From</dt>
@@ -124,7 +210,12 @@ export default async function AnimalProfilePage({
       </section>
 
       <section className="mb-3 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-stone-200">
-        <h2 className="mb-2 text-sm font-bold">Medical ({medical.length})</h2>
+        <div className="mb-2 flex items-center justify-between gap-2">
+          <h2 className="text-sm font-bold">Medical ({medical.length})</h2>
+          <Link href="/health?tab=vaccine" className="text-xs font-semibold text-emerald-700">
+            Schedule →
+          </Link>
+        </div>
         {medical.length === 0 ? (
           <p className="text-sm text-stone-500">No medical events yet.</p>
         ) : (
@@ -135,15 +226,20 @@ export default async function AnimalProfilePage({
                   <span className="font-medium">{m.event_type}</span>
                   {m.notes && <span className="text-stone-500"> — {m.notes}</span>}
                 </span>
-                <span className="shrink-0 text-stone-500">{m.date || "—"}</span>
+                <span className="shrink-0 text-stone-500">{formatDate(m.date)}</span>
               </li>
             ))}
           </ul>
         )}
       </section>
 
-      <section className="mb-3 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-stone-200">
-        <h2 className="mb-2 text-sm font-bold">Breeding ({breeding.length})</h2>
+      <section id="breeding" className="mb-3 scroll-mt-20 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-stone-200">
+        <div className="mb-2 flex items-center justify-between gap-2">
+          <h2 className="text-sm font-bold">Breeding ({breeding.length})</h2>
+          <Link href="/health?tab=breeding" className="text-xs font-semibold text-emerald-700">
+            Herd view →
+          </Link>
+        </div>
         {breeding.length === 0 ? (
           <p className="text-sm text-stone-500">No breeding records.</p>
         ) : (
@@ -154,9 +250,25 @@ export default async function AnimalProfilePage({
                   {b.buck_name || "Unknown buck"} · {b.status || b.outcome}
                 </p>
                 <p className="text-stone-500">
-                  Crossed {b.date_crossed || "—"} · Due {b.expected_due_date || "—"}
+                  Crossed {formatDate(b.date_crossed)} · Due {formatDate(b.expected_due_date)}
                 </p>
                 {b.notes && <p className="text-xs text-stone-500">{b.notes}</p>}
+                <BreedingEventEditor
+                  event={{
+                    id: b.id,
+                    femaleId: animalId,
+                    buck_name: b.buck_name,
+                    male_animal_id: b.male_animal_id,
+                    date_crossed: b.date_crossed,
+                    expected_due_date: b.expected_due_date,
+                    delivered_date: b.delivered_date,
+                    outcome: b.outcome,
+                    status: b.status,
+                    notes: b.notes,
+                  }}
+                  maleAnimals={data.quickEntry.maleAnimals}
+                  pastBuckNames={data.quickEntry.pastBuckNames}
+                />
               </li>
             ))}
           </ul>
@@ -174,7 +286,7 @@ export default async function AnimalProfilePage({
               return (
                 <li key={t.id} className="flex justify-between gap-2">
                   <span>
-                    {t.date} · {t.category}
+                    {formatDate(t.date)} · {t.category}
                     {sale && (
                       <span className="block text-xs text-stone-500">
                         Net {formatPkr(sale.net_received)} (your half {formatPkr(sale.partner_share)})
@@ -189,22 +301,29 @@ export default async function AnimalProfilePage({
         )}
       </section>
 
-      {weights.length > 0 && (
-        <section className="mb-3 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-stone-200">
-          <h2 className="mb-2 text-sm font-bold">Weight</h2>
+      <section className="mb-3 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-stone-200">
+        <div className="mb-2 flex items-center justify-between gap-2">
+          <h2 className="text-sm font-bold">Weight ({weights.length})</h2>
+          <Link href="/health?tab=weight" className="text-xs font-semibold text-emerald-700">
+            Herd view →
+          </Link>
+        </div>
+        {weights.length === 0 ? (
+          <p className="text-sm text-stone-500">No weight records yet. Use Quick Entry → Log Weight.</p>
+        ) : (
           <ul className="space-y-1 text-sm">
             {weights.map((w) => (
               <li key={w.id} className="flex justify-between">
-                <span>{w.weighed_on}</span>
+                <span>{formatDate(w.weighed_on)}</span>
                 <span className="font-semibold">{w.weight_kg} kg</span>
               </li>
             ))}
           </ul>
-        </section>
-      )}
+        )}
+      </section>
 
-      <QuickEntry {...data.quickEntry} />
-      <BottomNav active="goats" />
+      <QuickEntryLoader {...data.quickEntry} />
+      <BottomNav active={sp.from === "health" ? "health" : "goats"} />
     </main>
   );
 }

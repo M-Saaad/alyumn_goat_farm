@@ -23,6 +23,8 @@ export type MedicalEventType = "Vaccine" | "Deworming" | "Ultrasound" | "Surgery
 export type BreedingOutcome = "Pending" | "Delivered" | "Stillbirth" | "Miscarriage" | "Doubt";
 export type BreedingStatus = "Ready" | "Doubt" | "Delivered" | "Kid";
 
+export type AgreementStatus = "open" | "settled";
+
 export interface Contact {
   id: string;
   name: string;
@@ -65,6 +67,8 @@ export interface Transaction {
   adjustment_partner_id: string | null;
   notes: string | null;
   source_row: number | null;
+  purchase_agreement_id: string | null;
+  livestock_sale_id: string | null;
 }
 
 export interface PartnerLedgerEntry {
@@ -88,7 +92,18 @@ export interface PalaiPayment {
   notes: string | null;
 }
 
-/** Metadata for a livestock sale (ledger row stores one partner's half only). */
+/** Purchase deal — total price vs cash paid so far. */
+export interface PurchaseAgreement {
+  id: string;
+  animal_id: number;
+  vendor_id: string | null;
+  total_amount: number;
+  amount_paid: number;
+  status: AgreementStatus;
+  notes: string | null;
+}
+
+/** Metadata for a livestock sale (ledger row stores one partner's half per receipt). */
 export interface LivestockSale {
   id: string;
   date: string;
@@ -98,7 +113,9 @@ export interface LivestockSale {
   net_received: number;
   partner_share: number;
   received_by_partner_id: string;
-  transaction_id: string;
+  transaction_id: string | null;
+  amount_received: number;
+  status: AgreementStatus;
   notes: string | null;
 }
 
@@ -150,6 +167,7 @@ export interface FarmDatabase {
   partner_ledger_entries: PartnerLedgerEntry[];
   palai_payments: PalaiPayment[];
   livestock_sales: LivestockSale[];
+  purchase_agreements: PurchaseAgreement[];
   medical_events: MedicalEvent[];
   breeding_events: BreedingEvent[];
   weight_logs: WeightLog[];

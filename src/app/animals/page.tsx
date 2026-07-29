@@ -1,10 +1,11 @@
 import { Suspense } from "react";
 import Link from "next/link";
-import { animalLabel } from "@/lib/actions";
+import { animalLabel } from "@/lib/labels";
 import { loadAnimalsListData, contactNameFrom } from "@/lib/db/queries";
+import { isBreedingInPipeline } from "@/lib/livestock/breeding";
 import { BottomNav } from "@/components/BottomNav";
+import { QuickEntryLoader } from "@/components/QuickEntryLoader";
 import { AnimalsFilters } from "@/components/AnimalsFilters";
-import { QuickEntry } from "@/components/QuickEntryDynamic";
 
 export const dynamic = "force-dynamic";
 
@@ -27,7 +28,7 @@ export default async function AnimalsPage({
   if (filter === "breeding") {
     const femaleIds = new Set(
       data.breeding_events
-        .filter((b) => b.outcome === "Pending" || b.status === "Doubt")
+        .filter((b) => isBreedingInPipeline(b))
         .map((b) => b.female_animal_id)
     );
     animals = animals.filter((a) => femaleIds.has(a.id));
@@ -91,7 +92,7 @@ export default async function AnimalsPage({
         ))}
       </ul>
 
-      <QuickEntry {...data.quickEntry} />
+      <QuickEntryLoader {...data.quickEntry} />
       <BottomNav active="goats" />
     </main>
   );
