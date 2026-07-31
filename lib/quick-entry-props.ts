@@ -1,5 +1,6 @@
 import { animalLabel } from "@/lib/labels";
 import { femalesInBreedingPipeline } from "@/lib/livestock/breeding";
+import { palaiServiceMonth } from "@/lib/palai/service-month";
 import type { FarmDatabase } from "@/lib/types";
 import type { QuickEntryProps } from "@/components/QuickEntry";
 import type { ContactOption } from "@/components/ContactSelect";
@@ -50,6 +51,26 @@ export function quickEntryPropsFromDb(db: FarmDatabase): QuickEntryProps {
   const inPipeline = femalesInBreedingPipeline(db.breeding_events);
   const breedingEligibleFemales = femaleAnimals.filter((a) => !inPipeline.has(a.id));
 
+  const palaiHistory = db.palai_payments
+    .map((p) => {
+      const customer = db.contacts.find((c) => c.id === p.customer_id);
+      if (!customer) return null;
+      return {
+        id: p.id,
+        transactionId: p.transaction_id ?? "",
+        customerId: p.customer_id,
+        customerName: customer.name,
+        date: p.date,
+        serviceMonth: palaiServiceMonth(p),
+        ratePerGoat: p.rate_per_goat ?? 0,
+        goatCount: p.goat_count ?? 0,
+        totalAmount: p.total_amount,
+        paymentMethod: p.payment_method,
+        notes: p.notes,
+      };
+    })
+    .filter((p): p is NonNullable<typeof p> => Boolean(p && p.transactionId));
+
   return {
     animals,
     femaleAnimals: femaleAnimals.length > 0 ? femaleAnimals : animals,
@@ -59,5 +80,6 @@ export function quickEntryPropsFromDb(db: FarmDatabase): QuickEntryProps {
     ownerOptions,
     maleAnimals,
     pastBuckNames,
+    palaiHistory,
   };
 }

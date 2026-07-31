@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import { animalLabel } from "@/lib/labels";
+import { palaiServiceMonth } from "@/lib/palai/service-month";
 import { LEDGER_CATEGORIES, slugToCategory } from "@/lib/constants";
 import { loadTransactionsData, contactNameFrom } from "@/lib/db/queries";
 import { BottomNav } from "@/components/BottomNav";
@@ -85,6 +86,7 @@ export default async function TransactionsPage({
     if (variant === "palai_income") {
       if (palaiPayment) {
         palai = {
+          serviceMonth: palaiServiceMonth(palaiPayment),
           ratePerGoat: palaiPayment.rate_per_goat ?? Math.abs(tx.amount),
           goatCount: palaiPayment.goat_count ?? 1,
           paymentMethod: palaiPayment.payment_method ?? "",
@@ -93,6 +95,7 @@ export default async function TransactionsPage({
       } else {
         const total = Math.abs(tx.amount) * 2;
         palai = {
+          serviceMonth: tx.date.slice(0, 7),
           ratePerGoat: total,
           goatCount: 1,
           paymentMethod: "",

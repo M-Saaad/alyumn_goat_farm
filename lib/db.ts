@@ -25,6 +25,9 @@ function loadJsonDb(): FarmDatabase {
   if (!db.weight_logs) db.weight_logs = [];
   if (!db.medical_events) db.medical_events = [];
   if (!db.breeding_events) db.breeding_events = [];
+  for (const p of db.palai_payments ?? []) {
+    if (!p.service_month) p.service_month = p.date.slice(0, 7);
+  }
   return db;
 }
 

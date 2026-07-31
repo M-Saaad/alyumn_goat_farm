@@ -37,6 +37,7 @@ async function main() {
     const awais = db.contacts.find((c) => c.name === "Awais")!;
     const result = recognizePalaiPayment(db, {
       date: "2026-07-26",
+      serviceMonth: "2026-07",
       customerId: awais.id,
       ratePerGoat: 7000,
       goatCount: 2,
@@ -249,6 +250,50 @@ async function main() {
       throw new Error("edit purchase agreement failed");
     }
     console.log("PASS edit goat purchase details");
+
+    const { recordPalai, updatePalai } = await import("../lib/actions");
+    await recordPalai({
+      date: "2026-07-15",
+      serviceMonth: "2024-03",
+      customerName: "Awais",
+      ratePerGoat: 7000,
+      goatCount: 1,
+      notes: "june palai test",
+    });
+    const afterJunePalai = loadDb();
+    const junePalai = afterJunePalai.palai_payments.find((p) => p.notes === "june palai test");
+    if (!junePalai || junePalai.service_month !== "2024-03") {
+      throw new Error("palai service month not saved");
+    }
+    let duplicateFailed = false;
+    try {
+      await recordPalai({
+        date: "2026-07-16",
+        serviceMonth: "2024-03",
+        customerName: "Awais",
+        ratePerGoat: 7000,
+        goatCount: 1,
+      });
+    } catch {
+      duplicateFailed = true;
+    }
+    if (!duplicateFailed) throw new Error("duplicate palai month should be blocked");
+    await updatePalai({
+      transactionId: junePalai.transaction_id!,
+      date: "2026-07-15",
+      serviceMonth: "2024-02",
+      customerName: "Awais",
+      ratePerGoat: 7000,
+      goatCount: 2,
+      paymentMethod: "Cash",
+      notes: "moved to may",
+    });
+    const afterPalaiUpdate = loadDb();
+    const updatedPalai = afterPalaiUpdate.palai_payments.find((p) => p.id === junePalai.id);
+    if (!updatedPalai || updatedPalai.service_month !== "2024-02" || updatedPalai.goat_count !== 2) {
+      throw new Error("palai month update failed");
+    }
+    console.log("PASS palai service month record, duplicate block, and update");
 
     console.log("\nAll live engine tests passed.");
   } finally {

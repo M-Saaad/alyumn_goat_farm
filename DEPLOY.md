@@ -10,6 +10,7 @@ This app needs Postgres + auth for production. Local JSON (`data/farm.db.json`) 
    - [`supabase/migrations/002_livestock_sales_and_media.sql`](supabase/migrations/002_livestock_sales_and_media.sql)
    - [`supabase/migrations/003_drop_customer_wallet.sql`](supabase/migrations/003_drop_customer_wallet.sql)
    - [`supabase/migrations/004_installments.sql`](supabase/migrations/004_installments.sql)
+   - [`supabase/migrations/005_palai_service_month.sql`](supabase/migrations/005_palai_service_month.sql)
 3. Confirm Storage bucket `animal-media` exists (created by migration 002).
 4. Copy from **Project Settings → API**:
    - Project URL → `NEXT_PUBLIC_SUPABASE_URL`
