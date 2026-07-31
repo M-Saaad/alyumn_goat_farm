@@ -8,6 +8,7 @@ import {
   getPartnerIds,
 } from "./partner-equity/settlement";
 import { recognizePalaiPayment, applyPalaiToDb } from "./palai/recognize-payment";
+import { findPalaiForCustomerMonth, normalizeServiceMonth } from "./palai/service-month";
 import { applyLivestockSaleToDb, applySaleReceiptToDb, beginLivestockSale, buildSaleReceipt, findSaleForAnimal } from "./livestock/record-sale";
 import {
   applyDeleteSaleReceipt,
@@ -113,6 +114,7 @@ export async function logExpense(input: {
 
 export async function recordPalai(input: {
   date: string;
+  serviceMonth: string;
   customerName: string;
   ratePerGoat: number;
   goatCount: number;
@@ -136,9 +138,19 @@ export async function recordPalai(input: {
     newContacts.push(customer);
     db = { ...db, contacts: [...db.contacts, customer] };
   }
+
+  const serviceMonth = normalizeServiceMonth(input.serviceMonth);
+  const duplicate = findPalaiForCustomerMonth(db, customer.id, serviceMonth);
+  if (duplicate) {
+    throw new Error(
+      `Palai for ${input.customerName} is already recorded for ${serviceMonth}. Edit or delete the existing entry below.`
+    );
+  }
+
   const total = input.ratePerGoat * input.goatCount;
   const result = recognizePalaiPayment(db, {
     date: input.date,
+    serviceMonth,
     customerId: customer.id,
     ratePerGoat: input.ratePerGoat,
     goatCount: input.goatCount,
@@ -594,6 +606,47 @@ export async function deleteBreeding(id: string) {
     return after;
   }
   return persistMutation(before, after);
+}
+
+export async function updatePalai(input: {
+  transactionId: string;
+  date: string;
+  serviceMonth: string;
+  customerName: string;
+  ratePerGoat: number;
+  goatCount: number;
+  paymentMethod?: string | null;
+  notes?: string | null;
+}) {
+  const before = await fetchDb();
+  const payment = before.palai_payments.find((p) => p.transaction_id === input.transactionId);
+  if (!payment) throw new Error("Palai payment not found");
+
+  const customer = before.contacts.find(
+    (c) =>
+      c.name.toLowerCase() === input.customerName.toLowerCase() && c.type === "Customer"
+  );
+  if (!customer) throw new Error("Customer not found");
+
+  const serviceMonth = normalizeServiceMonth(input.serviceMonth);
+  const duplicate = findPalaiForCustomerMonth(before, customer.id, serviceMonth, payment.id);
+  if (duplicate) {
+    throw new Error(
+      `Another palai entry already exists for ${input.customerName} in ${serviceMonth}.`
+    );
+  }
+
+  return updateTransaction({
+    id: input.transactionId,
+    variant: "palai_income",
+    date: input.date,
+    serviceMonth,
+    customerName: input.customerName,
+    ratePerGoat: input.ratePerGoat,
+    goatCount: input.goatCount,
+    paymentMethod: input.paymentMethod,
+    notes: input.notes,
+  });
 }
 
 export async function logWeight(input: {

@@ -26,3 +26,7 @@ export function formatDate(value: string | null | undefined): string {
 export function todayIso(): string {
   return new Date().toISOString().slice(0, 10);
 }
+
+export function currentMonthIso(): string {
+  return new Date().toISOString().slice(0, 7);
+}

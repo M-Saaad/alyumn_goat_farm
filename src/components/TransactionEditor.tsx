@@ -31,6 +31,7 @@ export type EditableTransaction = {
   transferAbsAmount: number | null;
   transferDirection: "from_monis" | "to_monis" | null;
   palai: {
+    serviceMonth: string;
     ratePerGoat: number;
     goatCount: number;
     paymentMethod: string;
@@ -400,6 +401,16 @@ function PalaiForm({
   return (
     <>
       <Field label="Date" name="date" type="date" defaultValue={tx.date} required />
+      <div>
+        <label className={labelCls}>For month</label>
+        <input
+          className={field}
+          name="serviceMonth"
+          type="month"
+          defaultValue={palai?.serviceMonth ?? tx.date.slice(0, 7)}
+          required
+        />
+      </div>
       <ContactSelect
         label="Customer"
         name="customerName"

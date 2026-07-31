@@ -82,9 +82,13 @@ export function mapLedger(r: Record<string, unknown>): PartnerLedgerEntry {
 }
 
 export function mapPalai(r: Record<string, unknown>): PalaiPayment {
+  const date = String(r.date);
   return {
     id: String(r.id),
-    date: String(r.date),
+    date,
+    service_month: r.service_month
+      ? String(r.service_month).slice(0, 7)
+      : date.slice(0, 7),
     customer_id: String(r.customer_id),
     rate_per_goat: r.rate_per_goat == null ? null : num(r.rate_per_goat),
     goat_count: r.goat_count == null ? null : num(r.goat_count),
@@ -322,6 +326,7 @@ export async function saveToSupabase(client: SupabaseClient, db: FarmDatabase): 
     db.palai_payments.map((p) => ({
       id: p.id,
       date: p.date,
+      service_month: p.service_month,
       customer_id: p.customer_id,
       rate_per_goat: p.rate_per_goat,
       goat_count: p.goat_count,

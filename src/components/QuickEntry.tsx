@@ -10,12 +10,12 @@ import {
   actionPartnerTransfer,
   actionRecordBreeding,
   actionRecordLivestockSale,
-  actionRecordPalai,
 } from "@/lib/server-actions";
 import { LEDGER_CATEGORIES } from "@/lib/constants";
 import { todayIso } from "@/lib/format";
 import { ActionForm, SubmitButton } from "@/components/ActionForm";
 import { BuckSelect, ContactSelect, type ContactOption } from "@/components/ContactSelect";
+import { PalaiPaymentForm, type PalaiHistoryEntry } from "@/components/PalaiPaymentForm";
 
 type AnimalOption = { id: number; label: string };
 type Mode =
@@ -43,6 +43,7 @@ export type QuickEntryProps = {
   ownerOptions: ContactOption[];
   maleAnimals: AnimalOption[];
   pastBuckNames: string[];
+  palaiHistory?: PalaiHistoryEntry[];
 };
 
 export function QuickEntry({
@@ -54,6 +55,7 @@ export function QuickEntry({
   ownerOptions,
   maleAnimals,
   pastBuckNames,
+  palaiHistory = [],
 }: QuickEntryProps) {
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<Mode>(null);
@@ -144,23 +146,11 @@ export function QuickEntry({
             )}
 
             {mode === "palai" && (
-              <ActionForm action={actionRecordPalai} onSuccess={close}>
-                <Field label="Date" name="date" type="date" defaultValue={todayIso()} required />
-                <ContactSelect
-                  label="Customer"
-                  name="customerName"
-                  options={customers}
-                  defaultValue={customers.find((c) => c.name === "Awais")?.name ?? customers[0]?.name}
-                  required
-                  addNewLabel="+ Add new customer"
-                />
-                <Field label="Rate / goat" name="ratePerGoat" type="number" defaultValue="7000" required />
-                <Field label="Goat count" name="goatCount" type="number" defaultValue="2" required />
-                <Field label="Payment method" name="paymentMethod" defaultValue="Online Transfer" />
-                <Field label="Notes" name="notes" />
-                <p className="text-xs text-stone-500">Splits 50/50 to Monis and Saad automatically.</p>
-                <SubmitButton />
-              </ActionForm>
+              <PalaiPaymentForm
+                customers={customers}
+                palaiHistory={palaiHistory}
+                onSuccess={close}
+              />
             )}
 
             {mode === "buy" && (

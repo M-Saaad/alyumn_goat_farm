@@ -14,9 +14,11 @@
  */
 import type { FarmDatabase, PalaiPayment, PartnerLedgerEntry, Transaction } from "../types";
 import { createAdjustmentTransaction, getPartnerIds } from "../partner-equity/settlement";
+import { buildPalaiNotes, normalizeServiceMonth } from "./service-month";
 
 export interface RecognizePalaiInput {
   date: string;
+  serviceMonth: string;
   customerId: string;
   ratePerGoat: number;
   goatCount: number;
@@ -57,14 +59,19 @@ export function recognizePalaiPayment(
     category: "Palai Income",
     monisId,
     customerId: input.customerId,
-    notes:
-      input.notes ||
-      `Palai ${input.goatCount} goats @ ${input.ratePerGoat} = ${input.totalAmount} (50/50 split)`,
+    notes: buildPalaiNotes({
+      goatCount: input.goatCount,
+      ratePerGoat: input.ratePerGoat,
+      totalAmount: input.totalAmount,
+      serviceMonth: input.serviceMonth,
+      notes: input.notes,
+    }),
   });
 
   const payment: PalaiPayment = {
     id: crypto.randomUUID(),
     date: input.date,
+    service_month: normalizeServiceMonth(input.serviceMonth),
     customer_id: input.customerId,
     rate_per_goat: input.ratePerGoat,
     goat_count: input.goatCount,

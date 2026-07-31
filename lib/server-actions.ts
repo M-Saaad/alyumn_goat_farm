@@ -18,6 +18,7 @@ import {
   deleteBreeding,
   recordLivestockSale,
   recordPalai,
+  updatePalai,
   updateAnimal,
   updateTransaction,
   undoLivestockSale,
@@ -67,13 +68,34 @@ export async function actionLogExpense(formData: FormData) {
 }
 
 export async function actionRecordPalai(formData: FormData) {
+  const serviceMonth = String(formData.get("serviceMonth") || "").trim();
+  if (!serviceMonth) throw new Error("Select which month this payment is for");
   await recordPalai({
     date: String(formData.get("date")),
+    serviceMonth,
     customerName: String(formData.get("customerName")),
     ratePerGoat: Number(formData.get("ratePerGoat")),
     goatCount: Number(formData.get("goatCount")),
     paymentMethod: String(formData.get("paymentMethod") || ""),
     notes: String(formData.get("notes") || ""),
+  });
+  revalidateTxnPaths();
+}
+
+export async function actionUpdatePalai(formData: FormData) {
+  const transactionId = String(formData.get("transactionId") || "").trim();
+  const serviceMonth = String(formData.get("serviceMonth") || "").trim();
+  if (!transactionId) throw new Error("Payment id is required");
+  if (!serviceMonth) throw new Error("Select which month this payment is for");
+  await updatePalai({
+    transactionId,
+    date: String(formData.get("date")),
+    serviceMonth,
+    customerName: String(formData.get("customerName")),
+    ratePerGoat: Number(formData.get("ratePerGoat")),
+    goatCount: Number(formData.get("goatCount")),
+    paymentMethod: String(formData.get("paymentMethod") || "") || null,
+    notes: String(formData.get("notes") || "") || null,
   });
   revalidateTxnPaths();
 }
@@ -339,6 +361,7 @@ export async function actionUpdateTransaction(formData: FormData) {
       id,
       variant: "palai_income",
       date: String(formData.get("date")),
+      serviceMonth: String(formData.get("serviceMonth")),
       customerName: String(formData.get("customerName")),
       ratePerGoat: Number(formData.get("ratePerGoat")),
       goatCount: Number(formData.get("goatCount")),

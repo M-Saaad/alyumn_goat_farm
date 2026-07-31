@@ -20,6 +20,7 @@ import {
   saleAdjustmentAmount,
 } from "../livestock/record-sale";
 import { applyDeleteSaleReceipt, findSaleForReceipt } from "../livestock/cancel-sale";
+import { buildPalaiNotes, normalizeServiceMonth } from "../palai/service-month";
 import { diffDb, type WritePlan } from "../db/writes";
 
 export type TransactionEditVariant =
@@ -110,6 +111,7 @@ export type UpdateTransactionInput =
       id: string;
       variant: "palai_income";
       date: string;
+      serviceMonth: string;
       customerName: string;
       ratePerGoat: number;
       goatCount: number;
@@ -220,17 +222,21 @@ export function applyUpdateTransaction(
     case "palai_income": {
       const total = input.ratePerGoat * input.goatCount;
       const half = total / 2;
-      // Default: Saad received cash → positive Monis adjustment (matches create path)
       const adjustmentAmount = half;
+      const serviceMonth = normalizeServiceMonth(input.serviceMonth);
 
       let next = db;
       const r = findOrCreateContact(next, input.customerName.trim(), "Customer");
       next = r.db;
       const customerId = r.id;
 
-      const notes =
-        input.notes ||
-        `Palai ${input.goatCount} goats @ ${input.ratePerGoat} = ${total} (50/50 split)`;
+      const notes = buildPalaiNotes({
+        goatCount: input.goatCount,
+        ratePerGoat: input.ratePerGoat,
+        totalAmount: total,
+        serviceMonth,
+        notes: input.notes,
+      });
 
       const updated: Transaction = {
         ...tx,
@@ -248,6 +254,7 @@ export function applyUpdateTransaction(
         ? {
             ...existingPayment,
             date: input.date,
+            service_month: serviceMonth,
             customer_id: customerId,
             rate_per_goat: input.ratePerGoat,
             goat_count: input.goatCount,
@@ -259,6 +266,7 @@ export function applyUpdateTransaction(
         : {
             id: crypto.randomUUID(),
             date: input.date,
+            service_month: serviceMonth,
             customer_id: customerId,
             rate_per_goat: input.ratePerGoat,
             goat_count: input.goatCount,

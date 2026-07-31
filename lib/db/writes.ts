@@ -110,6 +110,7 @@ function palaiRow(p: PalaiPayment): Record<string, unknown> {
   return {
     id: p.id,
     date: p.date,
+    service_month: p.service_month,
     customer_id: p.customer_id,
     rate_per_goat: p.rate_per_goat,
     goat_count: p.goat_count,

@@ -83,6 +83,8 @@ export interface PartnerLedgerEntry {
 export interface PalaiPayment {
   id: string;
   date: string;
+  /** YYYY-MM — which month this palai fee is for. */
+  service_month: string;
   customer_id: string;
   rate_per_goat: number | null;
   goat_count: number | null;
