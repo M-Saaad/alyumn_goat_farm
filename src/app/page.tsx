@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { loadHomeData, contactNameFrom } from "@/lib/db/queries";
 import { computeSettlement } from "@/lib/partner-equity/settlement";
-import { formatPkr, formatDate } from "@/lib/format";
+import { formatPkr, formatDate, currentMonthIso } from "@/lib/format";
+import { palaiServiceMonth } from "@/lib/palai/service-month";
 import { BottomNav } from "@/components/BottomNav";
 import { QuickEntryLoader } from "@/components/QuickEntryLoader";
 import { SignOutButton } from "@/components/SignOutButton";
@@ -21,7 +22,7 @@ export default async function HomePage() {
   const recent = [...data.transactions].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 12);
 
   const palaiThisMonth = data.palai_payments
-    .filter((p) => p.date.startsWith(new Date().toISOString().slice(0, 7)))
+    .filter((p) => palaiServiceMonth(p) === currentMonthIso())
     .reduce((sum, p) => sum + p.total_amount, 0);
 
   const categoryOrder = [
