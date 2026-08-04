@@ -1,5 +1,6 @@
 import {
   computeHerdHealth,
+  DEWORM_INTERVAL_DAYS,
   ETV_INTERVAL_DAYS,
   PPR_INTERVAL_DAYS,
   vaccineKindFromNotes,
@@ -101,4 +102,6 @@ assert(
   "split ETV overdue"
 );
 
-console.log("PASS herd health vaccine intervals (PPR yearly, ETV twice yearly)");
+assert(DEWORM_INTERVAL_DAYS === 182, "deworm interval is twice yearly");
+
+console.log("PASS herd health intervals (PPR yearly, ETV & deworm twice yearly)");
