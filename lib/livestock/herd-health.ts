@@ -9,7 +9,7 @@ export const PPR_INTERVAL_DAYS = 365;
 export const ETV_INTERVAL_DAYS = 182;
 /** @deprecated Use PPR_INTERVAL_DAYS / ETV_INTERVAL_DAYS */
 export const VACCINE_INTERVAL_DAYS = PPR_INTERVAL_DAYS;
-export const DEWORM_INTERVAL_DAYS = 90;
+export const DEWORM_INTERVAL_DAYS = 182;
 
 export type VaccineKind = "ppr" | "etv";
 

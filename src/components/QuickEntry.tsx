@@ -12,6 +12,12 @@ import {
   actionRecordLivestockSale,
 } from "@/lib/server-actions";
 import { LEDGER_CATEGORIES } from "@/lib/constants";
+import {
+  DEWORM_TYPES,
+  DEWORMER_NAMES_BY_TYPE,
+  VACCINE_NAMES,
+  type DewormType,
+} from "@/lib/livestock/medical-notes";
 import { todayIso } from "@/lib/format";
 import { ActionForm, SubmitButton } from "@/components/ActionForm";
 import { BuckSelect, ContactSelect, type ContactOption } from "@/components/ContactSelect";
@@ -158,20 +164,7 @@ export function QuickEntry({
             )}
 
             {mode === "medical" && (
-              <ActionForm action={actionLogMedical} onSuccess={close}>
-                <AnimalSelect animals={animals} />
-                <div>
-                  <label className={label}>Event type</label>
-                  <select name="eventType" className={field} required>
-                    {["Vaccine", "Deworming", "Ultrasound", "Surgery", "General"].map((e) => (
-                      <option key={e}>{e}</option>
-                    ))}
-                  </select>
-                </div>
-                <Field label="Date" name="date" type="date" defaultValue={todayIso()} required />
-                <Field label="Notes" name="notes" />
-                <SubmitButton />
-              </ActionForm>
+              <MedicalForm animals={animals} onSuccess={close} />
             )}
 
             {mode === "weight" && (
@@ -254,6 +247,113 @@ export function QuickEntry({
         </div>
       )}
     </>
+  );
+}
+
+function MedicalForm({
+  animals,
+  onSuccess,
+}: {
+  animals: AnimalOption[];
+  onSuccess: () => void;
+}) {
+  const [eventType, setEventType] = useState("Vaccine");
+  const [dewormType, setDewormType] = useState<DewormType>("internal");
+  const [dewormerName, setDewormerName] = useState<string>(
+    DEWORMER_NAMES_BY_TYPE.internal[0]
+  );
+
+  const dewormerOptions = DEWORMER_NAMES_BY_TYPE[dewormType];
+
+  function onDewormTypeChange(next: DewormType) {
+    setDewormType(next);
+    const options = DEWORMER_NAMES_BY_TYPE[next];
+    setDewormerName((prev) => (prev === "Other" || options.includes(prev) ? prev : options[0]));
+  }
+
+  return (
+    <ActionForm action={actionLogMedical} onSuccess={onSuccess}>
+      <AnimalMultiSelect animals={animals} />
+      <div>
+        <label className={label}>Event type</label>
+        <select
+          name="eventType"
+          className={field}
+          required
+          value={eventType}
+          onChange={(e) => setEventType(e.target.value)}
+        >
+          {["Vaccine", "Deworming", "Ultrasound", "Surgery", "General"].map((e) => (
+            <option key={e}>{e}</option>
+          ))}
+        </select>
+      </div>
+      <Field label="Date" name="date" type="date" defaultValue={todayIso()} required />
+
+      {eventType === "Vaccine" && (
+        <>
+          <div>
+            <label className={label}>Vaccine</label>
+            <select name="vaccineName" className={field} required defaultValue={VACCINE_NAMES[0]}>
+              {VACCINE_NAMES.map((v) => (
+                <option key={v} value={v}>
+                  {v}
+                </option>
+              ))}
+            </select>
+          </div>
+          <Field label="Dosage" name="dosage" defaultValue="1ml" required />
+        </>
+      )}
+
+      {eventType === "Deworming" && (
+        <>
+          <div>
+            <label className={label}>Type</label>
+            <select
+              name="dewormType"
+              className={field}
+              required
+              value={dewormType}
+              onChange={(e) => onDewormTypeChange(e.target.value as DewormType)}
+            >
+              {DEWORM_TYPES.map((t) => (
+                <option key={t.value} value={t.value}>
+                  {t.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className={label}>Dewormer</label>
+            <select
+              name="dewormerName"
+              className={field}
+              required
+              value={dewormerName}
+              onChange={(e) => setDewormerName(e.target.value)}
+            >
+              {dewormerOptions.map((n) => (
+                <option key={n} value={n}>
+                  {n}
+                </option>
+              ))}
+              <option value="Other">Other</option>
+            </select>
+          </div>
+          {dewormerName === "Other" && (
+            <Field label="Dewormer name" name="dewormerNameOther" required />
+          )}
+          <Field label="Dosage" name="dosage" defaultValue="1ml" required />
+        </>
+      )}
+
+      {eventType !== "Vaccine" && eventType !== "Deworming" && (
+        <Field label="Notes" name="notes" />
+      )}
+
+      <SubmitButton />
+    </ActionForm>
   );
 }
 
@@ -509,6 +609,84 @@ function AnimalSelect({
           </option>
         ))}
       </select>
+    </div>
+  );
+}
+
+function AnimalMultiSelect({ animals }: { animals: AnimalOption[] }) {
+  const [selected, setSelected] = useState<Set<number>>(() => new Set());
+
+  function toggle(id: number) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function selectAll() {
+    setSelected(new Set(animals.map((a) => a.id)));
+  }
+
+  function clearAll() {
+    setSelected(new Set());
+  }
+
+  const count = selected.size;
+  const allSelected = animals.length > 0 && count === animals.length;
+
+  return (
+    <div>
+      <div className="flex items-center justify-between gap-2">
+        <label className={label}>
+          Goats {count > 0 ? `(${count} selected)` : ""}
+        </label>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={allSelected ? clearAll : selectAll}
+            className="text-xs font-semibold text-emerald-700"
+          >
+            {allSelected ? "Clear" : "Select all"}
+          </button>
+          {count > 0 && !allSelected && (
+            <button type="button" onClick={clearAll} className="text-xs font-semibold text-stone-500">
+              Clear
+            </button>
+          )}
+        </div>
+      </div>
+      {animals.length === 0 ? (
+        <p className="mt-1 text-sm text-stone-500">No active goats.</p>
+      ) : (
+        <div className="mt-1 max-h-48 space-y-1 overflow-y-auto rounded-xl border border-stone-300 bg-white p-2">
+          {animals.map((a) => {
+            const checked = selected.has(a.id);
+            return (
+              <label
+                key={a.id}
+                className={`flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-stone-800 ${
+                  checked ? "bg-emerald-50" : "hover:bg-stone-50"
+                }`}
+              >
+                <input
+                  type="checkbox"
+                  name="animalId"
+                  value={a.id}
+                  checked={checked}
+                  onChange={() => toggle(a.id)}
+                  className="h-4 w-4 rounded border-stone-300"
+                />
+                {a.label}
+              </label>
+            );
+          })}
+        </div>
+      )}
+      <p className="mt-1 text-xs text-stone-500">
+        Same event is logged for every selected goat (e.g. herd vaccine or deworming).
+      </p>
     </div>
   );
 }

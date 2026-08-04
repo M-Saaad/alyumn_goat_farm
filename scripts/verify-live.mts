@@ -210,7 +210,7 @@ async function main() {
     }
     console.log("PASS buy goat creates animal + linked transaction");
 
-    await logMedical({ animalId: vg.id, eventType: "Vaccine", date: "2026-07-26", notes: "test vax" });
+    await logMedical({ animalIds: [vg.id], eventType: "Vaccine", date: "2026-07-26", notes: "test vax" });
     const med = loadDb().medical_events.find((m) => m.animal_id === vg.id && m.notes === "test vax");
     if (!med) throw new Error("medical missing");
     console.log("PASS medical appears on animal");

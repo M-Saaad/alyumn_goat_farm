@@ -26,6 +26,7 @@ import {
 import { revalidatePath } from "next/cache";
 import type { AnimalBreed, AnimalSex, AnimalStatus, LedgerCategory, MedicalEventType } from "@/lib/types";
 import { LEDGER_CATEGORIES } from "@/lib/types";
+import { formatDewormNotes, formatVaccineNotes } from "@/lib/livestock/medical-notes";
 import { uploadAnimalMedia } from "@/lib/media/upload";
 import type { TransactionEditVariant } from "@/lib/transactions/mutate";
 
@@ -125,11 +126,35 @@ export async function actionBuyGoat(formData: FormData) {
 }
 
 export async function actionLogMedical(formData: FormData) {
+  const animalIds = formData
+    .getAll("animalId")
+    .map((v) => Number(String(v).trim()))
+    .filter((id) => Number.isFinite(id) && id > 0);
+  if (animalIds.length === 0) throw new Error("Select at least one goat");
+
+  const eventType = String(formData.get("eventType")) as MedicalEventType;
+  let notes = String(formData.get("notes") || "").trim();
+
+  if (eventType === "Vaccine") {
+    notes = formatVaccineNotes(
+      String(formData.get("vaccineName") || ""),
+      String(formData.get("dosage") || "")
+    );
+  } else if (eventType === "Deworming") {
+    const dewormerName = String(formData.get("dewormerName") || "").trim();
+    const customName = String(formData.get("dewormerNameOther") || "").trim();
+    notes = formatDewormNotes({
+      type: String(formData.get("dewormType") || ""),
+      name: dewormerName === "Other" ? customName : dewormerName,
+      dosage: String(formData.get("dosage") || ""),
+    });
+  }
+
   await logMedical({
-    animalId: Number(formData.get("animalId")),
-    eventType: String(formData.get("eventType")) as MedicalEventType,
+    animalIds,
+    eventType,
     date: String(formData.get("date")),
-    notes: String(formData.get("notes") || ""),
+    notes,
   });
   revalidateTxnPaths();
 }

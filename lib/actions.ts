@@ -464,26 +464,29 @@ export async function updateAnimal(input: UpdateAnimalInput) {
 }
 
 export async function logMedical(input: {
-  animalId: number;
+  animalIds: number[];
   eventType: MedicalEventType;
   date: string;
   notes?: string;
 }) {
+  const animalIds = [...new Set(input.animalIds.filter((id) => Number.isFinite(id) && id > 0))];
+  if (animalIds.length === 0) throw new Error("Select at least one goat");
+
   const before = await fetchDb();
-  const event = {
+  const events = animalIds.map((animalId) => ({
     id: crypto.randomUUID(),
-    animal_id: input.animalId,
+    animal_id: animalId,
     event_type: input.eventType,
     date: input.date,
     notes: input.notes || null,
     transaction_id: null,
-  };
+  }));
   const after = {
     ...before,
-    medical_events: [...before.medical_events, event],
+    medical_events: [...before.medical_events, ...events],
   };
   if (isSupabaseDb()) {
-    await applyWritePlan({ upsertMedical: [event] });
+    await applyWritePlan({ upsertMedical: events });
     return after;
   }
   return persistMutation(before, after);
