@@ -9,7 +9,7 @@
     "lint": "eslint",
     "audit:data": "node scripts/audit-data.mjs",
     "import": "node scripts/import-all.mjs",
-    "verify": "node scripts/verify-v1.mjs && npx tsx scripts/verify-live.mts",
+    "verify": "node scripts/verify-v1.mjs && npx tsx scripts/verify-live.mts && npx tsx scripts/verify-monthly-report.mts",
     "db:reset": "node scripts/audit-data.mjs && node scripts/import-all.mjs && npm run verify",
     "seed:supabase": "npx tsx --env-file=.env.local scripts/seed-supabase.mts"
   },

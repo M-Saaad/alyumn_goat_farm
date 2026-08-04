@@ -15,6 +15,20 @@ export const LEDGER_CATEGORIES = [
 
 export type LedgerCategory = (typeof LEDGER_CATEGORIES)[number];
 
+export const CATEGORY_DISPLAY_ORDER: LedgerCategory[] = [
+  "Feed",
+  "Delivery",
+  "Vet/Medicine",
+  "Labor",
+  "Infrastructure",
+  "Livestock Purchase",
+  "Livestock Sale",
+  "Palai Income",
+  "Palai Expense",
+  "Partner Transfer",
+  "Other",
+];
+
 /** URL-safe slug ↔ category (handles `/` and spaces). */
 export function categoryToSlug(category: string): string {
   return category.toLowerCase().replace(/\//g, "-").replace(/\s+/g, "-");

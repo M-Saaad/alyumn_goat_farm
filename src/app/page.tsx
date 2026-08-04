@@ -1,9 +1,13 @@
 import Link from "next/link";
+import { Suspense } from "react";
 import { loadHomeData, contactNameFrom } from "@/lib/db/queries";
 import { computeSettlement } from "@/lib/partner-equity/settlement";
 import { formatPkr, formatDate, currentMonthIso } from "@/lib/format";
 import { palaiServiceMonth } from "@/lib/palai/service-month";
+import { computeMonthlyCategoryReport, parseFinanceMonth } from "@/lib/transactions/monthly-report";
+import { CATEGORY_DISPLAY_ORDER } from "@/lib/constants";
 import { BottomNav } from "@/components/BottomNav";
+import { FinanceMonthPicker } from "@/components/FinanceMonthPicker";
 import { QuickEntryLoader } from "@/components/QuickEntryLoader";
 import { SignOutButton } from "@/components/SignOutButton";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
@@ -11,33 +15,51 @@ import type { FarmDatabase } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
-export default async function HomePage() {
+export default function HomePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ month?: string }>;
+}) {
+  return (
+    <Suspense fallback={<HomePageFallback />}>
+      <HomePageContent searchParams={searchParams} />
+    </Suspense>
+  );
+}
+
+function HomePageFallback() {
+  return (
+    <main className="px-4 pt-6">
+      <div className="mb-4 h-16 animate-pulse rounded-xl bg-stone-200" />
+      <div className="mb-4 h-32 animate-pulse rounded-xl bg-stone-200" />
+      <BottomNav active="finance" />
+    </main>
+  );
+}
+
+async function HomePageContent({
+  searchParams,
+}: {
+  searchParams: Promise<{ month?: string }>;
+}) {
+  const sp = await searchParams;
+  const month = parseFinanceMonth(sp.month);
   const data = await loadHomeData();
-  // Settlement only needs contacts + transactions
   const settlementDb = {
     contacts: data.contacts,
     transactions: data.transactions,
   } as FarmDatabase;
   const s = computeSettlement(settlementDb);
+  const monthly = computeMonthlyCategoryReport({
+    transactions: data.transactions,
+    palaiPayments: data.palai_payments,
+    month,
+  });
   const recent = [...data.transactions].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 12);
 
   const palaiThisMonth = data.palai_payments
     .filter((p) => palaiServiceMonth(p) === currentMonthIso())
     .reduce((sum, p) => sum + p.total_amount, 0);
-
-  const categoryOrder = [
-    "Feed",
-    "Delivery",
-    "Vet/Medicine",
-    "Labor",
-    "Infrastructure",
-    "Livestock Purchase",
-    "Livestock Sale",
-    "Palai Income",
-    "Palai Expense",
-    "Partner Transfer",
-    "Other",
-  ];
 
   return (
     <main className="px-4 pt-6">
@@ -99,16 +121,41 @@ export default async function HomePage() {
       </section>
 
       <section className="mb-4 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-stone-200">
-        <h2 className="mb-2 text-sm font-bold text-stone-800">Spending by category</h2>
+        <div className="mb-3">
+          <h2 className="mb-2 text-sm font-bold text-stone-800">Monthly report</h2>
+          <Suspense fallback={<div className="h-8 animate-pulse rounded-lg bg-stone-100" />}>
+            <FinanceMonthPicker month={month} />
+          </Suspense>
+        </div>
+        {monthly.transactionCount === 0 ? (
+          <p className="text-sm text-stone-500">No transactions this month.</p>
+        ) : (
+          <>
+            <ul className="space-y-1">
+              {CATEGORY_DISPLAY_ORDER.filter((c) => monthly.byCategory[c]).map((c) => (
+                <li key={c} className="flex justify-between text-sm">
+                  <span className="text-stone-600">{c}</span>
+                  <span className="font-medium">{formatPkr(monthly.byCategory[c]!)}</span>
+                </li>
+              ))}
+            </ul>
+            <div className="mt-3 flex justify-between border-t border-stone-100 pt-2 text-sm font-bold">
+              <span>Total</span>
+              <span>{formatPkr(monthly.total)}</span>
+            </div>
+          </>
+        )}
+      </section>
+
+      <section className="mb-4 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-stone-200">
+        <h2 className="mb-2 text-sm font-bold text-stone-800">Spending by category (all time)</h2>
         <ul className="space-y-1">
-          {categoryOrder
-            .filter((c) => s.byCategory[c])
-            .map((c) => (
-              <li key={c} className="flex justify-between text-sm">
-                <span className="text-stone-600">{c}</span>
-                <span className="font-medium">{formatPkr(s.byCategory[c])}</span>
-              </li>
-            ))}
+          {CATEGORY_DISPLAY_ORDER.filter((c) => s.byCategory[c]).map((c) => (
+            <li key={c} className="flex justify-between text-sm">
+              <span className="text-stone-600">{c}</span>
+              <span className="font-medium">{formatPkr(s.byCategory[c])}</span>
+            </li>
+          ))}
         </ul>
       </section>
 
