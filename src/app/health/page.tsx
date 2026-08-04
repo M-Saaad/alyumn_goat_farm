@@ -106,7 +106,7 @@ function HealthPageView({
         <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">Livestock</p>
         <h1 className="text-2xl font-bold">Herd Health</h1>
         <p className="text-sm text-stone-500">
-          {summary.activeCount} active goats · vaccine & deworm every 90 days
+          {summary.activeCount} active goats · PPR yearly · ETV twice yearly · deworm every 90 days
         </p>
       </header>
 
@@ -233,12 +233,20 @@ function HealthPageView({
       )}
 
       {tab === "vaccine" && (
-        <DueList
-          title="Vaccination schedule"
-          items={herd.vaccines}
-          emptyMessage="No active goats."
-          healthTab="vaccine"
-        />
+        <>
+          <DueList
+            title="PPR (once a year)"
+            items={herd.vaccines.filter((v) => v.vaccineKind === "ppr")}
+            emptyMessage="No active goats."
+            healthTab="vaccine"
+          />
+          <DueList
+            title="ETV (twice a year)"
+            items={herd.vaccines.filter((v) => v.vaccineKind === "etv")}
+            emptyMessage="No active goats."
+            healthTab="vaccine"
+          />
+        </>
       )}
 
       {tab === "deworm" && (

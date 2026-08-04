@@ -5,8 +5,20 @@ import { todayIso } from "@/lib/format";
 
 export { HEALTH_TABS, parseHealthTab } from "./health-tabs";
 export type { HealthTab } from "./health-tabs";
-export const VACCINE_INTERVAL_DAYS = 90;
+export const PPR_INTERVAL_DAYS = 365;
+export const ETV_INTERVAL_DAYS = 182;
+/** @deprecated Use PPR_INTERVAL_DAYS / ETV_INTERVAL_DAYS */
+export const VACCINE_INTERVAL_DAYS = PPR_INTERVAL_DAYS;
 export const DEWORM_INTERVAL_DAYS = 90;
+
+export type VaccineKind = "ppr" | "etv";
+
+export function vaccineKindFromNotes(notes: string | null | undefined): VaccineKind | null {
+  const text = (notes ?? "").toUpperCase();
+  if (text.includes("PPR")) return "ppr";
+  if (text.includes("ETV")) return "etv";
+  return null;
+}
 export { GESTATION_DAYS } from "./breeding";
 export const DUE_SOON_DAYS = 14;
 
@@ -19,6 +31,7 @@ export type AnimalDueItem = {
   dueDate: string | null;
   daysUntilDue: number | null;
   status: DueStatus;
+  vaccineKind?: VaccineKind;
 };
 
 export type BreedingRow = {
@@ -114,11 +127,28 @@ function lastEventByAnimal(
   return map;
 }
 
+function lastVaccineByKind(
+  events: MedicalEvent[],
+  kind: VaccineKind
+): Map<number, MedicalEvent> {
+  const map = new Map<number, MedicalEvent>();
+  for (const e of events) {
+    if (e.event_type !== "Vaccine" || !e.date) continue;
+    if (vaccineKindFromNotes(e.notes) !== kind) continue;
+    const prev = map.get(e.animal_id);
+    if (!prev || e.date > (prev.date || "")) {
+      map.set(e.animal_id, e);
+    }
+  }
+  return map;
+}
+
 function buildDueList(
   activeAnimals: Animal[],
   lastByAnimal: Map<number, MedicalEvent>,
   intervalDays: number,
-  today: string
+  today: string,
+  vaccineKind?: VaccineKind
 ): AnimalDueItem[] {
   return activeAnimals
     .map((a) => {
@@ -131,6 +161,7 @@ function buildDueList(
         dueDate,
         daysUntilDue,
         status,
+        ...(vaccineKind ? { vaccineKind } : {}),
       };
     })
     .sort((a, b) => {
@@ -154,10 +185,18 @@ export function computeHerdHealth(input: {
   const breedingEvents = input.breeding_events ?? [];
   const activeAnimals = input.animals.filter((a) => a.status === "Active");
 
-  const lastVaccine = lastEventByAnimal(medicalEvents, "Vaccine");
+  const lastPpr = lastVaccineByKind(medicalEvents, "ppr");
+  const lastEtv = lastVaccineByKind(medicalEvents, "etv");
   const lastDeworm = lastEventByAnimal(medicalEvents, "Deworming");
 
-  const vaccines = buildDueList(activeAnimals, lastVaccine, VACCINE_INTERVAL_DAYS, today);
+  const pprVaccines = buildDueList(activeAnimals, lastPpr, PPR_INTERVAL_DAYS, today, "ppr");
+  const etvVaccines = buildDueList(activeAnimals, lastEtv, ETV_INTERVAL_DAYS, today, "etv");
+  const vaccines = [...pprVaccines, ...etvVaccines].sort((a, b) => {
+    const order: Record<DueStatus, number> = { overdue: 0, due_soon: 1, never: 2, ok: 3 };
+    const diff = order[a.status] - order[b.status];
+    if (diff !== 0) return diff;
+    return (a.daysUntilDue ?? 999) - (b.daysUntilDue ?? 999);
+  });
   const deworming = buildDueList(activeAnimals, lastDeworm, DEWORM_INTERVAL_DAYS, today);
 
   const breeding: BreedingRow[] = breedingEvents
@@ -211,11 +250,15 @@ export function computeHerdHealth(input: {
   const actions: HerdHealthData["actions"] = [];
   for (const v of vaccines) {
     if (v.status === "overdue" || v.status === "due_soon" || v.status === "never") {
+      const vaccineLabel = v.vaccineKind === "ppr" ? "PPR" : v.vaccineKind === "etv" ? "ETV" : "Vaccine";
       actions.push({
         kind: "vaccine",
         animalId: v.animalId,
         label: v.label,
-        detail: v.status === "never" ? "Never vaccinated" : `Due ${v.dueDate}`,
+        detail:
+          v.status === "never"
+            ? `Never had ${vaccineLabel}`
+            : `${vaccineLabel} due ${v.dueDate}`,
         urgency: v.status === "overdue" ? "overdue" : "due_soon",
       });
     }
@@ -280,7 +323,9 @@ export function computeHerdHealth(input: {
     dueSoonVaccines: vaccines.filter((v) => v.status === "due_soon").length,
     overdueDeworm: deworming.filter((d) => d.status === "overdue").length,
     dueSoonDeworm: deworming.filter((d) => d.status === "due_soon").length,
-    neverVaccinated: vaccines.filter((v) => v.status === "never").length,
+    neverVaccinated: new Set(
+      vaccines.filter((v) => v.status === "never").map((v) => v.animalId)
+    ).size,
     neverDewormed: deworming.filter((d) => d.status === "never").length,
     neverWeighed: weights.filter((w) => !w.latest).length,
     breedingDelivered,
