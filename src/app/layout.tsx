@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Farm App — Monis & Saad",
-  description: "Unified goat farm management",
+  title: "Al-Yumn Goat Farm",
+  description: "Farm management for Monis & Saad",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

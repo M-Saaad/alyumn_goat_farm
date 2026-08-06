@@ -8,6 +8,7 @@ import { computeMonthlyCategoryReport, parseFinanceMonth } from "@/lib/transacti
 import { CATEGORY_DISPLAY_ORDER } from "@/lib/constants";
 import { BottomNav } from "@/components/BottomNav";
 import { FinanceMonthPicker } from "@/components/FinanceMonthPicker";
+import { Logo } from "@/components/Logo";
 import { QuickEntryLoader } from "@/components/QuickEntryLoader";
 import { SignOutButton } from "@/components/SignOutButton";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
@@ -63,10 +64,13 @@ async function HomePageContent({
 
   return (
     <main className="px-4 pt-6">
-      <header className="mb-4 flex items-start justify-between gap-2">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">Farm Finance</p>
-          <h1 className="text-2xl font-bold text-stone-900">Partner Equity</h1>
+      <header className="mb-4 flex items-start justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-3">
+          <Logo size="sm" className="shrink-0" />
+          <div className="min-w-0">
+            <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">Farm Finance</p>
+            <h1 className="text-2xl font-bold text-stone-900">Partner Equity</h1>
+          </div>
         </div>
         {isSupabaseConfigured() && <SignOutButton />}
       </header>
