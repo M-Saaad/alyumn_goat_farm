@@ -1,5 +1,6 @@
 /**
- * Install the farm logo from a local file — copies bytes exactly (no redraw).
+ * Install the farm logo from a local file (PNG/JPEG/WebP).
+ * Converts to PNG for web use without altering the artwork; generates PWA icons.
  * Usage: node scripts/set-logo.mjs /path/to/your/logo.png
  */
 import fs from "fs";
@@ -18,17 +19,33 @@ if (!fs.existsSync(resolved)) {
   process.exit(1);
 }
 
-const publicLogo = path.join(process.cwd(), "public", "logo.png");
-const appIcon = path.join(process.cwd(), "src", "app", "icon.png");
+const root = process.cwd();
+const publicLogo = path.join(root, "public", "logo.png");
+const appIcon = path.join(root, "src", "app", "icon.png");
+const appleIcon = path.join(root, "src", "app", "apple-icon.png");
+const iconsDir = path.join(root, "public", "icons");
 
 fs.mkdirSync(path.dirname(publicLogo), { recursive: true });
-fs.copyFileSync(resolved, publicLogo);
+fs.mkdirSync(iconsDir, { recursive: true });
 
-// Favicon: scale only (same artwork, smaller dimensions for browser tab).
-await sharp(resolved)
-  .resize(192, 192, { fit: "contain", background: { r: 255, g: 255, b: 255, alpha: 1 } })
-  .png()
-  .toFile(appIcon);
+const image = sharp(resolved);
 
-console.log(`Installed ${publicLogo} (exact copy)`);
-console.log(`Installed ${appIcon} (scaled favicon)`);
+// Full logo for in-app display (same pixels, PNG container).
+await image.clone().png().toFile(publicLogo);
+
+async function writeIcon(size, dest) {
+  await sharp(resolved)
+    .resize(size, size, { fit: "contain", background: { r: 255, g: 255, b: 255, alpha: 1 } })
+    .png()
+    .toFile(dest);
+}
+
+await writeIcon(192, appIcon);
+await writeIcon(180, appleIcon);
+await writeIcon(192, path.join(iconsDir, "icon-192.png"));
+await writeIcon(512, path.join(iconsDir, "icon-512.png"));
+
+console.log(`Installed ${publicLogo}`);
+console.log(`Installed ${appIcon} (favicon)`);
+console.log(`Installed ${appleIcon} (iOS home screen)`);
+console.log(`Installed ${path.join(iconsDir, "icon-192.png")} and icon-512.png (PWA)`);

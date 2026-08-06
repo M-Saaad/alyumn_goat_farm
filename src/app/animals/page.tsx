@@ -3,6 +3,7 @@ import Link from "next/link";
 import { animalLabel } from "@/lib/labels";
 import { loadAnimalsListData, contactNameFrom } from "@/lib/db/queries";
 import { isBreedingInPipeline } from "@/lib/livestock/breeding";
+import { AppHeader } from "@/components/AppHeader";
 import { BottomNav } from "@/components/BottomNav";
 import { QuickEntryLoader } from "@/components/QuickEntryLoader";
 import { AnimalsFilters } from "@/components/AnimalsFilters";
@@ -58,10 +59,7 @@ export default async function AnimalsPage({
 
   return (
     <main className="px-4 pt-6">
-      <header className="mb-4">
-        <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">Livestock</p>
-        <h1 className="text-2xl font-bold">Goats ({animals.length})</h1>
-      </header>
+      <AppHeader eyebrow="Livestock" title={`Goats (${animals.length})`} />
 
       <Suspense fallback={<div className="mb-4 h-16 animate-pulse rounded-xl bg-stone-200" />}>
         <AnimalsFilters />
