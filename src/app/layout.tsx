@@ -4,6 +4,16 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "Al-Yumn Goat Farm",
   description: "Farm management for Monis & Saad",
+  applicationName: "Al-Yumn Goat Farm",
+  appleWebApp: {
+    capable: true,
+    title: "Al-Yumn",
+    statusBarStyle: "default",
+  },
+  icons: {
+    icon: [{ url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" }],
+    apple: [{ url: "/apple-icon.png", sizes: "180x180", type: "image/png" }],
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

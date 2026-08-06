@@ -5,6 +5,7 @@ import { formatDate } from "@/lib/format";
 import { parseHealthTab, type DueStatus, type HerdHealthData, type HerdHealthSummary } from "@/lib/livestock/herd-health";
 import { animalLinkFromHealth, healthTabForActionKind } from "@/lib/livestock/health-nav";
 import type { HealthTab } from "@/lib/livestock/health-tabs";
+import { AppHeader } from "@/components/AppHeader";
 import { BottomNav } from "@/components/BottomNav";
 import { QuickEntryLoader } from "@/components/QuickEntryLoader";
 import { HealthFilters } from "@/components/HealthFilters";
@@ -102,13 +103,11 @@ function HealthPageView({
 }) {
   return (
     <main className="px-4 pt-6">
-      <header className="mb-4">
-        <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">Livestock</p>
-        <h1 className="text-2xl font-bold">Herd Health</h1>
-        <p className="text-sm text-stone-500">
-          {summary.activeCount} active goats · PPR yearly · ETV & deworm twice yearly
-        </p>
-      </header>
+      <AppHeader
+        eyebrow="Livestock"
+        title="Herd Health"
+        subtitle={`${summary.activeCount} active goats · PPR yearly · ETV & deworm twice yearly`}
+      />
 
       <Suspense fallback={<div className="mb-4 h-10 animate-pulse rounded-xl bg-stone-200" />}>
         <HealthFilters />
