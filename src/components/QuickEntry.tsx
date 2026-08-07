@@ -43,7 +43,6 @@ const label = "block text-sm font-medium text-stone-700";
 export type QuickEntryProps = {
   animals: AnimalOption[];
   femaleAnimals?: AnimalOption[];
-  breedingEligibleFemales?: AnimalOption[];
   vendors: ContactOption[];
   customers: ContactOption[];
   ownerOptions: ContactOption[];
@@ -55,7 +54,6 @@ export type QuickEntryProps = {
 export function QuickEntry({
   animals,
   femaleAnimals,
-  breedingEligibleFemales,
   vendors,
   customers,
   ownerOptions,
@@ -66,7 +64,6 @@ export function QuickEntry({
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<Mode>(null);
   const females = femaleAnimals ?? animals;
-  const breedingFemales = breedingEligibleFemales ?? females;
 
   function pick(m: Mode) {
     setMode(m);
@@ -178,29 +175,26 @@ export function QuickEntry({
             )}
 
             {mode === "breeding" && (
-              breedingFemales.length === 0 ? (
-                <p className="text-sm text-stone-600">
-                  All active does already have an open breeding record. Update an existing record on
-                  the goat profile or Health → Breeding tab before logging a new one.
-                </p>
+              females.length === 0 ? (
+                <p className="text-sm text-stone-600">No active female goats to record breeding for.</p>
               ) : (
-              <ActionForm action={actionRecordBreeding} onSuccess={close}>
-                <div>
-                  <label className={label}>Female</label>
-                  <select name="femaleId" className={field} required>
-                    {breedingFemales.map((a) => (
-                      <option key={a.id} value={a.id}>
-                        {a.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <BuckSelect maleAnimals={maleAnimals} pastNames={pastBuckNames} />
-                <Field label="Date crossed" name="dateCrossed" type="date" defaultValue={todayIso()} required />
-                <Field label="Notes" name="notes" />
-                <p className="text-xs text-stone-500">Due date auto-calculated as +150 days.</p>
-                <SubmitButton />
-              </ActionForm>
+                <ActionForm action={actionRecordBreeding} onSuccess={close}>
+                  <div>
+                    <label className={label}>Female</label>
+                    <select name="femaleId" className={field} required>
+                      {females.map((a) => (
+                        <option key={a.id} value={a.id}>
+                          {a.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <BuckSelect maleAnimals={maleAnimals} pastNames={pastBuckNames} />
+                  <Field label="Date crossed" name="dateCrossed" type="date" defaultValue={todayIso()} required />
+                  <Field label="Notes" name="notes" />
+                  <p className="text-xs text-stone-500">Due date auto-calculated as +150 days.</p>
+                  <SubmitButton />
+                </ActionForm>
               )
             )}
 

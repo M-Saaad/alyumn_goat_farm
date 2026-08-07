@@ -5,7 +5,6 @@
 import { loadHerdHealthData, loadAnimalProfileData } from "../lib/db/queries.ts";
 import { animalLinkFromHealth, backFromAnimalProfile } from "../lib/livestock/health-nav.ts";
 import { parseHealthTab } from "../lib/livestock/health-tabs.ts";
-import { isBreedingInPipeline } from "../lib/livestock/breeding.ts";
 
 async function main() {
   let failed = 0;
@@ -61,15 +60,11 @@ async function main() {
   }
   ok("all breeding rows link to valid profiles");
 
-  const inPipeline = data.herd.breeding.filter((b) => isBreedingInPipeline(b.event));
-  const eligible = data.quickEntry.breedingEligibleFemales ?? [];
-  const overlap = eligible.filter((a) =>
-    inPipeline.some((b) => b.event.female_animal_id === a.id)
-  );
-  if (overlap.length > 0) {
-    fail(`eligible females include in-pipeline does: ${overlap.map((a) => a.label).join(", ")}`);
+  const females = data.quickEntry.femaleAnimals ?? [];
+  if (females.length === 0) {
+    fail("expected active female goats for breeding dropdown");
   } else {
-    ok(`pipeline guard (${inPipeline.length} in pipeline, ${eligible.length} eligible to log)`);
+    ok(`breeding dropdown lists ${females.length} active female(s)`);
   }
 
   if (failed > 0) {
