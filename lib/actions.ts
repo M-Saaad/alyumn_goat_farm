@@ -500,7 +500,6 @@ export async function recordBreeding(input: {
   notes?: string;
 }) {
   const before = await fetchDb();
-  assertFemaleAvailableForBreeding(before.breeding_events, input.femaleId);
   let maleAnimalId: number | null = input.maleAnimalId ?? null;
   let buckName = input.buckName.trim();
   if (maleAnimalId != null) {

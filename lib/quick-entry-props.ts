@@ -1,5 +1,4 @@
 import { animalLabel } from "@/lib/labels";
-import { femalesInBreedingPipeline } from "@/lib/livestock/breeding";
 import { palaiServiceMonth } from "@/lib/palai/service-month";
 import type { FarmDatabase } from "@/lib/types";
 import type { QuickEntryProps } from "@/components/QuickEntry";
@@ -48,9 +47,6 @@ export function quickEntryPropsFromDb(db: FarmDatabase): QuickEntryProps {
     ),
   ].sort((a, b) => a.localeCompare(b));
 
-  const inPipeline = femalesInBreedingPipeline(db.breeding_events);
-  const breedingEligibleFemales = femaleAnimals.filter((a) => !inPipeline.has(a.id));
-
   const palaiHistory = db.palai_payments
     .map((p) => {
       const customer = db.contacts.find((c) => c.id === p.customer_id);
@@ -74,7 +70,6 @@ export function quickEntryPropsFromDb(db: FarmDatabase): QuickEntryProps {
   return {
     animals,
     femaleAnimals: femaleAnimals.length > 0 ? femaleAnimals : animals,
-    breedingEligibleFemales,
     vendors,
     customers,
     ownerOptions,
