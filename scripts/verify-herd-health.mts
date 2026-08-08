@@ -179,11 +179,9 @@ const herdUltrasound = computeHerdHealth({
   weight_logs: [],
   today: ultrasoundToday,
 });
-assert(herdUltrasound.ultrasoundDue.length === 1, "herd health lists ultrasound due");
-assert(herdUltrasound.summary.ultrasoundDue === 1, "summary counts ultrasound due");
 assert(
-  herdUltrasound.actions.some((a) => a.kind === "ultrasound"),
-  "overview action includes ultrasound"
+  herdUltrasound.breeding[0]?.ultrasoundStatus === "in_window",
+  "herd breeding row tracks ultrasound status"
 );
 
 console.log("PASS herd health intervals (PPR yearly, ETV & deworm twice yearly)");

@@ -3,7 +3,6 @@ import {
   computeUltrasoundStatus,
   daysSinceCrossed,
   isBreedingInPipeline,
-  needsUltrasound,
   ultrasoundWindowEnd,
   ultrasoundWindowStart,
   type UltrasoundStatus,
@@ -64,8 +63,6 @@ export type WeightRow = {
 export type HerdHealthSummary = {
   activeCount: number;
   pendingPregnancies: number;
-  ultrasoundDue: number;
-  ultrasoundOverdue: number;
   overdueVaccines: number;
   dueSoonVaccines: number;
   overdueDeworm: number;
@@ -81,7 +78,7 @@ export type HerdHealthSummary = {
 export type HerdHealthData = {
   summary: HerdHealthSummary;
   actions: Array<{
-    kind: "vaccine" | "deworm" | "breeding" | "ultrasound";
+    kind: "vaccine" | "deworm" | "breeding";
     animalId: number;
     label: string;
     detail: string;
@@ -90,7 +87,6 @@ export type HerdHealthData = {
   vaccines: AnimalDueItem[];
   deworming: AnimalDueItem[];
   breeding: BreedingRow[];
-  ultrasoundDue: BreedingRow[];
   weights: WeightRow[];
   recentMedical: Array<MedicalEvent & { animalLabel: string }>;
   recentWeights: Array<WeightLog & { animalLabel: string }>;
@@ -306,25 +302,6 @@ export function computeHerdHealth(input: {
     }
   }
   for (const b of breeding) {
-    if (b.ultrasoundStatus === "in_window" || b.ultrasoundStatus === "overdue") {
-      const dayLabel = b.daysSinceCrossed != null ? `day ${b.daysSinceCrossed}` : "";
-      const windowLabel =
-        b.ultrasoundWindowStart && b.ultrasoundWindowEnd
-          ? `window ${b.ultrasoundWindowStart} – ${b.ultrasoundWindowEnd}`
-          : "day 40–75 window";
-      actions.push({
-        kind: "ultrasound",
-        animalId: b.event.female_animal_id,
-        label: b.femaleLabel,
-        detail:
-          b.ultrasoundStatus === "overdue"
-            ? `Ultrasound overdue · ${dayLabel} · crossed ${b.event.date_crossed}`
-            : `Ultrasound due · ${dayLabel} · ${windowLabel}`,
-        urgency: b.ultrasoundStatus === "overdue" ? "overdue" : "due_soon",
-      });
-    }
-  }
-  for (const b of breeding) {
     if (b.status === "overdue" || b.status === "due_soon") {
       actions.push({
         kind: "breeding",
@@ -366,13 +343,9 @@ export function computeHerdHealth(input: {
     .slice(0, 15)
     .map((w) => ({ ...w, animalLabel: animalLabelMap.get(w.animal_id) ?? `Goat #${w.animal_id}` }));
 
-  const ultrasoundDueRows = breeding.filter((b) => needsUltrasound(b.event, today));
-
   const summary: HerdHealthSummary = {
     activeCount: activeAnimals.length,
     pendingPregnancies,
-    ultrasoundDue: ultrasoundDueRows.length,
-    ultrasoundOverdue: ultrasoundDueRows.filter((b) => b.ultrasoundStatus === "overdue").length,
     overdueVaccines: vaccines.filter((v) => v.status === "overdue").length,
     dueSoonVaccines: vaccines.filter((v) => v.status === "due_soon").length,
     overdueDeworm: deworming.filter((d) => d.status === "overdue").length,
@@ -393,7 +366,6 @@ export function computeHerdHealth(input: {
     vaccines,
     deworming,
     breeding,
-    ultrasoundDue: ultrasoundDueRows,
     weights,
     recentMedical,
     recentWeights,

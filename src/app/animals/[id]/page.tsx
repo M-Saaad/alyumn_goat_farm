@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { animalLabel } from "@/lib/labels";
-import { formatPkr, formatDate } from "@/lib/format";
+import { formatPkr, formatDate, todayIso } from "@/lib/format";
 import { isSupabaseDb } from "@/lib/db";
 import { isSoldOnPalaiSale, saleReceiptAmount } from "@/lib/livestock/cancel-sale";
 import { loadAnimalProfileData, contactNameFrom } from "@/lib/db/queries";
@@ -14,8 +14,9 @@ import {
   SaleInstallmentCard,
 } from "@/components/InstallmentCards";
 import { DeleteAnimalButton } from "@/components/DeleteAnimalButton";
-import { BreedingEventEditor } from "@/components/BreedingEventEditor";
+import { BreedingRecordActions } from "@/components/BreedingRecordActions";
 import { backFromAnimalProfile } from "@/lib/livestock/health-nav";
+import { computeUltrasoundStatus, daysSinceCrossed } from "@/lib/livestock/breeding";
 
 export const dynamic = "force-dynamic";
 
@@ -244,17 +245,21 @@ export default async function AnimalProfilePage({
           <p className="text-sm text-stone-500">No breeding records.</p>
         ) : (
           <ul className="space-y-2 text-sm">
-            {breeding.map((b) => (
+            {breeding.map((b) => {
+              const today = todayIso();
+              const ultrasoundStatus = computeUltrasoundStatus(b, today);
+              const crossedDays =
+                b.date_crossed ? daysSinceCrossed(b.date_crossed, today) : null;
+              return (
               <li key={b.id} className="border-b border-stone-100 pb-2">
                 <p className="font-medium">
                   {b.buck_name || "Unknown buck"} · {b.status || b.outcome}
                 </p>
                 <p className="text-stone-500">
                   Crossed {formatDate(b.date_crossed)} · Due {formatDate(b.expected_due_date)}
-                  {b.ultrasound_date && <> · Ultrasound {formatDate(b.ultrasound_date)}</>}
                 </p>
                 {b.notes && <p className="text-xs text-stone-500">{b.notes}</p>}
-                <BreedingEventEditor
+                <BreedingRecordActions
                   event={{
                     id: b.id,
                     femaleId: animalId,
@@ -268,11 +273,15 @@ export default async function AnimalProfilePage({
                     status: b.status,
                     notes: b.notes,
                   }}
+                  ultrasoundStatus={ultrasoundStatus}
+                  daysSinceCrossed={crossedDays}
                   maleAnimals={data.quickEntry.maleAnimals}
                   pastBuckNames={data.quickEntry.pastBuckNames}
+                  supabaseEnabled={supabaseEnabled}
                 />
               </li>
-            ))}
+              );
+            })}
           </ul>
         )}
       </section>

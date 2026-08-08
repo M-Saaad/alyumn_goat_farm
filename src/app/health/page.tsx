@@ -9,6 +9,8 @@ import { AppHeader } from "@/components/AppHeader";
 import { BottomNav } from "@/components/BottomNav";
 import { QuickEntryLoader } from "@/components/QuickEntryLoader";
 import { HealthFilters } from "@/components/HealthFilters";
+import { HealthBreedingList } from "@/components/HealthBreedingList";
+import { isSupabaseDb } from "@/lib/db";
 import type { QuickEntryProps } from "@/components/QuickEntry";
 
 export const dynamic = "force-dynamic";
@@ -20,28 +22,22 @@ function statusBadge(
     | "due_soon"
     | "pending"
     | "completed"
-    | "in_window"
-    | "confirmed"
     | undefined
 ) {
   const key = status ?? "completed";
   const styles: Record<string, string> = {
     overdue: "bg-red-100 text-red-800",
     due_soon: "bg-amber-100 text-amber-900",
-    in_window: "bg-amber-100 text-amber-900",
     never: "bg-stone-200 text-stone-700",
     ok: "bg-emerald-100 text-emerald-800",
-    confirmed: "bg-emerald-100 text-emerald-800",
     pending: "bg-sky-100 text-sky-800",
     completed: "bg-stone-100 text-stone-600",
   };
   const labels: Record<string, string> = {
     overdue: "Overdue",
     due_soon: "Due soon",
-    in_window: "Ultrasound window",
     never: "Never",
     ok: "OK",
-    confirmed: "Confirmed",
     pending: "Pending",
     completed: "Done",
   };
@@ -113,6 +109,8 @@ function HealthPageView({
   summary: HerdHealthSummary;
   quickEntry: QuickEntryProps;
 }) {
+  const supabaseEnabled = isSupabaseDb();
+
   return (
     <main className="px-4 pt-6">
       <AppHeader
@@ -145,7 +143,6 @@ function HealthPageView({
                         <p className="text-stone-600">
                           {a.kind === "vaccine" && "Vaccination · "}
                           {a.kind === "deworm" && "Deworming · "}
-                          {a.kind === "ultrasound" && "Ultrasound · "}
                           {a.kind === "breeding" && "Kidding due · "}
                           {a.detail}
                         </p>
@@ -160,16 +157,6 @@ function HealthPageView({
 
           <section className="mb-4 grid grid-cols-2 gap-3">
             <StatCard label="Pending pregnancies" value={String(summary.pendingPregnancies)} />
-            <StatCard
-              label="Ultrasound due"
-              value={String(summary.ultrasoundDue)}
-              warn={summary.ultrasoundDue > 0}
-            />
-            <StatCard
-              label="Ultrasound overdue"
-              value={String(summary.ultrasoundOverdue)}
-              warn={summary.ultrasoundOverdue > 0}
-            />
             <StatCard
               label="Avg weight"
               value={summary.avgWeightKg != null ? `${summary.avgWeightKg} kg` : "—"}
@@ -216,101 +203,10 @@ function HealthPageView({
       )}
 
       {tab === "breeding" && (
-        <>
-          {herd.ultrasoundDue.length > 0 && (
-            <section className="mb-4 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-amber-200">
-              <h2 className="mb-2 text-sm font-bold text-amber-900">
-                Needs ultrasound ({herd.ultrasoundDue.length})
-              </h2>
-              <p className="mb-3 text-xs text-stone-600">
-                Scan between day 40 and day 75 after crossing. Set ultrasound date on the goat profile
-                after the vet visit.
-              </p>
-              <ul className="divide-y divide-stone-100">
-                {herd.ultrasoundDue.map((b) => (
-                  <li key={b.event.id} className="py-3">
-                    <Link
-                      href={animalLinkFromHealth(b.event.female_animal_id, "breeding")}
-                      className="block"
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <div>
-                          <p className="font-semibold">{b.femaleLabel}</p>
-                          <p className="text-sm text-stone-600">
-                            {b.event.buck_name || "Unknown buck"} · crossed{" "}
-                            {formatDate(b.event.date_crossed)}
-                          </p>
-                          {b.daysSinceCrossed != null && (
-                            <p className="text-sm text-stone-500">
-                              Day {b.daysSinceCrossed} since crossing
-                              {b.ultrasoundWindowStart && b.ultrasoundWindowEnd && (
-                                <span>
-                                  {" "}
-                                  · window {formatDate(b.ultrasoundWindowStart)} –{" "}
-                                  {formatDate(b.ultrasoundWindowEnd)}
-                                </span>
-                              )}
-                            </p>
-                          )}
-                        </div>
-                        {statusBadge(
-                          b.ultrasoundStatus === "overdue" ? "overdue" : "in_window"
-                        )}
-                      </div>
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </section>
-          )}
-
-          <section className="mb-4 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-stone-200">
-            <h2 className="mb-2 text-sm font-bold">Breeding records</h2>
-          {herd.breeding.length === 0 ? (
-            <p className="text-sm text-stone-500">No breeding records yet.</p>
-          ) : (
-            <ul className="divide-y divide-stone-100">
-              {herd.breeding.map((b) => (
-                <li key={b.event.id} className="py-3">
-                  <Link href={animalLinkFromHealth(b.event.female_animal_id, "breeding")} className="block">
-                    <div className="flex items-start justify-between gap-2">
-                      <div>
-                        <p className="font-semibold">{b.femaleLabel}</p>
-                        <p className="text-sm text-stone-600">
-                          {b.event.buck_name || "Unknown buck"} · crossed{" "}
-                          {formatDate(b.event.date_crossed)}
-                        </p>
-                        {b.event.expected_due_date && (
-                          <p className="text-sm text-stone-500">
-                            Due {formatDate(b.event.expected_due_date)}
-                            {b.daysUntilDue != null && b.status !== "completed" && (
-                              <span>
-                                {" "}
-                                · {b.daysUntilDue < 0 ? `${Math.abs(b.daysUntilDue)}d overdue` : `${b.daysUntilDue}d left`}
-                              </span>
-                            )}
-                          </p>
-                        )}
-                        {b.event.ultrasound_date && (
-                          <p className="text-sm text-emerald-700">
-                            Ultrasound {formatDate(b.event.ultrasound_date)}
-                          </p>
-                        )}
-                        {b.ultrasoundStatus === "in_window" || b.ultrasoundStatus === "overdue" ? (
-                          <p className="text-sm font-medium text-amber-800">
-                            Ultrasound needed · day {b.daysSinceCrossed}
-                          </p>
-                        ) : null}
-                      </div>
-                      {statusBadge(b.status)}
-                    </div>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          )}
-          </section>
-        </>
+        <section className="mb-4 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-stone-200">
+          <h2 className="mb-2 text-sm font-bold">Breeding records</h2>
+          <HealthBreedingList rows={herd.breeding} supabaseEnabled={supabaseEnabled} />
+        </section>
       )}
 
       {tab === "vaccine" && (
