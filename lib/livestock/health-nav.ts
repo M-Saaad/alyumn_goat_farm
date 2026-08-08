@@ -26,9 +26,6 @@ export function backFromAnimalProfile(searchParams: {
   return { href: "/animals", label: "Goats" };
 }
 
-export function healthTabForActionKind(
-  kind: "vaccine" | "deworm" | "breeding" | "ultrasound"
-): HealthTab {
-  if (kind === "ultrasound") return "breeding";
+export function healthTabForActionKind(kind: "vaccine" | "deworm" | "breeding"): HealthTab {
   return kind;
 }

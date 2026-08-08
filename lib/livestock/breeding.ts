@@ -47,6 +47,21 @@ export function needsUltrasound(event: BreedingEvent, today: string): boolean {
   return status === "in_window" || status === "overdue";
 }
 
+export function ultrasoundStatusText(
+  status: UltrasoundStatus,
+  ultrasoundDate: string | null,
+  daysSinceCrossed: number | null
+): string {
+  if (status === "confirmed" && ultrasoundDate) {
+    return `Ultrasound ${ultrasoundDate.slice(0, 10)}`;
+  }
+  const day = daysSinceCrossed != null ? `day ${daysSinceCrossed}` : "";
+  if (status === "not_due") return `Ultrasound · early · ${day}`.trim();
+  if (status === "in_window") return `Ultrasound · in window · ${day}`.trim();
+  if (status === "overdue") return `Ultrasound · overdue · ${day}`.trim();
+  return "Ultrasound";
+}
+
 /** Active pregnancy / not yet closed out — matches Goats "Breeding" filter. */
 export function isBreedingInPipeline(event: BreedingEvent): boolean {
   if (event.outcome === "Delivered" || event.outcome === "Stillbirth" || event.outcome === "Miscarriage") {

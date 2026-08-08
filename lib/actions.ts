@@ -46,6 +46,7 @@ import type {
   BreedingStatus,
 } from "./types";
 import { animalLabel } from "./labels";
+import { uploadAnimalMedia } from "./media/upload";
 
 export { animalLabel };
 
@@ -580,6 +581,10 @@ export async function updateBreeding(input: {
   if (ultrasoundDate && (resolvedStatus === "Doubt" || !resolvedStatus)) {
     resolvedStatus = "Ready";
   }
+  let resolvedOutcome: BreedingOutcome = nextOutcome;
+  if (ultrasoundDate && resolvedOutcome === "Doubt") {
+    resolvedOutcome = "Pending";
+  }
 
   const updated = {
     ...existing,
@@ -589,7 +594,7 @@ export async function updateBreeding(input: {
     expected_due_date: expectedDueDate(input.dateCrossed),
     delivered_date: nextOutcome === "Delivered" ? deliveredDate : null,
     ultrasound_date: ultrasoundDate,
-    outcome: nextOutcome,
+    outcome: resolvedOutcome,
     status: resolvedStatus,
     notes: input.notes?.trim() || null,
   };
@@ -616,6 +621,50 @@ export async function deleteBreeding(id: string) {
   };
   if (isSupabaseDb()) {
     await applyWritePlan({ deleteBreedingIds: [id] });
+    return after;
+  }
+  return persistMutation(before, after);
+}
+
+export async function recordBreedingUltrasound(input: {
+  id: string;
+  femaleId: number;
+  ultrasoundDate: string;
+  status?: BreedingStatus | "";
+  file?: File | null;
+}) {
+  const before = await fetchDb();
+  const existing = before.breeding_events.find((b) => b.id === input.id);
+  if (!existing) throw new Error("Breeding record not found");
+
+  const ultrasoundDate = input.ultrasoundDate.trim().slice(0, 10);
+  if (!ultrasoundDate) throw new Error("Ultrasound date is required");
+
+  if (input.file?.size) {
+    await uploadAnimalMedia({
+      animalId: input.femaleId,
+      file: input.file,
+      caption: `Ultrasound ${ultrasoundDate}`,
+    });
+  }
+
+  const resolvedStatus: BreedingStatus = (input.status?.trim() as BreedingStatus) || "Ready";
+  let outcome: BreedingOutcome = existing.outcome;
+  if (outcome === "Doubt") outcome = "Pending";
+
+  const updated = {
+    ...existing,
+    ultrasound_date: ultrasoundDate,
+    status: resolvedStatus,
+    outcome,
+  };
+
+  const after = {
+    ...before,
+    breeding_events: before.breeding_events.map((b) => (b.id === updated.id ? updated : b)),
+  };
+  if (isSupabaseDb()) {
+    await applyWritePlan({ upsertBreeding: [updated] });
     return after;
   }
   return persistMutation(before, after);

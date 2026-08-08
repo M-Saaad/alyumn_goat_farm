@@ -14,6 +14,7 @@ import {
   logWeight,
   partnerTransfer,
   recordBreeding,
+  recordBreedingUltrasound,
   updateBreeding,
   deleteBreeding,
   recordLivestockSale,
@@ -201,6 +202,23 @@ export async function actionUpdateBreeding(formData: FormData) {
     deliveredDate: deliveredRaw || null,
     ultrasoundDate: ultrasoundRaw || null,
     notes: String(formData.get("notes") || "") || null,
+  });
+  const femaleId = Number(formData.get("femaleId"));
+  if (femaleId && !Number.isNaN(femaleId)) {
+    revalidatePath(`/animals/${femaleId}`);
+  }
+  revalidateTxnPaths();
+}
+
+export async function actionRecordBreedingUltrasound(formData: FormData) {
+  const file = formData.get("file");
+  const statusRaw = String(formData.get("status") || "").trim();
+  await recordBreedingUltrasound({
+    id: String(formData.get("id")),
+    femaleId: Number(formData.get("femaleId")),
+    ultrasoundDate: String(formData.get("ultrasoundDate")),
+    status: statusRaw as import("@/lib/types").BreedingStatus | "",
+    file: file instanceof File && file.size > 0 ? file : null,
   });
   const femaleId = Number(formData.get("femaleId"));
   if (femaleId && !Number.isNaN(femaleId)) {
