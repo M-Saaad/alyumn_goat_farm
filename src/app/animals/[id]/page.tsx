@@ -251,6 +251,7 @@ export default async function AnimalProfilePage({
                 </p>
                 <p className="text-stone-500">
                   Crossed {formatDate(b.date_crossed)} · Due {formatDate(b.expected_due_date)}
+                  {b.ultrasound_date && <> · Ultrasound {formatDate(b.ultrasound_date)}</>}
                 </p>
                 {b.notes && <p className="text-xs text-stone-500">{b.notes}</p>}
                 <BreedingEventEditor
@@ -262,6 +263,7 @@ export default async function AnimalProfilePage({
                     date_crossed: b.date_crossed,
                     expected_due_date: b.expected_due_date,
                     delivered_date: b.delivered_date,
+                    ultrasound_date: b.ultrasound_date,
                     outcome: b.outcome,
                     status: b.status,
                     notes: b.notes,

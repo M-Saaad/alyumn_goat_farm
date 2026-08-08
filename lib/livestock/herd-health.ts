@@ -1,5 +1,13 @@
 import { animalLabel } from "@/lib/labels";
-import { isBreedingInPipeline } from "./breeding";
+import {
+  computeUltrasoundStatus,
+  daysSinceCrossed,
+  isBreedingInPipeline,
+  needsUltrasound,
+  ultrasoundWindowEnd,
+  ultrasoundWindowStart,
+  type UltrasoundStatus,
+} from "./breeding";
 import type { Animal, BreedingEvent, MedicalEvent, WeightLog } from "@/lib/types";
 import { todayIso } from "@/lib/format";
 
@@ -39,6 +47,10 @@ export type BreedingRow = {
   femaleLabel: string;
   daysUntilDue: number | null;
   status: "overdue" | "due_soon" | "pending" | "completed";
+  daysSinceCrossed: number | null;
+  ultrasoundStatus: UltrasoundStatus;
+  ultrasoundWindowStart: string | null;
+  ultrasoundWindowEnd: string | null;
 };
 
 export type WeightRow = {
@@ -52,6 +64,8 @@ export type WeightRow = {
 export type HerdHealthSummary = {
   activeCount: number;
   pendingPregnancies: number;
+  ultrasoundDue: number;
+  ultrasoundOverdue: number;
   overdueVaccines: number;
   dueSoonVaccines: number;
   overdueDeworm: number;
@@ -67,7 +81,7 @@ export type HerdHealthSummary = {
 export type HerdHealthData = {
   summary: HerdHealthSummary;
   actions: Array<{
-    kind: "vaccine" | "deworm" | "breeding";
+    kind: "vaccine" | "deworm" | "breeding" | "ultrasound";
     animalId: number;
     label: string;
     detail: string;
@@ -76,6 +90,7 @@ export type HerdHealthData = {
   vaccines: AnimalDueItem[];
   deworming: AnimalDueItem[];
   breeding: BreedingRow[];
+  ultrasoundDue: BreedingRow[];
   weights: WeightRow[];
   recentMedical: Array<MedicalEvent & { animalLabel: string }>;
   recentWeights: Array<WeightLog & { animalLabel: string }>;
@@ -212,7 +227,23 @@ export function computeHerdHealth(input: {
         else if (daysUntilDue <= DUE_SOON_DAYS) status = "due_soon";
         else status = "pending";
       }
-      return { event, femaleLabel, daysUntilDue, status };
+      const crossedDays =
+        event.date_crossed && isPending ? daysSinceCrossed(event.date_crossed, today) : null;
+      const ultrasoundStatus = computeUltrasoundStatus(event, today);
+      const windowStart =
+        event.date_crossed && isPending ? ultrasoundWindowStart(event.date_crossed) : null;
+      const windowEnd =
+        event.date_crossed && isPending ? ultrasoundWindowEnd(event.date_crossed) : null;
+      return {
+        event,
+        femaleLabel,
+        daysUntilDue,
+        status,
+        daysSinceCrossed: crossedDays,
+        ultrasoundStatus,
+        ultrasoundWindowStart: windowStart,
+        ultrasoundWindowEnd: windowEnd,
+      };
     })
     .sort((a, b) => {
       const pendingOrder = { overdue: 0, due_soon: 1, pending: 2, completed: 3 };
@@ -275,6 +306,25 @@ export function computeHerdHealth(input: {
     }
   }
   for (const b of breeding) {
+    if (b.ultrasoundStatus === "in_window" || b.ultrasoundStatus === "overdue") {
+      const dayLabel = b.daysSinceCrossed != null ? `day ${b.daysSinceCrossed}` : "";
+      const windowLabel =
+        b.ultrasoundWindowStart && b.ultrasoundWindowEnd
+          ? `window ${b.ultrasoundWindowStart} – ${b.ultrasoundWindowEnd}`
+          : "day 40–75 window";
+      actions.push({
+        kind: "ultrasound",
+        animalId: b.event.female_animal_id,
+        label: b.femaleLabel,
+        detail:
+          b.ultrasoundStatus === "overdue"
+            ? `Ultrasound overdue · ${dayLabel} · crossed ${b.event.date_crossed}`
+            : `Ultrasound due · ${dayLabel} · ${windowLabel}`,
+        urgency: b.ultrasoundStatus === "overdue" ? "overdue" : "due_soon",
+      });
+    }
+  }
+  for (const b of breeding) {
     if (b.status === "overdue" || b.status === "due_soon") {
       actions.push({
         kind: "breeding",
@@ -316,9 +366,13 @@ export function computeHerdHealth(input: {
     .slice(0, 15)
     .map((w) => ({ ...w, animalLabel: animalLabelMap.get(w.animal_id) ?? `Goat #${w.animal_id}` }));
 
+  const ultrasoundDueRows = breeding.filter((b) => needsUltrasound(b.event, today));
+
   const summary: HerdHealthSummary = {
     activeCount: activeAnimals.length,
     pendingPregnancies,
+    ultrasoundDue: ultrasoundDueRows.length,
+    ultrasoundOverdue: ultrasoundDueRows.filter((b) => b.ultrasoundStatus === "overdue").length,
     overdueVaccines: vaccines.filter((v) => v.status === "overdue").length,
     dueSoonVaccines: vaccines.filter((v) => v.status === "due_soon").length,
     overdueDeworm: deworming.filter((d) => d.status === "overdue").length,
@@ -339,6 +393,7 @@ export function computeHerdHealth(input: {
     vaccines,
     deworming,
     breeding,
+    ultrasoundDue: ultrasoundDueRows,
     weights,
     recentMedical,
     recentWeights,

@@ -190,6 +190,7 @@ export async function actionUpdateBreeding(formData: FormData) {
   const maleRaw = String(formData.get("maleAnimalId") || "").trim();
   const statusRaw = String(formData.get("status") || "").trim();
   const deliveredRaw = String(formData.get("deliveredDate") || "").trim();
+  const ultrasoundRaw = String(formData.get("ultrasoundDate") || "").trim();
   await updateBreeding({
     id: String(formData.get("id")),
     buckName: String(formData.get("buckName") || ""),
@@ -198,6 +199,7 @@ export async function actionUpdateBreeding(formData: FormData) {
     outcome: String(formData.get("outcome")) as import("@/lib/types").BreedingOutcome,
     status: statusRaw as import("@/lib/types").BreedingStatus | "",
     deliveredDate: deliveredRaw || null,
+    ultrasoundDate: ultrasoundRaw || null,
     notes: String(formData.get("notes") || "") || null,
   });
   const femaleId = Number(formData.get("femaleId"));

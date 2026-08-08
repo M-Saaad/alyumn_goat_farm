@@ -138,6 +138,7 @@ export interface BreedingEvent {
   date_crossed: string | null;
   expected_due_date: string | null;
   delivered_date: string | null;
+  ultrasound_date: string | null;
   outcome: BreedingOutcome;
   status: BreedingStatus | null;
   notes: string | null;
