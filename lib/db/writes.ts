@@ -170,6 +170,7 @@ function breedingRow(b: BreedingEvent): Record<string, unknown> {
     date_crossed: b.date_crossed,
     expected_due_date: b.expected_due_date,
     delivered_date: b.delivered_date,
+    ultrasound_date: b.ultrasound_date,
     outcome: b.outcome,
     status: b.status,
     notes: b.notes,

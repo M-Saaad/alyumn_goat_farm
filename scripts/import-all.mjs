@@ -234,6 +234,13 @@ for (const row of bBody) {
   }
   let status = (row[bI.Status] || "").trim() || null;
   if (status && !["Ready", "Doubt", "Delivered", "Kid"].includes(status)) status = "Doubt";
+  const confirmed = (row[bI["Confirmed Date"]] || "").trim().toLowerCase() === "yes";
+  let ultrasoundDate = null;
+  if (confirmed && crossed) {
+    const d = new Date(crossed);
+    d.setUTCDate(d.getUTCDate() + 50);
+    ultrasoundDate = d.toISOString().slice(0, 10);
+  }
   db.breeding_events.push({
     id: randomUUID(),
     female_animal_id: femaleId,
@@ -242,6 +249,7 @@ for (const row of bBody) {
     date_crossed: crossed,
     expected_due_date: expected,
     delivered_date: parseNotionDate(row[bI["Delivered Date"]]),
+    ultrasound_date: ultrasoundDate,
     outcome: status === "Delivered" ? "Delivered" : status === "Doubt" ? "Doubt" : "Pending",
     status,
     notes: (row[bI.Comments] || "").trim() || null,

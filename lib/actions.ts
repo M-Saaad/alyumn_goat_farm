@@ -517,6 +517,7 @@ export async function recordBreeding(input: {
     date_crossed: input.dateCrossed,
     expected_due_date: expectedDueDate(input.dateCrossed),
     delivered_date: null,
+    ultrasound_date: null,
     outcome: "Pending" as const,
     status: "Doubt" as const,
     notes: input.notes || null,
@@ -540,6 +541,7 @@ export async function updateBreeding(input: {
   outcome: BreedingOutcome;
   status: BreedingStatus | "";
   deliveredDate?: string | null;
+  ultrasoundDate?: string | null;
   notes?: string | null;
 }) {
   const before = await fetchDb();
@@ -547,12 +549,12 @@ export async function updateBreeding(input: {
   if (!existing) throw new Error("Breeding record not found");
 
   const nextOutcome = input.outcome;
-  const nextStatus = input.status || null;
+  let resolvedStatus: BreedingStatus | null = input.status || null;
   const willBeInPipeline =
     nextOutcome !== "Delivered" &&
     nextOutcome !== "Stillbirth" &&
     nextOutcome !== "Miscarriage" &&
-    (nextOutcome === "Pending" || nextOutcome === "Doubt" || nextStatus === "Doubt");
+    (nextOutcome === "Pending" || nextOutcome === "Doubt" || resolvedStatus === "Doubt");
 
   if (willBeInPipeline) {
     assertFemaleAvailableForBreeding(before.breeding_events, existing.female_animal_id, input.id);
@@ -571,6 +573,14 @@ export async function updateBreeding(input: {
     (nextOutcome === "Delivered" ? existing.delivered_date : null) ||
     null;
 
+  const ultrasoundDate =
+    input.ultrasoundDate !== undefined
+      ? input.ultrasoundDate?.trim() || null
+      : existing.ultrasound_date;
+  if (ultrasoundDate && (resolvedStatus === "Doubt" || !resolvedStatus)) {
+    resolvedStatus = "Ready";
+  }
+
   const updated = {
     ...existing,
     male_animal_id: maleAnimalId,
@@ -578,8 +588,9 @@ export async function updateBreeding(input: {
     date_crossed: input.dateCrossed,
     expected_due_date: expectedDueDate(input.dateCrossed),
     delivered_date: nextOutcome === "Delivered" ? deliveredDate : null,
+    ultrasound_date: ultrasoundDate,
     outcome: nextOutcome,
-    status: nextStatus,
+    status: resolvedStatus,
     notes: input.notes?.trim() || null,
   };
 
