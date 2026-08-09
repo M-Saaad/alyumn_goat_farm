@@ -1,5 +1,7 @@
 import { animalLabel } from "@/lib/labels";
+import { palaiReceivedByFromTx } from "@/lib/palai/received-by";
 import { palaiServiceMonth } from "@/lib/palai/service-month";
+import { getPartnerIds } from "@/lib/partner-equity/settlement";
 import type { FarmDatabase } from "@/lib/types";
 import type { QuickEntryProps } from "@/components/QuickEntry";
 import type { ContactOption } from "@/components/ContactSelect";
@@ -51,6 +53,10 @@ export function quickEntryPropsFromDb(db: FarmDatabase): QuickEntryProps {
     .map((p) => {
       const customer = db.contacts.find((c) => c.id === p.customer_id);
       if (!customer) return null;
+      const tx = db.transactions.find((t) => t.id === p.transaction_id);
+      const { monisId, saadId } = getPartnerIds(db);
+      const receivedBy =
+        tx ? palaiReceivedByFromTx(tx, monisId, saadId) : "Saad";
       return {
         id: p.id,
         transactionId: p.transaction_id ?? "",
@@ -62,6 +68,7 @@ export function quickEntryPropsFromDb(db: FarmDatabase): QuickEntryProps {
         goatCount: p.goat_count ?? 0,
         totalAmount: p.total_amount,
         paymentMethod: p.payment_method,
+        receivedBy,
         notes: p.notes,
       };
     })

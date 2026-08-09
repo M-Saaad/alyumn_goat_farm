@@ -162,6 +162,7 @@ export function createAdjustmentTransaction(input: {
   customerId?: string | null;
   animalId?: number | null;
   livestockSaleId?: string | null;
+  receivedByPartnerId?: string | null;
 }): { tx: Transaction; ledger: Omit<PartnerLedgerEntry, "id" | "created_at">[] } {
   const tx: Transaction = {
     id: crypto.randomUUID(),
@@ -174,7 +175,7 @@ export function createAdjustmentTransaction(input: {
     customer_id: input.customerId ?? null,
     vendor_id: null,
     paid_by_partner_id: null,
-    received_by_partner_id: null,
+    received_by_partner_id: input.receivedByPartnerId ?? null,
     adjustment_partner_id: input.monisId,
     notes: input.notes ?? null,
     source_row: input.sourceRow ?? null,

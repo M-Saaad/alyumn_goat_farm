@@ -27,6 +27,7 @@ export type PalaiHistoryEntry = {
   goatCount: number;
   totalAmount: number;
   paymentMethod: string | null;
+  receivedBy: "Monis" | "Saad";
   notes: string | null;
 };
 
@@ -74,6 +75,13 @@ function PalaiFields({
       </div>
       <Field label="Rate / goat" name="ratePerGoat" type="number" defaultValue={String(defaults?.ratePerGoat ?? 7000)} required />
       <Field label="Goat count" name="goatCount" type="number" defaultValue={String(defaults?.goatCount ?? 2)} required />
+      <div>
+        <label className={labelCls}>Received by</label>
+        <select name="receivedBy" className={field} defaultValue={defaults?.receivedBy ?? "Saad"}>
+          <option value="Saad">Saad</option>
+          <option value="Monis">Monis</option>
+        </select>
+      </div>
       <Field
         label="Payment method"
         name="paymentMethod"
@@ -177,7 +185,7 @@ export function PalaiPaymentForm({
             onCustomerChange={setCustomerName}
           />
           <p className="text-xs text-stone-500">
-            Pick which month the fee is for. Splits 50/50 to Monis and Saad automatically.
+            Pick which month the fee is for. Splits 50/50 to Monis and Saad based on who received the cash.
           </p>
           <SubmitButton label="Record palai payment" />
         </ActionForm>
@@ -237,6 +245,7 @@ export function PalaiPaymentForm({
                     <p className="text-xs text-stone-500">
                       Paid {formatDate(entry.date)}
                       {entry.paymentMethod ? ` · ${entry.paymentMethod}` : ""}
+                      {` · Received by ${entry.receivedBy}`}
                     </p>
                   </div>
                   <div className="flex shrink-0 flex-col gap-1">

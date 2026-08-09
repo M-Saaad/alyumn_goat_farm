@@ -80,6 +80,7 @@ export async function actionRecordPalai(formData: FormData) {
     goatCount: Number(formData.get("goatCount")),
     paymentMethod: String(formData.get("paymentMethod") || ""),
     notes: String(formData.get("notes") || ""),
+    receivedBy: String(formData.get("receivedBy") || "Saad") as "Monis" | "Saad",
   });
   revalidateTxnPaths();
 }
@@ -98,6 +99,7 @@ export async function actionUpdatePalai(formData: FormData) {
     goatCount: Number(formData.get("goatCount")),
     paymentMethod: String(formData.get("paymentMethod") || "") || null,
     notes: String(formData.get("notes") || "") || null,
+    receivedBy: String(formData.get("receivedBy") || "Saad") as "Monis" | "Saad",
   });
   revalidateTxnPaths();
 }
@@ -412,6 +414,7 @@ export async function actionUpdateTransaction(formData: FormData) {
       goatCount: Number(formData.get("goatCount")),
       paymentMethod: String(formData.get("paymentMethod") || "") || null,
       notes: String(formData.get("notes") || "") || null,
+      receivedBy: String(formData.get("receivedBy") || "Saad") as "Monis" | "Saad",
     });
   } else if (variant === "livestock_sale") {
     const additional = String(formData.get("additionalAnimalId") || "").trim();

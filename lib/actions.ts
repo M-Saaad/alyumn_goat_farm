@@ -121,6 +121,7 @@ export async function recordPalai(input: {
   goatCount: number;
   paymentMethod?: string;
   notes?: string;
+  receivedBy?: "Monis" | "Saad";
 }) {
   const before = await fetchDb();
   let db = before;
@@ -158,6 +159,7 @@ export async function recordPalai(input: {
     totalAmount: total,
     paymentMethod: input.paymentMethod,
     notes: input.notes,
+    receivedBy: input.receivedBy ?? "Saad",
   });
   const after = applyPalaiToDb(db, result);
   if (isSupabaseDb()) {
@@ -679,6 +681,7 @@ export async function updatePalai(input: {
   goatCount: number;
   paymentMethod?: string | null;
   notes?: string | null;
+  receivedBy?: "Monis" | "Saad";
 }) {
   const before = await fetchDb();
   const payment = before.palai_payments.find((p) => p.transaction_id === input.transactionId);
@@ -708,6 +711,7 @@ export async function updatePalai(input: {
     goatCount: input.goatCount,
     paymentMethod: input.paymentMethod,
     notes: input.notes,
+    receivedBy: input.receivedBy ?? "Saad",
   });
 }
 
