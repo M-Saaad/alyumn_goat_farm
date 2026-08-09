@@ -28,6 +28,8 @@ See [DEPLOY.md](DEPLOY.md) for:
 | `npm run verify` | Settlement + linkage assertions (JSON mode) |
 | `npm run db:reset` | Full audit → import → verify |
 | `npm run seed:supabase` | Upsert JSON DB into Supabase and verify settlement |
+| `npm run pull:supabase` | Pull live Supabase data into `data/farm.db.json` |
+| `npm run sync:supabase` | Pull JSON + print live Supabase status summary |
 
 ## Stack
 
