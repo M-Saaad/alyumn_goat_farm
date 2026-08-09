@@ -25,8 +25,8 @@ export interface RecognizePalaiInput {
   totalAmount: number;
   paymentMethod?: string | null;
   notes?: string | null;
-  /** When true, Monis share = total/2 adjustment (Saad received cash). Default true. */
-  saadReceivedCash?: boolean;
+  /** Partner who received the customer payment. Default Saad. */
+  receivedBy?: "Monis" | "Saad";
 }
 
 export interface RecognizePalaiResult {
@@ -46,9 +46,11 @@ export function recognizePalaiPayment(
   db: FarmDatabase,
   input: RecognizePalaiInput
 ): RecognizePalaiResult {
-  const { monisId } = getPartnerIds(db);
+  const { monisId, saadId } = getPartnerIds(db);
   const half = input.totalAmount / 2;
-  const saadReceived = input.saadReceivedCash !== false;
+  const receivedBy = input.receivedBy ?? "Saad";
+  const saadReceived = receivedBy === "Saad";
+  const receivedByPartnerId = receivedBy === "Monis" ? monisId : saadId;
 
   // Monis share adjustment: positive when Saad holds Monis's half
   const adjustmentAmount = saadReceived ? half : -half;
@@ -59,6 +61,7 @@ export function recognizePalaiPayment(
     category: "Palai Income",
     monisId,
     customerId: input.customerId,
+    receivedByPartnerId,
     notes: buildPalaiNotes({
       goatCount: input.goatCount,
       ratePerGoat: input.ratePerGoat,

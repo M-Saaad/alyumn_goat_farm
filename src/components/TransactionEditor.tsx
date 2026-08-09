@@ -36,6 +36,7 @@ export type EditableTransaction = {
     goatCount: number;
     paymentMethod: string;
     totalAmount: number;
+    receivedBy: "Monis" | "Saad";
   } | null;
   sale: {
     animalIds: number[];
@@ -434,6 +435,18 @@ function PalaiForm({
         defaultValue={count}
         required
       />
+      <div>
+        <label className={labelCls}>Received by</label>
+        <select
+          name="receivedBy"
+          className={field}
+          required
+          defaultValue={palai?.receivedBy ?? "Saad"}
+        >
+          <option value="Saad">Saad</option>
+          <option value="Monis">Monis</option>
+        </select>
+      </div>
       <Field
         label="Payment method"
         name="paymentMethod"

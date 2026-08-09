@@ -117,6 +117,7 @@ export type UpdateTransactionInput =
       goatCount: number;
       paymentMethod?: string | null;
       notes?: string | null;
+      receivedBy: "Monis" | "Saad";
     }
   | {
       id: string;
@@ -222,7 +223,9 @@ export function applyUpdateTransaction(
     case "palai_income": {
       const total = input.ratePerGoat * input.goatCount;
       const half = total / 2;
-      const adjustmentAmount = half;
+      const receivedBy = input.receivedBy ?? "Saad";
+      const adjustmentAmount = receivedBy === "Saad" ? half : -half;
+      const receivedByPartnerId = receivedBy === "Monis" ? monisId : saadId;
       const serviceMonth = normalizeServiceMonth(input.serviceMonth);
 
       let next = db;
@@ -247,6 +250,7 @@ export function applyUpdateTransaction(
         customer_id: customerId,
         notes,
         adjustment_partner_id: monisId,
+        received_by_partner_id: receivedByPartnerId,
       };
 
       const existingPayment = next.palai_payments.find((p) => p.transaction_id === tx.id);

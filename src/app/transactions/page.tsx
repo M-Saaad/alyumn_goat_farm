@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import { animalLabel } from "@/lib/labels";
 import { palaiServiceMonth } from "@/lib/palai/service-month";
+import { palaiReceivedByFromTx } from "@/lib/palai/received-by";
 import { LEDGER_CATEGORIES, slugToCategory } from "@/lib/constants";
 import { loadTransactionsData, contactNameFrom } from "@/lib/db/queries";
 import { AppHeader } from "@/components/AppHeader";
@@ -85,6 +86,7 @@ export default async function TransactionsPage({
 
     let palai: EditableTransaction["palai"] = null;
     if (variant === "palai_income") {
+      const receivedBy = palaiReceivedByFromTx(tx, monisId, saadId);
       if (palaiPayment) {
         palai = {
           serviceMonth: palaiServiceMonth(palaiPayment),
@@ -92,6 +94,7 @@ export default async function TransactionsPage({
           goatCount: palaiPayment.goat_count ?? 1,
           paymentMethod: palaiPayment.payment_method ?? "",
           totalAmount: palaiPayment.total_amount,
+          receivedBy,
         };
       } else {
         const total = Math.abs(tx.amount) * 2;
@@ -101,6 +104,7 @@ export default async function TransactionsPage({
           goatCount: 1,
           paymentMethod: "",
           totalAmount: total,
+          receivedBy,
         };
       }
     }
