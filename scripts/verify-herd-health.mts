@@ -184,5 +184,20 @@ assert(
   "herd breeding row tracks ultrasound status"
 );
 
+const soldDoe: Animal = { ...animal, id: 2, name: "SoldDoe", status: "Sold" };
+const soldBreeding = breedingEvent({ id: "br-sold", female_animal_id: 2 });
+const herdActiveOnly = computeHerdHealth({
+  animals: [animal, soldDoe],
+  medical_events: [],
+  breeding_events: [inWindow, soldBreeding],
+  weight_logs: [],
+  today: ultrasoundToday,
+});
+assert(herdActiveOnly.breeding.length === 1, "only active goat breeding rows");
+assert(
+  herdActiveOnly.breeding[0]?.event.female_animal_id === 1,
+  "active doe only in breeding list"
+);
+
 console.log("PASS herd health intervals (PPR yearly, ETV & deworm twice yearly)");
 console.log("PASS breeding ultrasound window (day 40–75)");
