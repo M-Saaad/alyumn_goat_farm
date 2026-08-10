@@ -32,7 +32,7 @@ export default async function AnimalsPage({
         .filter((b) => isBreedingInPipeline(b))
         .map((b) => b.female_animal_id)
     );
-    animals = animals.filter((a) => femaleIds.has(a.id));
+    animals = animals.filter((a) => a.status === "Active" && femaleIds.has(a.id));
   }
   if (q) {
     animals = animals.filter(

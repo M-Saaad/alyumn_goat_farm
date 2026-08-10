@@ -42,7 +42,7 @@ export function HealthBreedingList({
   const [recordingId, setRecordingId] = useState<string | null>(null);
 
   if (rows.length === 0) {
-    return <p className="text-sm text-stone-500">No breeding records yet.</p>;
+    return <p className="text-sm text-stone-500">No active goats.</p>;
   }
 
   return (

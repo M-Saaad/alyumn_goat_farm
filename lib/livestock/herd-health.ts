@@ -195,6 +195,10 @@ export function computeHerdHealth(input: {
   const medicalEvents = input.medical_events ?? [];
   const breedingEvents = input.breeding_events ?? [];
   const activeAnimals = input.animals.filter((a) => a.status === "Active");
+  const activeAnimalIds = new Set(activeAnimals.map((a) => a.id));
+  const activeBreedingEvents = breedingEvents.filter((e) =>
+    activeAnimalIds.has(e.female_animal_id)
+  );
 
   const lastPpr = lastVaccineByKind(medicalEvents, "ppr");
   const lastEtv = lastVaccineByKind(medicalEvents, "etv");
@@ -210,7 +214,7 @@ export function computeHerdHealth(input: {
   });
   const deworming = buildDueList(activeAnimals, lastDeworm, DEWORM_INTERVAL_DAYS, today);
 
-  const breeding: BreedingRow[] = breedingEvents
+  const breeding: BreedingRow[] = activeBreedingEvents
     .map((event) => {
       const female = input.animals.find((a) => a.id === event.female_animal_id);
       const femaleLabel = female ? animalLabel(female) : `Goat #${event.female_animal_id}`;
@@ -318,7 +322,7 @@ export function computeHerdHealth(input: {
     (b) => b.status === "overdue" || b.status === "due_soon" || b.status === "pending"
   ).length;
 
-  const completedBreeding = breedingEvents.filter((b) => b.outcome !== "Pending");
+  const completedBreeding = activeBreedingEvents.filter((b) => b.outcome !== "Pending");
   const breedingDelivered = completedBreeding.filter((b) => b.outcome === "Delivered").length;
   const breedingFailed = completedBreeding.filter(
     (b) => b.outcome === "Miscarriage" || b.outcome === "Stillbirth"
