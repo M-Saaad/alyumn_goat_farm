@@ -18,6 +18,7 @@ import { DeleteAnimalButton } from "@/components/DeleteAnimalButton";
 import { BreedingRecordActions } from "@/components/BreedingRecordActions";
 import { backFromAnimalProfile } from "@/lib/livestock/health-nav";
 import { computeUltrasoundStatus, daysSinceCrossed } from "@/lib/livestock/breeding";
+import { estimateAnimalAge } from "@/lib/livestock/age";
 
 export const dynamic = "force-dynamic";
 
@@ -57,6 +58,7 @@ export default async function AnimalProfilePage({
     : null;
   const ownerContact = data.contacts.find((c) => c.id === animal.owner_id);
   const isCustomerOwner = ownerContact?.type === "Customer";
+  const ageEstimate = estimateAnimalAge(animal, todayIso());
   const sale = saleMeta[0];
   const purchasePaid =
     data.purchase_agreement?.amount_paid ??
@@ -98,6 +100,7 @@ export default async function AnimalProfilePage({
             {[animal.breed, animal.sex, animal.status, animal.home_bred ? "Born" : null, ownerName]
               .filter(Boolean)
               .join(" · ")}
+            {ageEstimate ? ` · ${ageEstimate.label} (est. ${ageEstimate.teethLabel})` : ""}
             {sale && isSoldOnPalaiSale(sale) ? " · Sold on palai" : ""}
           </p>
         </div>
@@ -200,6 +203,12 @@ export default async function AnimalProfilePage({
                 <dt className="text-stone-500">From</dt>
                 <dd>{contactNameFrom(data.contacts, animal.purchased_from)}</dd>
               </div>
+              {animal.age_at_purchase && (
+                <div>
+                  <dt className="text-stone-500">Age at purchase</dt>
+                  <dd>{animal.age_at_purchase}</dd>
+                </div>
+              )}
             </>
           )}
           {animal.home_bred && (
@@ -228,6 +237,18 @@ export default async function AnimalProfilePage({
                   <dd className="font-semibold">{formatPkr(animal.sold_price)}</dd>
                 </div>
               )}
+            </>
+          )}
+          {ageEstimate && (
+            <>
+              <div>
+                <dt className="text-stone-500">Current age (est.)</dt>
+                <dd>{ageEstimate.label}</dd>
+              </div>
+              <div>
+                <dt className="text-stone-500">Estimated teeth</dt>
+                <dd>{ageEstimate.teethLabel}</dd>
+              </div>
             </>
           )}
           {animal.palai_rate != null && (
