@@ -13,6 +13,7 @@
     "db:reset": "node scripts/audit-data.mjs && node scripts/import-all.mjs && npm run verify",
     "seed:supabase": "npx tsx --env-file=.env.local scripts/seed-supabase.mts",
     "backfill:home-bred": "npx tsx --env-file=.env.local scripts/backfill-home-bred-supabase.mts",
+    "apply:animal-parents": "npx tsx --env-file=.env.local scripts/apply-animal-parents-supabase.mts",
     "set-logo": "node scripts/set-logo.mjs"
   },
   "dependencies": {
