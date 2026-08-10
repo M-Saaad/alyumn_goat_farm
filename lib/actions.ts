@@ -355,6 +355,62 @@ export async function buyGoat(input: {
   return persistMutation(before, after);
 }
 
+export async function registerBornGoat(input: {
+  date: string;
+  breed: AnimalBreed;
+  sex: AnimalSex;
+  description: string;
+  name?: string;
+  ownerName: string;
+  comment?: string;
+  palaiRate?: number | null;
+}) {
+  const before = await fetchDb();
+  let db = before;
+  const ownerRes = resolveOwnerContact(db, input.ownerName);
+  const newContacts: FarmDatabase["contacts"] = [];
+  if (ownerRes.created) {
+    newContacts.push(ownerRes.contact);
+    db = { ...db, contacts: [...db.contacts, ownerRes.contact] };
+  }
+  const owner = ownerRes.contact;
+  const isCustomerOwner = owner.type === "Customer";
+  const palaiRate =
+    isCustomerOwner && input.palaiRate != null && !Number.isNaN(input.palaiRate)
+      ? input.palaiRate
+      : null;
+
+  const nextId = db.animals.reduce((m, a) => Math.max(m, a.id), 0) + 1;
+  const animal = {
+    id: nextId,
+    name: input.name || null,
+    breed: input.breed,
+    sex: input.sex,
+    date_of_purchase: input.date,
+    age_at_purchase: "0",
+    description: input.description,
+    comment: input.comment?.trim() || null,
+    status: "Active" as const,
+    price: 0,
+    sold_price: null,
+    purchased_from: null,
+    owner_id: owner.id,
+    home_bred: true,
+    out_date: null,
+    palai_rate: palaiRate,
+  };
+  const after = { ...db, animals: [...db.animals, animal] };
+
+  if (isSupabaseDb()) {
+    await applyWritePlan({
+      upsertContacts: newContacts.length ? newContacts : undefined,
+      upsertAnimals: [animal],
+    });
+    return after;
+  }
+  return persistMutation(before, after);
+}
+
 export async function addPurchasePayment(input: {
   animalId: number;
   date: string;

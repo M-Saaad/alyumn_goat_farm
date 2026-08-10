@@ -50,6 +50,9 @@ export function AnimalEditor({
 }) {
   const [editing, setEditing] = useState(false);
   const [status, setStatus] = useState<AnimalStatus>(animal.status);
+  const [acquisitionType, setAcquisitionType] = useState<"purchased" | "born">(
+    animal.home_bred ? "born" : "purchased"
+  );
   const [showPalaiRate, setShowPalaiRate] = useState(
     Boolean(animal.ownerName) && !["Farm", "Monis", "Saad"].includes(animal.ownerName)
   );
@@ -155,7 +158,9 @@ export function AnimalEditor({
                 </div>
               )}
               <div>
-                <label className={labelCls}>Age at purchase</label>
+                <label className={labelCls}>
+                  {acquisitionType === "born" ? "Age at birth" : "Age at purchase"}
+                </label>
                 <input
                   className={field}
                   name="ageAtPurchase"
@@ -166,18 +171,39 @@ export function AnimalEditor({
                 <label className={labelCls}>Comment</label>
                 <input className={field} name="comment" defaultValue={animal.comment ?? ""} />
               </div>
-              <label className="flex items-center gap-2 text-sm text-stone-700">
-                <input
-                  type="checkbox"
-                  name="homeBred"
-                  value="true"
-                  defaultChecked={animal.home_bred}
-                  className="h-4 w-4 rounded border-stone-300"
-                />
-                Home bred
-              </label>
+              <div>
+                <p className={labelCls}>Acquisition</p>
+                <div className="mt-1 flex gap-2">
+                  {(
+                    [
+                      ["purchased", "Purchased"],
+                      ["born", "Born on farm"],
+                    ] as const
+                  ).map(([value, text]) => (
+                    <label
+                      key={value}
+                      className={`flex flex-1 cursor-pointer items-center justify-center rounded-xl border px-3 py-2 text-sm font-semibold ${
+                        acquisitionType === value
+                          ? "border-emerald-600 bg-emerald-50 text-emerald-900"
+                          : "border-stone-300 bg-white text-stone-700"
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="acquisitionType"
+                        value={value}
+                        checked={acquisitionType === value}
+                        onChange={() => setAcquisitionType(value)}
+                        className="sr-only"
+                      />
+                      {text}
+                    </label>
+                  ))}
+                </div>
+              </div>
             </div>
 
+            {acquisitionType === "purchased" ? (
             <div className={sectionCls}>
               <p className="text-xs font-bold uppercase tracking-wide text-stone-500">Purchase</p>
               <ContactSelect
@@ -221,6 +247,24 @@ export function AnimalEditor({
                 automatically — edit those from Transactions if amounts need to match.
               </p>
             </div>
+            ) : (
+            <div className={sectionCls}>
+              <p className="text-xs font-bold uppercase tracking-wide text-stone-500">Birth</p>
+              <div>
+                <label className={labelCls}>Birth date</label>
+                <input
+                  className={field}
+                  name="purchaseDate"
+                  type="date"
+                  defaultValue={animal.date_of_purchase ?? ""}
+                />
+              </div>
+              <p className="text-xs text-stone-500">
+                Farm-born goats have no purchase price or vendor. Feed and vet costs can still be
+                linked to this goat.
+              </p>
+            </div>
+            )}
 
             {showSaleFields && (
               <div className={sectionCls}>

@@ -1,0 +1,37 @@
+{
+  "generatedAt": "2026-08-10T07:29:28.017Z",
+  "breeding": {
+    "dataRows": 504,
+    "costBase": 3321422,
+    "monisCol": 1852958,
+    "saadCol": 2174322,
+    "advanceCol": 705858,
+    "monisFunded": 1852958,
+    "saadFunded": 1468464,
+    "fairShare": 1660711,
+    "monisDiff": 192247,
+    "saadDiff": -192247,
+    "balanceIdentityOk": true,
+    "settlementOk": true,
+    "eventOnlyRows": 46,
+    "splitRows": 4,
+    "categorized": 452,
+    "uncategorizedCount": 0
+  },
+  "animals": {
+    "totalRows": 48,
+    "withId": 47,
+    "blankRows": 1,
+    "unnamed": 4,
+    "blankStatus": 23
+  },
+  "awais": {
+    "goatPurchaseRows": 13,
+    "palaiRows": 15,
+    "palaiTotal": 332000,
+    "palaiMonisShare": 166000
+  },
+  "uncategorized": [],
+  "flags": [],
+  "dateFixCount": 6
+}
