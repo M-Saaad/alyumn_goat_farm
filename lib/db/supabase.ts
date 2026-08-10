@@ -13,6 +13,8 @@ import type {
   WeightLog,
 } from "../types";
 import { emptyDb } from "../db-empty";
+import { mapAnimalsWithParents, mergeParentLinksInStorage, parentLinksFromAnimals } from "../livestock/animal-parents-store";
+import { hasAnimalParentColumns } from "./parent-columns";
 
 export function num(v: unknown): number {
   return typeof v === "number" ? v : Number(v);
@@ -247,7 +249,7 @@ export async function loadFromSupabase(client: SupabaseClient): Promise<FarmData
   const meta = metaRows[0];
   const db = emptyDb();
   db.contacts = contacts.map(mapContact);
-  db.animals = animals.map(mapAnimal);
+  db.animals = await mapAnimalsWithParents(client, animals);
   db.transactions = transactions
     .map(mapTx)
     .filter((t) => t.kind === "cost" || t.kind === "partner_adjustment");
@@ -308,8 +310,8 @@ async function syncTable(
   await upsert(client, table, rows, idColumn);
 }
 
-/** Persist FarmDatabase to Supabase (delete orphans, then upsert; preserves IDs). */
 export async function saveToSupabase(client: SupabaseClient, db: FarmDatabase): Promise<void> {
+  const parentCols = await hasAnimalParentColumns(client);
   // Children before parents so FK constraints are respected when deleting.
   await syncTable(
     client,
@@ -456,28 +458,40 @@ export async function saveToSupabase(client: SupabaseClient, db: FarmDatabase): 
   await syncTable(
     client,
     "animals",
-    db.animals.map((a) => ({
-      id: a.id,
-      name: a.name,
-      breed: a.breed,
-      sex: a.sex,
-      date_of_purchase: a.date_of_purchase,
-      age_at_purchase: a.age_at_purchase,
-      description: a.description,
-      comment: a.comment,
-      status: a.status,
-      price: a.price,
-      sold_price: a.sold_price,
-      purchased_from: a.purchased_from,
-      owner_id: a.owner_id,
-      home_bred: a.home_bred,
-      dam_id: a.dam_id,
-      sire_id: a.sire_id,
-      sire_name: a.sire_name,
-      out_date: a.out_date,
-      palai_rate: a.palai_rate,
-    }))
+    db.animals.map((a) => {
+      const row: Record<string, unknown> = {
+        id: a.id,
+        name: a.name,
+        breed: a.breed,
+        sex: a.sex,
+        date_of_purchase: a.date_of_purchase,
+        age_at_purchase: a.age_at_purchase,
+        description: a.description,
+        comment: a.comment,
+        status: a.status,
+        price: a.price,
+        sold_price: a.sold_price,
+        purchased_from: a.purchased_from,
+        owner_id: a.owner_id,
+        home_bred: a.home_bred,
+        out_date: a.out_date,
+        palai_rate: a.palai_rate,
+      };
+      if (parentCols) {
+        row.dam_id = a.dam_id;
+        row.sire_id = a.sire_id;
+        row.sire_name = a.sire_name;
+      }
+      return row;
+    })
   );
+
+  if (!parentCols) {
+    const links = parentLinksFromAnimals(db.animals);
+    if (Object.keys(links).length > 0) {
+      await mergeParentLinksInStorage(client, links);
+    }
+  }
 
   await syncTable(
     client,
