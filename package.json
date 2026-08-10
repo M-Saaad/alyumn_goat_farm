@@ -12,6 +12,7 @@
     "verify": "node scripts/verify-v1.mjs && npx tsx scripts/verify-live.mts && npx tsx scripts/verify-herd-health.mts && npx tsx scripts/verify-monthly-report.mts",
     "db:reset": "node scripts/audit-data.mjs && node scripts/import-all.mjs && npm run verify",
     "seed:supabase": "npx tsx --env-file=.env.local scripts/seed-supabase.mts",
+    "backfill:home-bred": "npx tsx --env-file=.env.local scripts/backfill-home-bred-supabase.mts",
     "set-logo": "node scripts/set-logo.mjs"
   },
   "dependencies": {
