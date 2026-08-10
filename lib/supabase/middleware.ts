@@ -37,13 +37,8 @@ export async function updateSession(request: NextRequest) {
     path.startsWith("/auth") ||
     path.startsWith("/_next") ||
     path === "/favicon.ico" ||
-<<<<<<< HEAD
     path === "/api/health-check" ||
-    path === "/api/backfill-purchase-settled" ||
     path === "/api/apply-animal-parents";
-=======
-    path === "/api/health-check";
->>>>>>> origin/main
 
   if (!user && !isPublic) {
     const redirectUrl = request.nextUrl.clone();
