@@ -44,6 +44,9 @@ export function mapAnimal(r: Record<string, unknown>): Animal {
     purchased_from: (r.purchased_from as string) ?? null,
     owner_id: (r.owner_id as string) ?? null,
     home_bred: Boolean(r.home_bred),
+    dam_id: r.dam_id == null ? null : num(r.dam_id),
+    sire_id: r.sire_id == null ? null : num(r.sire_id),
+    sire_name: (r.sire_name as string) ?? null,
     out_date: r.out_date ? String(r.out_date) : null,
     palai_rate: r.palai_rate == null ? null : num(r.palai_rate),
   };
@@ -468,6 +471,9 @@ export async function saveToSupabase(client: SupabaseClient, db: FarmDatabase): 
       purchased_from: a.purchased_from,
       owner_id: a.owner_id,
       home_bred: a.home_bred,
+      dam_id: a.dam_id,
+      sire_id: a.sire_id,
+      sire_name: a.sire_name,
       out_date: a.out_date,
       palai_rate: a.palai_rate,
     }))

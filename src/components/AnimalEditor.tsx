@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { actionUpdateAnimal } from "@/lib/server-actions";
 import { ActionForm, SubmitButton } from "@/components/ActionForm";
-import { ContactSelect, type ContactOption } from "@/components/ContactSelect";
+import { BuckSelect, ContactSelect, type ContactOption } from "@/components/ContactSelect";
 import type { AnimalBreed, AnimalSex, AnimalStatus } from "@/lib/types";
 
 const field =
@@ -25,6 +25,9 @@ export type AnimalEditorData = {
   palai_rate: number | null;
   age_at_purchase: string | null;
   home_bred: boolean;
+  dam_id: number | null;
+  sire_id: number | null;
+  sire_name: string | null;
   status: AnimalStatus;
   date_of_purchase: string | null;
   price: number;
@@ -43,10 +46,16 @@ export function AnimalEditor({
   animal,
   vendors,
   ownerOptions,
+  damAnimals,
+  maleAnimals,
+  pastBuckNames,
 }: {
   animal: AnimalEditorData;
   vendors: ContactOption[];
   ownerOptions: ContactOption[];
+  damAnimals: { id: number; label: string }[];
+  maleAnimals: { id: number; label: string }[];
+  pastBuckNames: string[];
 }) {
   const [editing, setEditing] = useState(false);
   const [status, setStatus] = useState<AnimalStatus>(animal.status);
@@ -250,6 +259,32 @@ export function AnimalEditor({
             ) : (
             <div className={sectionCls}>
               <p className="text-xs font-bold uppercase tracking-wide text-stone-500">Birth</p>
+              <div>
+                <label className={labelCls}>Dam (mother)</label>
+                <select
+                  name="damId"
+                  className={field}
+                  defaultValue={animal.dam_id ?? ""}
+                  required
+                >
+                  <option value="">—</option>
+                  {damAnimals.map((a) => (
+                    <option key={a.id} value={a.id}>
+                      {a.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <BuckSelect
+                label="Sire (optional)"
+                optional
+                maleAnimals={maleAnimals}
+                pastNames={pastBuckNames}
+                defaultMaleAnimalId={animal.sire_id}
+                defaultBuckName={animal.sire_name ?? undefined}
+                nameField="sireName"
+                idField="sireAnimalId"
+              />
               <div>
                 <label className={labelCls}>Birth date</label>
                 <input

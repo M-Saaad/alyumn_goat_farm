@@ -19,6 +19,9 @@ export type UpdateAnimalInput = {
   palai_rate?: number | null;
   age_at_purchase?: string | null;
   home_bred?: boolean;
+  dam_id?: number | null;
+  sire_id?: number | null;
+  sire_name?: string | null;
   status?: AnimalStatus;
   date_of_purchase?: string | null;
   purchase_price?: number | null;
@@ -214,6 +217,13 @@ export function applyUpdateAnimalDetails(
     purchased_from: isHomeBred ? null : vendorRes.id,
     age_at_purchase: input.age_at_purchase?.trim() || null,
     home_bred: isHomeBred,
+    dam_id: isHomeBred ? (input.dam_id ?? animal.dam_id) : null,
+    sire_id: isHomeBred ? (input.sire_id ?? animal.sire_id) : null,
+    sire_name: isHomeBred
+      ? input.sire_name !== undefined
+        ? input.sire_name?.trim() || null
+        : animal.sire_name
+      : null,
     status: nextStatus,
     date_of_purchase: input.date_of_purchase?.trim() || animal.date_of_purchase,
     price: isHomeBred ? 0 : (purchasePrice ?? animal.price),

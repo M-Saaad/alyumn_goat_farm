@@ -16,6 +16,10 @@ export function quickEntryPropsFromDb(db: FarmDatabase): QuickEntryProps {
     .filter((a) => a.status === "Active" && a.sex === "Female")
     .map((a) => ({ id: a.id, label: animalLabel(a) }));
 
+  const damAnimals = db.animals
+    .filter((a) => a.sex === "Female")
+    .map((a) => ({ id: a.id, label: animalLabel(a) }));
+
   const maleAnimals = db.animals
     .filter((a) => a.status === "Active" && a.sex === "Male")
     .map((a) => ({ id: a.id, label: animalLabel(a) }));
@@ -77,6 +81,7 @@ export function quickEntryPropsFromDb(db: FarmDatabase): QuickEntryProps {
   return {
     animals,
     femaleAnimals: femaleAnimals.length > 0 ? femaleAnimals : animals,
+    damAnimals,
     vendors,
     customers,
     ownerOptions,

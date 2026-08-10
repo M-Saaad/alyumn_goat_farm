@@ -107,11 +107,19 @@ export function BuckSelect({
   pastNames,
   defaultBuckName,
   defaultMaleAnimalId,
+  label = "Buck",
+  optional = false,
+  nameField = "buckName",
+  idField = "maleAnimalId",
 }: {
   maleAnimals: { id: number; label: string }[];
   pastNames: string[];
   defaultBuckName?: string;
   defaultMaleAnimalId?: number | null;
+  label?: string;
+  optional?: boolean;
+  nameField?: string;
+  idField?: string;
 }) {
   const animalOpts = maleAnimals.map((a) => ({
     value: `animal:${a.id}`,
@@ -128,7 +136,7 @@ export function BuckSelect({
     )
     .map((n) => ({ value: `name:${n}`, label: n }));
 
-  let initial = NEW;
+  let initial = optional ? "" : NEW;
   if (defaultMaleAnimalId != null && maleAnimals.some((a) => a.id === defaultMaleAnimalId)) {
     initial = `animal:${defaultMaleAnimalId}`;
   } else if (defaultBuckName) {
@@ -145,6 +153,8 @@ export function BuckSelect({
     initial = animalOpts[0].value;
   } else if (nameOpts[0]) {
     initial = nameOpts[0].value;
+  } else if (!optional) {
+    initial = NEW;
   }
 
   const [selected, setSelected] = useState(initial);
@@ -154,7 +164,10 @@ export function BuckSelect({
 
   let buckName = "";
   let maleAnimalId = "";
-  if (selected.startsWith("animal:")) {
+  if (!selected) {
+    buckName = "";
+    maleAnimalId = "";
+  } else if (selected.startsWith("animal:")) {
     const id = Number(selected.slice("animal:".length));
     const a = maleAnimals.find((m) => m.id === id);
     buckName = a?.label ?? "";
@@ -167,16 +180,17 @@ export function BuckSelect({
 
   return (
     <div>
-      <label className={labelCls}>Buck</label>
+      <label className={labelCls}>{label}</label>
       <select
         className={field}
         value={selected}
-        required={selected !== NEW}
+        required={!optional && selected !== NEW}
         onChange={(e) => {
           setSelected(e.target.value);
           if (e.target.value !== NEW) setOtherName("");
         }}
       >
+        {optional && <option value="">—</option>}
         {animalOpts.map((o) => (
           <option key={o.value} value={o.value}>
             {o.label}
@@ -199,8 +213,8 @@ export function BuckSelect({
           required
         />
       )}
-      <input type="hidden" name="buckName" value={buckName} />
-      <input type="hidden" name="maleAnimalId" value={maleAnimalId} />
+      <input type="hidden" name={nameField} value={buckName} />
+      <input type="hidden" name={idField} value={maleAnimalId} />
     </div>
   );
 }

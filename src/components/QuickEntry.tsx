@@ -45,6 +45,7 @@ const label = "block text-sm font-medium text-stone-700";
 export type QuickEntryProps = {
   animals: AnimalOption[];
   femaleAnimals?: AnimalOption[];
+  damAnimals?: AnimalOption[];
   vendors: ContactOption[];
   customers: ContactOption[];
   ownerOptions: ContactOption[];
@@ -56,6 +57,7 @@ export type QuickEntryProps = {
 export function QuickEntry({
   animals,
   femaleAnimals,
+  damAnimals,
   vendors,
   customers,
   ownerOptions,
@@ -164,7 +166,13 @@ export function QuickEntry({
             )}
 
             {mode === "born" && (
-              <BornGoatForm ownerOptions={ownerOptions} onSuccess={close} />
+              <BornGoatForm
+                damAnimals={damAnimals ?? females}
+                maleAnimals={maleAnimals}
+                pastBuckNames={pastBuckNames}
+                ownerOptions={ownerOptions}
+                onSuccess={close}
+              />
             )}
 
             {mode === "medical" && (
@@ -531,9 +539,15 @@ function BuyGoatForm({
 }
 
 function BornGoatForm({
+  damAnimals,
+  maleAnimals,
+  pastBuckNames,
   ownerOptions,
   onSuccess,
 }: {
+  damAnimals: AnimalOption[];
+  maleAnimals: AnimalOption[];
+  pastBuckNames: string[];
   ownerOptions: ContactOption[];
   onSuccess: () => void;
 }) {
@@ -542,6 +556,25 @@ function BornGoatForm({
   return (
     <ActionForm action={actionRegisterBornGoat} onSuccess={onSuccess}>
       <Field label="Birth date" name="date" type="date" defaultValue={todayIso()} required />
+      <div>
+        <label className={label}>Dam (mother)</label>
+        <select name="damId" className={field} required>
+          <option value="">Select dam…</option>
+          {damAnimals.map((a) => (
+            <option key={a.id} value={a.id}>
+              {a.label}
+            </option>
+          ))}
+        </select>
+      </div>
+      <BuckSelect
+        label="Sire (optional)"
+        optional
+        maleAnimals={maleAnimals}
+        pastNames={pastBuckNames}
+        nameField="sireName"
+        idField="sireAnimalId"
+      />
       <Field label="Name (optional)" name="name" />
       <Field label="Description" name="description" required />
       <div>

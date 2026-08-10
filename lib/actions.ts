@@ -274,6 +274,9 @@ export async function buyGoat(input: {
     purchased_from: vendorId,
     owner_id: owner.id,
     home_bred: false,
+    dam_id: null,
+    sire_id: null,
+    sire_name: null,
     out_date: null,
     palai_rate: palaiRate,
   };
@@ -364,6 +367,9 @@ export async function registerBornGoat(input: {
   ownerName: string;
   comment?: string;
   palaiRate?: number | null;
+  damId: number;
+  sireId?: number | null;
+  sireName?: string | null;
 }) {
   const before = await fetchDb();
   let db = before;
@@ -374,6 +380,9 @@ export async function registerBornGoat(input: {
     db = { ...db, contacts: [...db.contacts, ownerRes.contact] };
   }
   const owner = ownerRes.contact;
+  const dam = db.animals.find((a) => a.id === input.damId);
+  if (!dam || dam.sex !== "Female") throw new Error("Select a valid dam (female goat)");
+
   const isCustomerOwner = owner.type === "Customer";
   const palaiRate =
     isCustomerOwner && input.palaiRate != null && !Number.isNaN(input.palaiRate)
@@ -396,6 +405,9 @@ export async function registerBornGoat(input: {
     purchased_from: null,
     owner_id: owner.id,
     home_bred: true,
+    dam_id: input.damId,
+    sire_id: input.sireId ?? null,
+    sire_name: input.sireName?.trim() || null,
     out_date: null,
     palai_rate: palaiRate,
   };
