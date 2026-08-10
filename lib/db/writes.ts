@@ -90,6 +90,9 @@ function animalRow(a: Animal): Record<string, unknown> {
     purchased_from: a.purchased_from,
     owner_id: a.owner_id,
     home_bred: a.home_bred,
+    dam_id: a.dam_id,
+    sire_id: a.sire_id,
+    sire_name: a.sire_name,
     out_date: a.out_date,
     palai_rate: a.palai_rate,
   };

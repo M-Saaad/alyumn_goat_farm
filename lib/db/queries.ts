@@ -177,6 +177,7 @@ export const loadAnimalsListData = cache(async (): Promise<AnimalsListData> => {
 
 export type AnimalProfileData = {
   animal: Animal;
+  animals: Animal[];
   contacts: Contact[];
   medical_events: MedicalEvent[];
   breeding_events: BreedingEvent[];
@@ -245,6 +246,7 @@ export const loadAnimalProfileData = cache(
       const sale = saleMeta[0];
       return {
         animal,
+        animals: db.animals,
         contacts: db.contacts,
         medical_events: db.medical_events.filter((m) => m.animal_id === animalId),
         breeding_events: db.breeding_events.filter((b) => b.female_animal_id === animalId),
@@ -260,10 +262,11 @@ export const loadAnimalProfileData = cache(
     }
 
     const client = createServiceClient();
-    const [animalRow, contacts, medical, breeding, sales, purchaseRows, weights, media, quickEntry] =
+    const [animalRow, contacts, allAnimals, medical, breeding, sales, purchaseRows, weights, media, quickEntry] =
       await Promise.all([
         selectOne(client, "animals", "id", animalId),
         selectAll(client, "contacts"),
+        selectAll(client, "animals"),
         selectWhere(client, "medical_events", "animal_id", animalId),
         selectWhere(client, "breeding_events", "female_animal_id", animalId),
         selectAll(client, "livestock_sales"),
@@ -347,6 +350,7 @@ export const loadAnimalProfileData = cache(
 
     return {
       animal,
+      animals: allAnimals.map(mapAnimal),
       contacts: contacts.map(mapContact),
       medical_events: medical.map(mapMedical),
       breeding_events: breeding.map(mapBreeding),

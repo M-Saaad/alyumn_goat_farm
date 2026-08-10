@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { animalLabel } from "@/lib/labels";
 import { formatPkr, formatDate, todayIso } from "@/lib/format";
+import { animalParentLabel, sireLabel } from "@/lib/livestock/animal-parents";
 import { isSupabaseDb } from "@/lib/db";
 import { isSoldOnPalaiSale, saleReceiptAmount } from "@/lib/livestock/cancel-sale";
 import { loadAnimalProfileData, contactNameFrom } from "@/lib/db/queries";
@@ -116,6 +117,9 @@ export default async function AnimalProfilePage({
           palai_rate: animal.palai_rate,
           age_at_purchase: animal.age_at_purchase,
           home_bred: animal.home_bred,
+          dam_id: animal.dam_id,
+          sire_id: animal.sire_id,
+          sire_name: animal.sire_name,
           status: animal.status,
           date_of_purchase: animal.date_of_purchase,
           price: animal.price,
@@ -133,6 +137,9 @@ export default async function AnimalProfilePage({
         }}
         vendors={data.quickEntry.vendors}
         ownerOptions={data.quickEntry.ownerOptions}
+        damAnimals={data.quickEntry.damAnimals ?? data.quickEntry.femaleAnimals ?? []}
+        maleAnimals={data.quickEntry.maleAnimals}
+        pastBuckNames={data.quickEntry.pastBuckNames}
       />
 
       <AnimalMediaGallery
@@ -207,6 +214,14 @@ export default async function AnimalProfilePage({
                   <dd>{animal.age_at_purchase}</dd>
                 </div>
               )}
+              <div>
+                <dt className="text-stone-500">Dam</dt>
+                <dd>{animalParentLabel(data.animals, animal.dam_id)}</dd>
+              </div>
+              <div>
+                <dt className="text-stone-500">Sire</dt>
+                <dd>{sireLabel(animal, data.animals)}</dd>
+              </div>
               {animal.sold_price != null && (
                 <div>
                   <dt className="text-stone-500">Sold price</dt>

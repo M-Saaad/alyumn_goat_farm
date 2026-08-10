@@ -48,6 +48,9 @@ export interface Animal {
   purchased_from: string | null;
   owner_id: string | null;
   home_bred: boolean;
+  dam_id: number | null;
+  sire_id: number | null;
+  sire_name: string | null;
   out_date: string | null;
   palai_rate: number | null;
 }

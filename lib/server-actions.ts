@@ -131,6 +131,10 @@ export async function actionBuyGoat(formData: FormData) {
 
 export async function actionRegisterBornGoat(formData: FormData) {
   const palaiRaw = String(formData.get("palaiRate") || "").trim();
+  const damRaw = String(formData.get("damId") || "").trim();
+  const sireAnimalRaw = String(formData.get("sireAnimalId") || "").trim();
+  const sireNameRaw = String(formData.get("sireName") || "").trim();
+  if (!damRaw) throw new Error("Select the dam (mother)");
   await registerBornGoat({
     date: String(formData.get("date")),
     breed: String(formData.get("breed")) as AnimalBreed,
@@ -140,6 +144,9 @@ export async function actionRegisterBornGoat(formData: FormData) {
     ownerName: String(formData.get("ownerName")),
     comment: String(formData.get("comment") || "") || undefined,
     palaiRate: palaiRaw ? Number(palaiRaw) : null,
+    damId: Number(damRaw),
+    sireId: sireAnimalRaw ? Number(sireAnimalRaw) : null,
+    sireName: sireNameRaw || null,
   });
   revalidateTxnPaths();
 }
@@ -472,6 +479,13 @@ export async function actionUpdateAnimal(formData: FormData) {
   const receivedRaw = String(formData.get("amountReceived") || "").trim();
   const purchaseDateRaw = String(formData.get("purchaseDate") || "").trim();
   const outDateRaw = String(formData.get("outDate") || "").trim();
+  const damRaw = String(formData.get("damId") || "").trim();
+  const sireAnimalRaw = String(formData.get("sireAnimalId") || "").trim();
+  const sireNameRaw = String(formData.get("sireName") || "").trim();
+  const isBorn =
+    formData.get("acquisitionType") === "born" ||
+    formData.get("homeBred") === "on" ||
+    formData.get("homeBred") === "true";
 
   await updateAnimal({
     id,
@@ -484,10 +498,10 @@ export async function actionUpdateAnimal(formData: FormData) {
     vendorName: String(formData.get("vendorName") || "") || null,
     palai_rate: palaiRaw ? Number(palaiRaw) : null,
     age_at_purchase: String(formData.get("ageAtPurchase") || "") || null,
-    home_bred:
-      formData.get("acquisitionType") === "born" ||
-      formData.get("homeBred") === "on" ||
-      formData.get("homeBred") === "true",
+    home_bred: isBorn,
+    dam_id: isBorn && damRaw ? Number(damRaw) : isBorn ? null : null,
+    sire_id: isBorn && sireAnimalRaw ? Number(sireAnimalRaw) : isBorn ? null : null,
+    sire_name: isBorn && sireNameRaw ? sireNameRaw : isBorn ? null : null,
     status: statusRaw ? (statusRaw as AnimalStatus) : undefined,
     date_of_purchase: purchaseDateRaw || null,
     purchase_price: purchasePriceRaw ? Number(purchasePriceRaw) : null,

@@ -32,6 +32,9 @@ const animal: Animal = {
   purchased_from: null,
   owner_id: null,
   home_bred: false,
+  dam_id: null,
+  sire_id: null,
+  sire_name: null,
   out_date: null,
   palai_rate: null,
 };

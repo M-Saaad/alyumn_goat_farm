@@ -212,6 +212,9 @@ for (const row of aBody) {
     home_bred:
       String(row[aI["Home-bred"]] || "").toLowerCase() === "yes" ||
       (price === 0 && (!vendorName || vendorName === "-")),
+    dam_id: null,
+    sire_id: null,
+    sire_name: null,
     out_date: parseNotionDate(row[aI["Out Date"]]),
     palai_rate: num(row[aI["Palai Rate"]]),
   });
