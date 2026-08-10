@@ -10,6 +10,7 @@ import {
   actionPartnerTransfer,
   actionRecordBreeding,
   actionRecordLivestockSale,
+  actionRegisterBornGoat,
 } from "@/lib/server-actions";
 import { LEDGER_CATEGORIES } from "@/lib/constants";
 import {
@@ -29,6 +30,7 @@ type Mode =
   | "expense"
   | "palai"
   | "buy"
+  | "born"
   | "medical"
   | "weight"
   | "breeding"
@@ -105,6 +107,7 @@ export function QuickEntry({
                     ["expense", "Log Expense"],
                     ["palai", "Palai Payment"],
                     ["buy", "Buy Goat"],
+                    ["born", "Record Birth"],
                     ["medical", "Log Medical"],
                     ["weight", "Log Weight"],
                     ["breeding", "Record Breeding"],
@@ -158,6 +161,10 @@ export function QuickEntry({
 
             {mode === "buy" && (
               <BuyGoatForm vendors={vendors} ownerOptions={ownerOptions} onSuccess={close} />
+            )}
+
+            {mode === "born" && (
+              <BornGoatForm ownerOptions={ownerOptions} onSuccess={close} />
             )}
 
             {mode === "medical" && (
@@ -523,6 +530,59 @@ function BuyGoatForm({
   );
 }
 
+function BornGoatForm({
+  ownerOptions,
+  onSuccess,
+}: {
+  ownerOptions: ContactOption[];
+  onSuccess: () => void;
+}) {
+  const [showPalaiRate, setShowPalaiRate] = useState(false);
+
+  return (
+    <ActionForm action={actionRegisterBornGoat} onSuccess={onSuccess}>
+      <Field label="Birth date" name="date" type="date" defaultValue={todayIso()} required />
+      <Field label="Name (optional)" name="name" />
+      <Field label="Description" name="description" required />
+      <div>
+        <label className={label}>Breed</label>
+        <select name="breed" className={field} required>
+          {["Teddy", "Gulabi", "Bissar", "Tapra"].map((b) => (
+            <option key={b}>{b}</option>
+          ))}
+        </select>
+      </div>
+      <div>
+        <label className={label}>Sex</label>
+        <select name="sex" className={field} required>
+          <option>Female</option>
+          <option>Male</option>
+        </select>
+      </div>
+      <ContactSelect
+        label="Owner"
+        name="ownerName"
+        options={ownerOptions}
+        defaultValue="Farm"
+        required
+        addNewLabel="+ Add new customer"
+        onSelectionChange={(name) => {
+          const isCustomer =
+            Boolean(name.trim()) && !["Farm", "Monis", "Saad"].includes(name);
+          setShowPalaiRate(isCustomer);
+        }}
+      />
+      {showPalaiRate && <Field label="Palai rate (optional)" name="palaiRate" type="number" />}
+      <Field label="Notes (optional)" name="comment" />
+      <p className="text-xs text-stone-500">
+        Farm-born kids have no purchase price or vendor. Costs (feed, vet) can still be logged
+        against this goat later.
+      </p>
+      <SubmitButton label="Add kid" pendingLabel="Adding…" />
+    </ActionForm>
+  );
+}
+
 function modeLabel(m: Mode) {
   switch (m) {
     case "expense":
@@ -531,6 +591,8 @@ function modeLabel(m: Mode) {
       return "Palai Payment";
     case "buy":
       return "Buy Goat";
+    case "born":
+      return "Record Birth";
     case "medical":
       return "Log Medical";
     case "weight":

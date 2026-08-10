@@ -18,6 +18,7 @@ import {
   updateBreeding,
   deleteBreeding,
   recordLivestockSale,
+  registerBornGoat,
   recordPalai,
   updatePalai,
   updateAnimal,
@@ -123,6 +124,21 @@ export async function actionBuyGoat(formData: FormData) {
     ownerName: String(formData.get("ownerName")),
     vendorName: String(formData.get("vendorName") || "") || undefined,
     paidBy,
+    palaiRate: palaiRaw ? Number(palaiRaw) : null,
+  });
+  revalidateTxnPaths();
+}
+
+export async function actionRegisterBornGoat(formData: FormData) {
+  const palaiRaw = String(formData.get("palaiRate") || "").trim();
+  await registerBornGoat({
+    date: String(formData.get("date")),
+    breed: String(formData.get("breed")) as AnimalBreed,
+    sex: String(formData.get("sex")) as AnimalSex,
+    description: String(formData.get("description")),
+    name: String(formData.get("name") || "") || undefined,
+    ownerName: String(formData.get("ownerName")),
+    comment: String(formData.get("comment") || "") || undefined,
     palaiRate: palaiRaw ? Number(palaiRaw) : null,
   });
   revalidateTxnPaths();
@@ -468,7 +484,10 @@ export async function actionUpdateAnimal(formData: FormData) {
     vendorName: String(formData.get("vendorName") || "") || null,
     palai_rate: palaiRaw ? Number(palaiRaw) : null,
     age_at_purchase: String(formData.get("ageAtPurchase") || "") || null,
-    home_bred: formData.get("homeBred") === "on" || formData.get("homeBred") === "true",
+    home_bred:
+      formData.get("acquisitionType") === "born" ||
+      formData.get("homeBred") === "on" ||
+      formData.get("homeBred") === "true",
     status: statusRaw ? (statusRaw as AnimalStatus) : undefined,
     date_of_purchase: purchaseDateRaw || null,
     purchase_price: purchasePriceRaw ? Number(purchasePriceRaw) : null,

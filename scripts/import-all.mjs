@@ -187,6 +187,7 @@ for (const row of aBody) {
   const ownerId = upsertContact(ownerName, ownerType);
   const vendorName = (row[aI["Purchased From"]] || "").trim();
   const vendorId = vendorName && vendorName !== "-" ? upsertContact(vendorName, "Vendor") : null;
+  const price = num(row[aI.Price]) || 0;
   let status = (row[aI.Status] || "").trim() || "Active";
   if (!["Active", "Died", "Sold", "Slaughtered", "Gone"].includes(status)) status = "Active";
   let breed = (row[aI.Breed] || "").trim() || null;
@@ -204,11 +205,13 @@ for (const row of aBody) {
     description: (row[aI.Description] || "").trim() || null,
     comment: (row[aI.Comment] || "").trim() || null,
     status,
-    price: num(row[aI.Price]) || 0,
+    price,
     sold_price: num(row[aI.Sold]),
     purchased_from: vendorId,
     owner_id: ownerId,
-    home_bred: String(row[aI["Home-bred"]] || "").toLowerCase() === "yes",
+    home_bred:
+      String(row[aI["Home-bred"]] || "").toLowerCase() === "yes" ||
+      (price === 0 && (!vendorName || vendorName === "-")),
     out_date: parseNotionDate(row[aI["Out Date"]]),
     palai_rate: num(row[aI["Palai Rate"]]),
   });

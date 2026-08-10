@@ -6,6 +6,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 const filters = [
   { id: "all", label: "All" },
   { id: "active", label: "Active" },
+  { id: "purchased", label: "Purchased" },
+  { id: "born", label: "Born" },
   { id: "breeding", label: "Breeding" },
   { id: "palai", label: "Palai" },
 ];

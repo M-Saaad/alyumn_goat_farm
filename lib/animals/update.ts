@@ -197,6 +197,7 @@ export function applyUpdateAnimalDetails(
   }
 
   const owner = ownerRes.contact;
+  const isHomeBred = Boolean(input.home_bred);
   const purchasePrice = parseOptionalNumber(input.purchase_price);
   const soldPrice = parseOptionalNumber(input.sold_price ?? input.gross_sale_price);
 
@@ -210,12 +211,12 @@ export function applyUpdateAnimalDetails(
     description: input.description?.trim() || null,
     comment: input.comment?.trim() || null,
     owner_id: owner.id,
-    purchased_from: vendorRes.id,
+    purchased_from: isHomeBred ? null : vendorRes.id,
     age_at_purchase: input.age_at_purchase?.trim() || null,
-    home_bred: Boolean(input.home_bred),
+    home_bred: isHomeBred,
     status: nextStatus,
     date_of_purchase: input.date_of_purchase?.trim() || animal.date_of_purchase,
-    price: purchasePrice ?? animal.price,
+    price: isHomeBred ? 0 : (purchasePrice ?? animal.price),
     out_date:
       input.out_date !== undefined
         ? input.out_date?.trim() || null
@@ -236,13 +237,15 @@ export function applyUpdateAnimalDetails(
     animals: nextDb.animals.map((a) => (a.id === updatedAnimal.id ? updatedAnimal : a)),
   };
 
-  nextDb = updatePurchaseAgreement(
-    nextDb,
-    input.id,
-    vendorRes.id,
-    purchasePrice ?? (updatedAnimal.price > 0 ? updatedAnimal.price : undefined),
-    parseOptionalNumber(input.purchase_paid)
-  );
+  if (!isHomeBred) {
+    nextDb = updatePurchaseAgreement(
+      nextDb,
+      input.id,
+      vendorRes.id,
+      purchasePrice ?? (updatedAnimal.price > 0 ? updatedAnimal.price : undefined),
+      parseOptionalNumber(input.purchase_paid)
+    );
+  }
 
   const saleResult = updateLivestockSale(nextDb, input.id, {
     sale_date: input.sale_date,
