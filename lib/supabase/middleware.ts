@@ -37,8 +37,7 @@ export async function updateSession(request: NextRequest) {
     path.startsWith("/auth") ||
     path.startsWith("/_next") ||
     path === "/favicon.ico" ||
-    path === "/api/health-check" ||
-    path === "/api/backfill-purchase-settled";
+    path === "/api/health-check";
 
   if (!user && !isPublic) {
     const redirectUrl = request.nextUrl.clone();
