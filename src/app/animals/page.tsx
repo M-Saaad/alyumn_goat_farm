@@ -22,6 +22,8 @@ export default async function AnimalsPage({
 
   let animals = [...data.animals];
   if (filter === "active") animals = animals.filter((a) => a.status === "Active");
+  if (filter === "purchased") animals = animals.filter((a) => !a.home_bred);
+  if (filter === "born") animals = animals.filter((a) => a.home_bred);
   if (filter === "palai") {
     const farmId = data.contacts.find((c) => c.name === "Farm")?.id;
     animals = animals.filter((a) => a.owner_id && a.owner_id !== farmId && a.status === "Active");
@@ -76,7 +78,7 @@ export default async function AnimalsPage({
                 <div>
                   <p className="font-semibold text-stone-900">{animalLabel(a)}</p>
                   <p className="text-sm text-stone-500">
-                    {[a.breed, a.sex, contactNameFrom(data.contacts, a.owner_id)]
+                    {[a.breed, a.sex, a.home_bred ? "Born" : null, contactNameFrom(data.contacts, a.owner_id)]
                       .filter(Boolean)
                       .join(" · ")}
                   </p>

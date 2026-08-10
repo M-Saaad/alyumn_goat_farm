@@ -94,7 +94,7 @@ export default async function AnimalProfilePage({
         <div>
           <h1 className="text-2xl font-bold">{animalLabel(animal)}</h1>
           <p className="text-stone-500">
-            {[animal.breed, animal.sex, animal.status, ownerName]
+            {[animal.breed, animal.sex, animal.status, animal.home_bred ? "Born" : null, ownerName]
               .filter(Boolean)
               .join(" · ")}
             {sale && isSoldOnPalaiSale(sale) ? " · Sold on palai" : ""}
@@ -141,14 +141,14 @@ export default async function AnimalProfilePage({
         supabaseEnabled={supabaseEnabled}
       />
 
-      {data.purchase_agreement ? (
+      {data.purchase_agreement && !animal.home_bred ? (
         <PurchaseInstallmentCard
           animalId={animalId}
           agreement={data.purchase_agreement}
           balance={data.purchase_balance}
           isCustomerOwner={isCustomerOwner}
         />
-      ) : data.purchase_balance > 0 ? (
+      ) : data.purchase_balance > 0 && !animal.home_bred ? (
         <section className="mb-3 rounded-2xl bg-amber-50 p-4 text-sm text-amber-900 ring-1 ring-amber-200">
           <p className="font-semibold">Outstanding purchase balance</p>
           <p>{formatPkr(data.purchase_balance)} remaining on agreed price {formatPkr(animal.price)}</p>
@@ -169,28 +169,52 @@ export default async function AnimalProfilePage({
       )}
 
       <section className="mb-3 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-stone-200">
-        <h2 className="mb-2 text-sm font-bold">Purchase</h2>
+        <h2 className="mb-2 text-sm font-bold">{animal.home_bred ? "Birth" : "Purchase"}</h2>
         <dl className="grid grid-cols-2 gap-2 text-sm">
-          <div>
-            <dt className="text-stone-500">Price</dt>
-            <dd className="font-semibold">
-              {animal.price ? formatPkr(animal.price) : "—"}
-            </dd>
-          </div>
-          <div>
-            <dt className="text-stone-500">Sold price</dt>
-            <dd className="font-semibold">
-              {animal.sold_price != null ? formatPkr(animal.sold_price) : "—"}
-            </dd>
-          </div>
-          <div>
-            <dt className="text-stone-500">Purchased</dt>
-            <dd>{formatDate(animal.date_of_purchase)}</dd>
-          </div>
-          <div>
-            <dt className="text-stone-500">From</dt>
-            <dd>{contactNameFrom(data.contacts, animal.purchased_from)}</dd>
-          </div>
+          {!animal.home_bred && (
+            <>
+              <div>
+                <dt className="text-stone-500">Price</dt>
+                <dd className="font-semibold">
+                  {animal.price ? formatPkr(animal.price) : "—"}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-stone-500">Sold price</dt>
+                <dd className="font-semibold">
+                  {animal.sold_price != null ? formatPkr(animal.sold_price) : "—"}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-stone-500">Purchased</dt>
+                <dd>{formatDate(animal.date_of_purchase)}</dd>
+              </div>
+              <div>
+                <dt className="text-stone-500">From</dt>
+                <dd>{contactNameFrom(data.contacts, animal.purchased_from)}</dd>
+              </div>
+            </>
+          )}
+          {animal.home_bred && (
+            <>
+              <div>
+                <dt className="text-stone-500">Born</dt>
+                <dd>{formatDate(animal.date_of_purchase)}</dd>
+              </div>
+              {animal.age_at_purchase && (
+                <div>
+                  <dt className="text-stone-500">Age at birth</dt>
+                  <dd>{animal.age_at_purchase}</dd>
+                </div>
+              )}
+              {animal.sold_price != null && (
+                <div>
+                  <dt className="text-stone-500">Sold price</dt>
+                  <dd className="font-semibold">{formatPkr(animal.sold_price)}</dd>
+                </div>
+              )}
+            </>
+          )}
           {animal.palai_rate != null && (
             <div>
               <dt className="text-stone-500">Palai rate</dt>
