@@ -3,6 +3,8 @@ import Link from "next/link";
 import { animalLabel } from "@/lib/labels";
 import { loadAnimalsListData, contactNameFrom } from "@/lib/db/queries";
 import { isBreedingInPipeline } from "@/lib/livestock/breeding";
+import { estimateAnimalAge } from "@/lib/livestock/age";
+import { todayIso } from "@/lib/format";
 import { AppHeader } from "@/components/AppHeader";
 import { BottomNav } from "@/components/BottomNav";
 import { QuickEntryLoader } from "@/components/QuickEntryLoader";
@@ -17,6 +19,7 @@ export default async function AnimalsPage({
 }) {
   const sp = await searchParams;
   const data = await loadAnimalsListData();
+  const today = todayIso();
   const q = (sp.q || "").toLowerCase();
   const filter = sp.filter || "all";
 
@@ -68,7 +71,9 @@ export default async function AnimalsPage({
       </Suspense>
 
       <ul className="space-y-2">
-        {animals.map((a) => (
+        {animals.map((a) => {
+          const age = estimateAnimalAge(a, today);
+          return (
           <li key={a.id}>
             <Link
               href={`/animals/${a.id}`}
@@ -81,6 +86,7 @@ export default async function AnimalsPage({
                     {[a.breed, a.sex, a.home_bred ? "Born" : null, contactNameFrom(data.contacts, a.owner_id)]
                       .filter(Boolean)
                       .join(" · ")}
+                    {age ? ` · ${age.label} (est. ${age.teethLabel})` : ""}
                   </p>
                 </div>
                 <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${statusColor[a.status]}`}>
@@ -89,7 +95,8 @@ export default async function AnimalsPage({
               </div>
             </Link>
           </li>
-        ))}
+          );
+        })}
       </ul>
 
       <QuickEntryLoader {...data.quickEntry} />
