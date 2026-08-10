@@ -20,7 +20,6 @@ import { emptyDb } from "../db-empty";
 import { getCachedDb, isSupabaseDb } from "../db";
 import { createServiceClient } from "../supabase/admin";
 import {
-  mapAnimal,
   mapBreeding,
   mapContact,
   mapMedia,

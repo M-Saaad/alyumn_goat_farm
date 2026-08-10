@@ -12,58 +12,45 @@ export type ParentLink = {
 
 export type ParentLinkMap = Record<number, ParentLink>;
 
-const STORAGE_PATH = "_system/animal-parents.json";
+const PARENTS_MARKER = "\n__parents__:";
 
-function parseParentLinks(raw: unknown): ParentLinkMap {
-  if (!raw || typeof raw !== "object") return {};
-  const out: ParentLinkMap = {};
-  for (const [key, value] of Object.entries(raw as Record<string, unknown>)) {
-    const id = Number(key);
-    if (!Number.isFinite(id) || !value || typeof value !== "object") continue;
-    const row = value as Record<string, unknown>;
-    out[id] = {
-      dam_id: row.dam_id == null ? null : Number(row.dam_id),
-      sire_id: row.sire_id == null ? null : Number(row.sire_id),
-      sire_name: row.sire_name == null ? null : String(row.sire_name),
+export function stripParentsComment(comment: string | null): string {
+  if (!comment) return "";
+  const idx = comment.indexOf(PARENTS_MARKER);
+  return idx === -1 ? comment : comment.slice(0, idx).trimEnd();
+}
+
+export function encodeParentsComment(comment: string | null, link: ParentLink): string {
+  const base = stripParentsComment(comment);
+  const payload = `${PARENTS_MARKER}${JSON.stringify(link)}`;
+  return base ? `${base}${payload}` : payload.trimStart();
+}
+
+export function parseParentsFromComment(comment: string | null): ParentLink | null {
+  if (!comment) return null;
+  const idx = comment.indexOf(PARENTS_MARKER);
+  if (idx === -1) return null;
+  try {
+    const parsed = JSON.parse(comment.slice(idx + PARENTS_MARKER.length)) as ParentLink;
+    return {
+      dam_id: parsed.dam_id ?? null,
+      sire_id: parsed.sire_id ?? null,
+      sire_name: parsed.sire_name ?? null,
     };
+  } catch {
+    return null;
+  }
+}
+
+export function parentLinksFromAnimalRows(rows: Record<string, unknown>[]): ParentLinkMap {
+  const out: ParentLinkMap = { ...BORN_KID_PARENT_BACKFILL };
+  for (const row of rows) {
+    const id = Number(row.id);
+    if (!Number.isFinite(id)) continue;
+    const fromComment = parseParentsFromComment((row.comment as string) ?? null);
+    if (fromComment) out[id] = fromComment;
   }
   return out;
-}
-
-export async function loadParentLinksFromStorage(client: SupabaseClient): Promise<ParentLinkMap> {
-  const { data, error } = await client.storage.from("animal-media").download(STORAGE_PATH);
-  if (error || !data) return { ...BORN_KID_PARENT_BACKFILL };
-  try {
-    const text = await data.text();
-    const parsed = parseParentLinks(JSON.parse(text));
-    return { ...BORN_KID_PARENT_BACKFILL, ...parsed };
-  } catch {
-    return { ...BORN_KID_PARENT_BACKFILL };
-  }
-}
-
-export async function saveParentLinksToStorage(
-  client: SupabaseClient,
-  links: ParentLinkMap
-): Promise<void> {
-  const body = JSON.stringify(links, null, 2);
-  const { error } = await client.storage
-    .from("animal-media")
-    .upload(STORAGE_PATH, Buffer.from(body, "utf8"), {
-      contentType: "application/json",
-      upsert: true,
-    });
-  if (error) throw new Error(`parent links storage: ${error.message}`);
-}
-
-export async function mergeParentLinksInStorage(
-  client: SupabaseClient,
-  patch: ParentLinkMap
-): Promise<ParentLinkMap> {
-  const existing = await loadParentLinksFromStorage(client);
-  const merged = { ...existing, ...patch };
-  await saveParentLinksToStorage(client, merged);
-  return merged;
 }
 
 export function applyParentLinks(animals: Animal[], links: ParentLinkMap): Animal[] {
@@ -85,7 +72,7 @@ export async function mapAnimalsWithParents(
 ): Promise<Animal[]> {
   const animals = rows.map(mapAnimal);
   if (await hasAnimalParentColumns(client)) return animals;
-  const links = await loadParentLinksFromStorage(client);
+  const links = parentLinksFromAnimalRows(rows);
   return applyParentLinks(animals, links);
 }
 
@@ -101,4 +88,49 @@ export function parentLinksFromAnimals(animals: Animal[]): ParentLinkMap {
     };
   }
   return out;
+}
+
+/** Persist parent links in comment when DB columns are missing. */
+export function animalsWithEncodedParentComments(animals: Animal[]): Animal[] {
+  return animals.map((a) => {
+    if (!a.home_bred) return a;
+    const link = parentLinksFromAnimals([a])[a.id];
+    if (!link) return a;
+    return {
+      ...a,
+      comment: encodeParentsComment(a.comment, link) || null,
+      dam_id: null,
+      sire_id: null,
+      sire_name: null,
+    };
+  });
+}
+
+export async function backfillParentComments(
+  client: SupabaseClient,
+  links: ParentLinkMap
+): Promise<Array<{ id: number; ok: boolean; error?: string }>> {
+  const results: Array<{ id: number; ok: boolean; error?: string }> = [];
+  for (const [idRaw, link] of Object.entries(links)) {
+    const id = Number(idRaw);
+    const { data, error: readErr } = await client
+      .from("animals")
+      .select("comment")
+      .eq("id", id)
+      .maybeSingle();
+    if (readErr) {
+      results.push({ id, ok: false, error: readErr.message });
+      continue;
+    }
+    const comment = encodeParentsComment((data?.comment as string) ?? null, link);
+    const { error } = await client.from("animals").update({ comment }).eq("id", id);
+    results.push({ id, ok: !error, error: error?.message });
+  }
+  return results;
+}
+
+export async function loadParentLinks(client: SupabaseClient): Promise<ParentLinkMap> {
+  const { data, error } = await client.from("animals").select("id,comment");
+  if (error) throw new Error(error.message);
+  return parentLinksFromAnimalRows((data ?? []) as Record<string, unknown>[]);
 }

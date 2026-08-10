@@ -20,7 +20,7 @@ import type {
 import { createServiceClient } from "../supabase/admin";
 import { isSupabaseDb, persistDb } from "../db";
 import { hasAnimalParentColumns } from "./parent-columns";
-import { mergeParentLinksInStorage, parentLinksFromAnimals } from "../livestock/animal-parents-store";
+import { animalsWithEncodedParentComments } from "../livestock/animal-parents-store";
 
 export type WritePlan = {
   upsertContacts?: Contact[];
@@ -257,17 +257,14 @@ export async function applyWritePlan(plan: WritePlan): Promise<void> {
 
   if (plan.upsertAnimals?.length) {
     const parentCols = await hasAnimalParentColumns(client);
+    const animalsToWrite = parentCols
+      ? plan.upsertAnimals
+      : animalsWithEncodedParentComments(plan.upsertAnimals);
     await upsertRows(
       client,
       "animals",
-      plan.upsertAnimals.map((a) => animalRow(a, parentCols))
+      animalsToWrite.map((a) => animalRow(a, parentCols))
     );
-    if (!parentCols) {
-      const links = parentLinksFromAnimals(plan.upsertAnimals);
-      if (Object.keys(links).length > 0) {
-        await mergeParentLinksInStorage(client, links);
-      }
-    }
   }
   if (plan.upsertTransactions?.length) {
     await upsertRows(client, "transactions", plan.upsertTransactions.map(txRow));
