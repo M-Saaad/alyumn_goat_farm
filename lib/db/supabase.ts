@@ -13,7 +13,7 @@ import type {
   WeightLog,
 } from "../types";
 import { emptyDb } from "../db-empty";
-import { mapAnimalsWithParents, mergeParentLinksInStorage, parentLinksFromAnimals } from "../livestock/animal-parents-store";
+import { mapAnimalsWithParents, animalsWithEncodedParentComments } from "../livestock/animal-parents-store";
 import { hasAnimalParentColumns } from "./parent-columns";
 
 export function num(v: unknown): number {
@@ -458,7 +458,7 @@ export async function saveToSupabase(client: SupabaseClient, db: FarmDatabase): 
   await syncTable(
     client,
     "animals",
-    db.animals.map((a) => {
+    (parentCols ? db.animals : animalsWithEncodedParentComments(db.animals)).map((a) => {
       const row: Record<string, unknown> = {
         id: a.id,
         name: a.name,
@@ -485,13 +485,6 @@ export async function saveToSupabase(client: SupabaseClient, db: FarmDatabase): 
       return row;
     })
   );
-
-  if (!parentCols) {
-    const links = parentLinksFromAnimals(db.animals);
-    if (Object.keys(links).length > 0) {
-      await mergeParentLinksInStorage(client, links);
-    }
-  }
 
   await syncTable(
     client,
