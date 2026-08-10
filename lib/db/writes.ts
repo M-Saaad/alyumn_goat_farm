@@ -19,6 +19,8 @@ import type {
 } from "../types";
 import { createServiceClient } from "../supabase/admin";
 import { isSupabaseDb, persistDb } from "../db";
+import { hasAnimalParentColumns } from "./parent-columns";
+import { mergeParentLinksInStorage, parentLinksFromAnimals } from "../livestock/animal-parents-store";
 
 export type WritePlan = {
   upsertContacts?: Contact[];
@@ -74,8 +76,8 @@ function contactRow(c: Contact): Record<string, unknown> {
   };
 }
 
-function animalRow(a: Animal): Record<string, unknown> {
-  return {
+function animalRow(a: Animal, includeParents = true): Record<string, unknown> {
+  const row: Record<string, unknown> = {
     id: a.id,
     name: a.name,
     breed: a.breed,
@@ -90,12 +92,15 @@ function animalRow(a: Animal): Record<string, unknown> {
     purchased_from: a.purchased_from,
     owner_id: a.owner_id,
     home_bred: a.home_bred,
-    dam_id: a.dam_id,
-    sire_id: a.sire_id,
-    sire_name: a.sire_name,
     out_date: a.out_date,
     palai_rate: a.palai_rate,
   };
+  if (includeParents) {
+    row.dam_id = a.dam_id;
+    row.sire_id = a.sire_id;
+    row.sire_name = a.sire_name;
+  }
+  return row;
 }
 
 function ledgerRow(l: PartnerLedgerEntry): Record<string, unknown> {
@@ -251,7 +256,18 @@ export async function applyWritePlan(plan: WritePlan): Promise<void> {
   }
 
   if (plan.upsertAnimals?.length) {
-    await upsertRows(client, "animals", plan.upsertAnimals.map(animalRow));
+    const parentCols = await hasAnimalParentColumns(client);
+    await upsertRows(
+      client,
+      "animals",
+      plan.upsertAnimals.map((a) => animalRow(a, parentCols))
+    );
+    if (!parentCols) {
+      const links = parentLinksFromAnimals(plan.upsertAnimals);
+      if (Object.keys(links).length > 0) {
+        await mergeParentLinksInStorage(client, links);
+      }
+    }
   }
   if (plan.upsertTransactions?.length) {
     await upsertRows(client, "transactions", plan.upsertTransactions.map(txRow));

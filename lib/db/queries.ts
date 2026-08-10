@@ -36,6 +36,7 @@ import {
 } from "./supabase";
 import { getPartnerIds } from "../partner-equity/settlement";
 import { quickEntryPropsFromDb } from "../quick-entry-props";
+import { mapAnimalsWithParents } from "../livestock/animal-parents-store";
 import { computeHerdHealth, type HerdHealthData } from "../livestock/herd-health";
 import type { QuickEntryProps } from "@/components/QuickEntry";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -90,7 +91,7 @@ export const getQuickEntryData = cache(async (): Promise<QuickEntryProps> => {
     selectAll(client, "breeding_events"),
   ]);
   const db = emptyDb();
-  db.animals = animals.map(mapAnimal);
+  db.animals = await mapAnimalsWithParents(client, animals);
   db.contacts = contacts.map(mapContact);
   db.breeding_events = breeding.map(mapBreeding);
   return quickEntryPropsFromDb(db);
@@ -159,7 +160,7 @@ export const loadAnimalsListData = cache(async (): Promise<AnimalsListData> => {
     selectAll(client, "breeding_events"),
   ]);
 
-  const mappedAnimals = animals.map(mapAnimal);
+  const mappedAnimals = await mapAnimalsWithParents(client, animals);
   const mappedContacts = contacts.map(mapContact);
   const mappedBreeding = breeding.map(mapBreeding);
   const db = emptyDb();
@@ -339,7 +340,9 @@ export const loadAnimalProfileData = cache(
       }
     }
 
-    const animal = mapAnimal(animalRow);
+    const mappedAllAnimals = await mapAnimalsWithParents(client, allAnimals);
+    const animal = mappedAllAnimals.find((a) => a.id === animalId);
+    if (!animal) return null;
     const miniDb = emptyDb();
     miniDb.animals = [animal];
     miniDb.transactions = [...txById.values()];
@@ -350,7 +353,7 @@ export const loadAnimalProfileData = cache(
 
     return {
       animal,
-      animals: allAnimals.map(mapAnimal),
+      animals: mappedAllAnimals,
       contacts: contacts.map(mapContact),
       medical_events: medical.map(mapMedical),
       breeding_events: breeding.map(mapBreeding),
@@ -398,7 +401,7 @@ export const loadTransactionsData = cache(async (): Promise<TransactionsData> =>
     selectAll(client, "breeding_events"),
   ]);
 
-  const mappedAnimals = animals.map(mapAnimal);
+  const mappedAnimals = await mapAnimalsWithParents(client, animals);
   const mappedContacts = contacts.map(mapContact);
   const db = emptyDb();
   db.animals = mappedAnimals;
@@ -443,7 +446,7 @@ export const loadHerdHealthData = cache(async (): Promise<HerdHealthPageData> =>
     selectAll(client, "contacts"),
   ]);
 
-  const mappedAnimals = animals.map(mapAnimal);
+  const mappedAnimals = await mapAnimalsWithParents(client, animals);
   const db = emptyDb();
   db.animals = mappedAnimals;
   db.contacts = contacts.map(mapContact);
