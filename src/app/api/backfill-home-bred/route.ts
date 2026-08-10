@@ -32,9 +32,7 @@ export async function POST(req: Request) {
   }
 
   const targets = (data ?? []).filter(
-    (a) =>
-      !a.home_bred &&
-      (BORN_ANIMAL_IDS.includes(a.id) || (a.price === 0 && !a.purchased_from))
+    (a) => BORN_ANIMAL_IDS.includes(a.id) && !a.home_bred
   );
 
   if (targets.length === 0) {
