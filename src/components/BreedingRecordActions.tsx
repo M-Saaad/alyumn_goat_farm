@@ -33,6 +33,7 @@ export function BreedingRecordActions({
       expected_due_date: event.expected_due_date,
       delivered_date: event.delivered_date,
       ultrasound_date: event.ultrasound_date,
+      fetus_count: event.fetus_count,
       outcome: event.outcome,
       status: event.status,
       notes: event.notes,
@@ -43,6 +44,7 @@ export function BreedingRecordActions({
       <UltrasoundStatusLine
         ultrasoundStatus={ultrasoundStatus}
         ultrasoundDate={event.ultrasound_date}
+        fetusCount={event.fetus_count}
         daysSinceCrossed={daysSinceCrossed}
         showWhenIdle={canRecord}
       />
@@ -67,7 +69,7 @@ export function BreedingRecordActions({
           breedingId={event.id}
           femaleId={event.femaleId}
           defaultUltrasoundDate={event.ultrasound_date}
-          defaultStatus={event.status}
+          defaultFetusCount={event.fetus_count}
           supabaseEnabled={supabaseEnabled}
           onDone={() => setRecording(false)}
         />

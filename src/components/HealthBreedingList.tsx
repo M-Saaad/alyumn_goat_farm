@@ -82,6 +82,7 @@ export function HealthBreedingList({
                   <UltrasoundStatusLine
                     ultrasoundStatus={b.ultrasoundStatus}
                     ultrasoundDate={b.event.ultrasound_date}
+                    fetusCount={b.event.fetus_count}
                     daysSinceCrossed={b.daysSinceCrossed}
                     showWhenIdle={canRecord}
                   />
@@ -103,7 +104,7 @@ export function HealthBreedingList({
                 breedingId={b.event.id}
                 femaleId={b.event.female_animal_id}
                 defaultUltrasoundDate={b.event.ultrasound_date}
-                defaultStatus={b.event.status}
+                defaultFetusCount={b.event.fetus_count}
                 supabaseEnabled={supabaseEnabled}
                 onDone={() => setRecordingId(null)}
               />

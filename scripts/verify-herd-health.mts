@@ -8,6 +8,7 @@ import {
 import {
   computeUltrasoundStatus,
   needsUltrasound,
+  ultrasoundConfirmedText,
   ULTRASOUND_WINDOW_END_DAYS,
   ULTRASOUND_WINDOW_START_DAYS,
 } from "../lib/livestock/breeding.ts";
@@ -127,6 +128,7 @@ function breedingEvent(
     expected_due_date: "2026-09-28",
     delivered_date: null,
     ultrasound_date: null,
+    fetus_count: null,
     outcome: "Pending",
     status: "Doubt",
     notes: null,
@@ -173,6 +175,30 @@ const confirmed = breedingEvent({
 assert(
   computeUltrasoundStatus(confirmed, ultrasoundToday) === "confirmed",
   "ultrasound date set should be confirmed"
+);
+
+const confirmedTwins = breedingEvent({
+  id: "br-5",
+  female_animal_id: 6,
+  ultrasound_date: "2026-06-10",
+  fetus_count: 2,
+});
+assert(
+  ultrasoundConfirmedText(confirmedTwins.ultrasound_date, confirmedTwins.fetus_count) ===
+    "Confirmed · 2 kids · Ultrasound 2026-06-10",
+  "confirmed twins text"
+);
+
+const notPregnant = breedingEvent({
+  id: "br-6",
+  female_animal_id: 7,
+  ultrasound_date: "2026-06-10",
+  fetus_count: 0,
+});
+assert(
+  ultrasoundConfirmedText(notPregnant.ultrasound_date, notPregnant.fetus_count) ===
+    "Not pregnant · Ultrasound 2026-06-10",
+  "not pregnant text"
 );
 
 const herdUltrasound = computeHerdHealth({

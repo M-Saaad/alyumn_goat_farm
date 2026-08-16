@@ -589,6 +589,7 @@ export async function recordBreeding(input: {
     expected_due_date: expectedDueDate(input.dateCrossed),
     delivered_date: null,
     ultrasound_date: null,
+    fetus_count: null,
     outcome: "Pending" as const,
     status: "Doubt" as const,
     notes: input.notes || null,
@@ -613,6 +614,7 @@ export async function updateBreeding(input: {
   status: BreedingStatus | "";
   deliveredDate?: string | null;
   ultrasoundDate?: string | null;
+  fetusCount?: number | null;
   notes?: string | null;
 }) {
   const before = await fetchDb();
@@ -648,6 +650,8 @@ export async function updateBreeding(input: {
     input.ultrasoundDate !== undefined
       ? input.ultrasoundDate?.trim() || null
       : existing.ultrasound_date;
+  const fetusCount =
+    input.fetusCount !== undefined ? input.fetusCount : existing.fetus_count;
   if (ultrasoundDate && (resolvedStatus === "Doubt" || !resolvedStatus)) {
     resolvedStatus = "Ready";
   }
@@ -664,6 +668,7 @@ export async function updateBreeding(input: {
     expected_due_date: expectedDueDate(input.dateCrossed),
     delivered_date: nextOutcome === "Delivered" ? deliveredDate : null,
     ultrasound_date: ultrasoundDate,
+    fetus_count: fetusCount,
     outcome: resolvedOutcome,
     status: resolvedStatus,
     notes: input.notes?.trim() || null,
@@ -701,6 +706,7 @@ export async function recordBreedingUltrasound(input: {
   femaleId: number;
   ultrasoundDate: string;
   status?: BreedingStatus | "";
+  fetusCount?: number | null;
   file?: File | null;
 }) {
   const before = await fetchDb();
@@ -725,6 +731,7 @@ export async function recordBreedingUltrasound(input: {
   const updated = {
     ...existing,
     ultrasound_date: ultrasoundDate,
+    fetus_count: input.fetusCount !== undefined ? input.fetusCount : existing.fetus_count,
     status: resolvedStatus,
     outcome,
   };

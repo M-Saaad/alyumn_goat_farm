@@ -217,6 +217,7 @@ export async function actionUpdateBreeding(formData: FormData) {
   const statusRaw = String(formData.get("status") || "").trim();
   const deliveredRaw = String(formData.get("deliveredDate") || "").trim();
   const ultrasoundRaw = String(formData.get("ultrasoundDate") || "").trim();
+  const fetusRaw = String(formData.get("fetusCount") || "").trim();
   await updateBreeding({
     id: String(formData.get("id")),
     buckName: String(formData.get("buckName") || ""),
@@ -226,6 +227,7 @@ export async function actionUpdateBreeding(formData: FormData) {
     status: statusRaw as import("@/lib/types").BreedingStatus | "",
     deliveredDate: deliveredRaw || null,
     ultrasoundDate: ultrasoundRaw || null,
+    fetusCount: fetusRaw === "" ? null : Number(fetusRaw),
     notes: String(formData.get("notes") || "") || null,
   });
   const femaleId = Number(formData.get("femaleId"));
@@ -238,11 +240,26 @@ export async function actionUpdateBreeding(formData: FormData) {
 export async function actionRecordBreedingUltrasound(formData: FormData) {
   const file = formData.get("file");
   const statusRaw = String(formData.get("status") || "").trim();
+  const pregnancyResult = String(formData.get("pregnancyResult") || "").trim();
+  const kidCountRaw = String(formData.get("kidCount") || "").trim();
+
+  let fetusCount: number | null = null;
+  if (pregnancyResult === "confirmed") {
+    const count = Number(kidCountRaw);
+    if (!kidCountRaw || Number.isNaN(count) || count < 1) {
+      throw new Error("Number of kids is required when pregnancy is confirmed");
+    }
+    fetusCount = count;
+  } else if (pregnancyResult === "not_pregnant") {
+    fetusCount = 0;
+  }
+
   await recordBreedingUltrasound({
     id: String(formData.get("id")),
     femaleId: Number(formData.get("femaleId")),
     ultrasoundDate: String(formData.get("ultrasoundDate")),
     status: statusRaw as import("@/lib/types").BreedingStatus | "",
+    fetusCount,
     file: file instanceof File && file.size > 0 ? file : null,
   });
   const femaleId = Number(formData.get("femaleId"));

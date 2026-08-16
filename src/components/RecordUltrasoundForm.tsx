@@ -4,32 +4,40 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { actionRecordBreedingUltrasound } from "@/lib/server-actions";
 import { todayIso } from "@/lib/format";
-import type { BreedingStatus } from "@/lib/types";
 
 const field =
   "mt-1 w-full rounded-xl border border-stone-300 bg-white px-3 py-2 text-base text-stone-900 outline-none focus:border-emerald-600";
 const labelCls = "block text-sm font-medium text-stone-700";
 
-const STATUSES: BreedingStatus[] = ["Ready", "Doubt", "Delivered", "Kid"];
+type PregnancyResult = "confirmed" | "not_pregnant" | "unknown";
+
+function defaultPregnancyResult(fetusCount?: number | null): PregnancyResult {
+  if (fetusCount === 0) return "not_pregnant";
+  if (fetusCount != null && fetusCount > 0) return "confirmed";
+  return "unknown";
+}
 
 export function RecordUltrasoundForm({
   breedingId,
   femaleId,
   defaultUltrasoundDate,
-  defaultStatus,
+  defaultFetusCount,
   supabaseEnabled,
   onDone,
 }: {
   breedingId: string;
   femaleId: number;
   defaultUltrasoundDate?: string | null;
-  defaultStatus?: BreedingStatus | null;
+  defaultFetusCount?: number | null;
   supabaseEnabled: boolean;
   onDone?: () => void;
 }) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [pregnancyResult, setPregnancyResult] = useState<PregnancyResult>(
+    defaultPregnancyResult(defaultFetusCount)
+  );
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -52,6 +60,7 @@ export function RecordUltrasoundForm({
     <form onSubmit={onSubmit} className="mt-2 space-y-2 rounded-xl bg-stone-50 p-3 ring-1 ring-stone-100">
       <input type="hidden" name="id" value={breedingId} />
       <input type="hidden" name="femaleId" value={femaleId} />
+      <input type="hidden" name="status" value="Ready" />
       <p className="text-sm font-semibold text-stone-800">Record ultrasound</p>
       <div>
         <label className={labelCls}>Ultrasound date</label>
@@ -64,13 +73,39 @@ export function RecordUltrasoundForm({
         />
       </div>
       <div>
-        <label className={labelCls}>Status</label>
-        <select name="status" className={field} defaultValue={defaultStatus ?? "Ready"}>
-          {STATUSES.map((s) => (
-            <option key={s} value={s}>{s}</option>
-          ))}
+        <label className={labelCls}>Pregnancy result</label>
+        <select
+          name="pregnancyResult"
+          className={field}
+          value={pregnancyResult}
+          onChange={(e) => setPregnancyResult(e.target.value as PregnancyResult)}
+          required
+        >
+          <option value="unknown">Unknown / not recorded</option>
+          <option value="confirmed">Confirmed pregnant</option>
+          <option value="not_pregnant">Not pregnant</option>
         </select>
       </div>
+      {pregnancyResult === "confirmed" && (
+        <div>
+          <label className={labelCls}>Number of kids</label>
+          <select
+            name="kidCount"
+            className={field}
+            required
+            defaultValue={
+              defaultFetusCount != null && defaultFetusCount > 0
+                ? String(Math.min(defaultFetusCount, 4))
+                : "1"
+            }
+          >
+            <option value="1">1 kid</option>
+            <option value="2">2 kids</option>
+            <option value="3">3 kids</option>
+            <option value="4">4+ kids</option>
+          </select>
+        </div>
+      )}
       {supabaseEnabled ? (
         <div>
           <label className={labelCls}>Ultrasound video (optional)</label>

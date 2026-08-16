@@ -1,5 +1,9 @@
 import { formatDate } from "@/lib/format";
-import { ultrasoundStatusText, type UltrasoundStatus } from "@/lib/livestock/breeding";
+import {
+  ultrasoundConfirmedText,
+  ultrasoundStatusText,
+  type UltrasoundStatus,
+} from "@/lib/livestock/breeding";
 
 const colorClass: Record<UltrasoundStatus, string> = {
   not_due: "text-stone-500",
@@ -11,11 +15,13 @@ const colorClass: Record<UltrasoundStatus, string> = {
 export function UltrasoundStatusLine({
   ultrasoundStatus,
   ultrasoundDate,
+  fetusCount,
   daysSinceCrossed,
   showWhenIdle = false,
 }: {
   ultrasoundStatus: UltrasoundStatus;
   ultrasoundDate: string | null;
+  fetusCount?: number | null;
   daysSinceCrossed: number | null;
   /** Show early/window/overdue lines; confirmed always shown when set. */
   showWhenIdle?: boolean;
@@ -23,13 +29,18 @@ export function UltrasoundStatusLine({
   if (ultrasoundStatus === "confirmed" && ultrasoundDate) {
     return (
       <p className={`text-sm font-medium ${colorClass.confirmed}`}>
-        Ultrasound {formatDate(ultrasoundDate)}
+        {ultrasoundConfirmedText(ultrasoundDate, fetusCount ?? null)}
       </p>
     );
   }
 
   if (!showWhenIdle && ultrasoundStatus === "not_due") return null;
 
-  const text = ultrasoundStatusText(ultrasoundStatus, ultrasoundDate, daysSinceCrossed);
+  const text = ultrasoundStatusText(
+    ultrasoundStatus,
+    ultrasoundDate,
+    daysSinceCrossed,
+    fetusCount ?? null
+  );
   return <p className={`text-sm font-medium ${colorClass[ultrasoundStatus]}`}>{text}</p>;
 }

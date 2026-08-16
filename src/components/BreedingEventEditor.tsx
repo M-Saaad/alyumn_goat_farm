@@ -30,6 +30,7 @@ export type BreedingEditorEvent = {
   expected_due_date: string | null;
   delivered_date: string | null;
   ultrasound_date: string | null;
+  fetus_count: number | null;
   outcome: BreedingOutcome;
   status: BreedingStatus | null;
   notes: string | null;
@@ -105,6 +106,21 @@ export function BreedingEventEditor({
             defaultValue={event.ultrasound_date?.slice(0, 10) ?? ""}
           />
           <p className="mt-1 text-xs text-stone-500">Ideal window is day 40–75 after crossing.</p>
+        </div>
+        <div>
+          <label className={labelCls}>Kids on ultrasound</label>
+          <input
+            className={field}
+            name="fetusCount"
+            type="number"
+            min={0}
+            max={10}
+            placeholder="Blank = unknown, 0 = not pregnant"
+            defaultValue={event.fetus_count ?? ""}
+          />
+          <p className="mt-1 text-xs text-stone-500">
+            Confirmed pregnancy count from ultrasound. Leave blank if unknown.
+          </p>
         </div>
         <div>
           <label className={labelCls}>Outcome</label>
