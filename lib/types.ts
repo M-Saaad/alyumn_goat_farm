@@ -142,6 +142,8 @@ export interface BreedingEvent {
   expected_due_date: string | null;
   delivered_date: string | null;
   ultrasound_date: string | null;
+  /** Kids seen on ultrasound: null = unknown, 0 = not pregnant, 1+ = confirmed count. */
+  fetus_count: number | null;
   outcome: BreedingOutcome;
   status: BreedingStatus | null;
   notes: string | null;

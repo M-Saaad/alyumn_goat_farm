@@ -320,6 +320,7 @@ export default async function AnimalProfilePage({
                 </p>
                 {b.notes && <p className="text-xs text-stone-500">{b.notes}</p>}
                 <BreedingRecordActions
+                  femaleLabel={animalLabel(animal)}
                   event={{
                     id: b.id,
                     femaleId: animalId,
@@ -329,6 +330,7 @@ export default async function AnimalProfilePage({
                     expected_due_date: b.expected_due_date,
                     delivered_date: b.delivered_date,
                     ultrasound_date: b.ultrasound_date,
+                    fetus_count: b.fetus_count,
                     outcome: b.outcome,
                     status: b.status,
                     notes: b.notes,

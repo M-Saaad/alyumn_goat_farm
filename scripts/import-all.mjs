@@ -256,6 +256,7 @@ for (const row of bBody) {
     expected_due_date: expected,
     delivered_date: parseNotionDate(row[bI["Delivered Date"]]),
     ultrasound_date: ultrasoundDate,
+    fetus_count: null,
     outcome: status === "Delivered" ? "Delivered" : status === "Doubt" ? "Doubt" : "Pending",
     status,
     notes: (row[bI.Comments] || "").trim() || null,

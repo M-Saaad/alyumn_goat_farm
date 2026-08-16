@@ -50,16 +50,33 @@ export function needsUltrasound(event: BreedingEvent, today: string): boolean {
 export function ultrasoundStatusText(
   status: UltrasoundStatus,
   ultrasoundDate: string | null,
-  daysSinceCrossed: number | null
+  daysSinceCrossed: number | null,
+  fetusCount?: number | null
 ): string {
   if (status === "confirmed" && ultrasoundDate) {
-    return `Ultrasound ${ultrasoundDate.slice(0, 10)}`;
+    return ultrasoundConfirmedText(ultrasoundDate, fetusCount ?? null);
   }
   const day = daysSinceCrossed != null ? `day ${daysSinceCrossed}` : "";
   if (status === "not_due") return `Ultrasound · early · ${day}`.trim();
   if (status === "in_window") return `Ultrasound · in window · ${day}`.trim();
   if (status === "overdue") return `Ultrasound · overdue · ${day}`.trim();
   return "Ultrasound";
+}
+
+export function formatKidCount(count: number): string {
+  return count === 1 ? "1 kid" : `${count} kids`;
+}
+
+export function ultrasoundConfirmedText(
+  ultrasoundDate: string | null,
+  fetusCount: number | null
+): string {
+  const datePart = ultrasoundDate ? `Ultrasound ${ultrasoundDate.slice(0, 10)}` : "Ultrasound";
+  if (fetusCount === 0) return `Not pregnant · ${datePart}`;
+  if (fetusCount != null && fetusCount > 0) {
+    return `Confirmed · ${formatKidCount(fetusCount)} · ${datePart}`;
+  }
+  return datePart;
 }
 
 /** Active pregnancy / not yet closed out — matches Goats "Breeding" filter. */
