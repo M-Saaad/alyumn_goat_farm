@@ -44,6 +44,7 @@ import type {
   MedicalEventType,
   BreedingOutcome,
   BreedingStatus,
+  BreedingEvent,
 } from "./types";
 import { animalLabel } from "./labels";
 import { uploadAnimalMedia } from "./media/upload";
@@ -701,6 +702,63 @@ export async function deleteBreeding(id: string) {
   return persistMutation(before, after);
 }
 
+export async function recordBreedingUltrasounds(input: {
+  records: Array<{ id: string; femaleId: number }>;
+  ultrasoundDate: string;
+  status?: BreedingStatus | "";
+  fetusCount?: number | null;
+  file?: File | null;
+}) {
+  if (input.records.length === 0) {
+    throw new Error("Select at least one goat to record ultrasound");
+  }
+
+  const ultrasoundDate = input.ultrasoundDate.trim().slice(0, 10);
+  if (!ultrasoundDate) throw new Error("Ultrasound date is required");
+
+  const before = await fetchDb();
+  const resolvedStatus: BreedingStatus = (input.status?.trim() as BreedingStatus) || "Ready";
+  const updated: BreedingEvent[] = [];
+
+  for (const record of input.records) {
+    const existing = before.breeding_events.find((b) => b.id === record.id);
+    if (!existing) throw new Error("Breeding record not found");
+    if (existing.female_animal_id !== record.femaleId) {
+      throw new Error("Breeding record does not match selected goat");
+    }
+
+    if (input.file?.size) {
+      await uploadAnimalMedia({
+        animalId: record.femaleId,
+        file: input.file,
+        caption: `Ultrasound ${ultrasoundDate}`,
+      });
+    }
+
+    let outcome: BreedingOutcome = existing.outcome;
+    if (outcome === "Doubt") outcome = "Pending";
+
+    updated.push({
+      ...existing,
+      ultrasound_date: ultrasoundDate,
+      fetus_count: input.fetusCount !== undefined ? input.fetusCount : existing.fetus_count,
+      status: resolvedStatus,
+      outcome,
+    });
+  }
+
+  const updatedById = new Map(updated.map((b) => [b.id, b]));
+  const after = {
+    ...before,
+    breeding_events: before.breeding_events.map((b) => updatedById.get(b.id) ?? b),
+  };
+  if (isSupabaseDb()) {
+    await applyWritePlan({ upsertBreeding: updated });
+    return after;
+  }
+  return persistMutation(before, after);
+}
+
 export async function recordBreedingUltrasound(input: {
   id: string;
   femaleId: number;
@@ -709,42 +767,13 @@ export async function recordBreedingUltrasound(input: {
   fetusCount?: number | null;
   file?: File | null;
 }) {
-  const before = await fetchDb();
-  const existing = before.breeding_events.find((b) => b.id === input.id);
-  if (!existing) throw new Error("Breeding record not found");
-
-  const ultrasoundDate = input.ultrasoundDate.trim().slice(0, 10);
-  if (!ultrasoundDate) throw new Error("Ultrasound date is required");
-
-  if (input.file?.size) {
-    await uploadAnimalMedia({
-      animalId: input.femaleId,
-      file: input.file,
-      caption: `Ultrasound ${ultrasoundDate}`,
-    });
-  }
-
-  const resolvedStatus: BreedingStatus = (input.status?.trim() as BreedingStatus) || "Ready";
-  let outcome: BreedingOutcome = existing.outcome;
-  if (outcome === "Doubt") outcome = "Pending";
-
-  const updated = {
-    ...existing,
-    ultrasound_date: ultrasoundDate,
-    fetus_count: input.fetusCount !== undefined ? input.fetusCount : existing.fetus_count,
-    status: resolvedStatus,
-    outcome,
-  };
-
-  const after = {
-    ...before,
-    breeding_events: before.breeding_events.map((b) => (b.id === updated.id ? updated : b)),
-  };
-  if (isSupabaseDb()) {
-    await applyWritePlan({ upsertBreeding: [updated] });
-    return after;
-  }
-  return persistMutation(before, after);
+  return recordBreedingUltrasounds({
+    records: [{ id: input.id, femaleId: input.femaleId }],
+    ultrasoundDate: input.ultrasoundDate,
+    status: input.status,
+    fetusCount: input.fetusCount,
+    file: input.file,
+  });
 }
 
 export async function updatePalai(input: {

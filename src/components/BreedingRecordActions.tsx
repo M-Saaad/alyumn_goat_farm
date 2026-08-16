@@ -3,12 +3,13 @@
 import { useState } from "react";
 import { isBreedingInPipeline } from "@/lib/livestock/breeding";
 import { BreedingEventEditor, type BreedingEditorEvent } from "@/components/BreedingEventEditor";
-import { RecordUltrasoundForm } from "@/components/RecordUltrasoundForm";
+import { RecordUltrasoundForm, type UltrasoundTarget } from "@/components/RecordUltrasoundForm";
 import { UltrasoundStatusLine } from "@/components/UltrasoundStatusLine";
 import type { UltrasoundStatus } from "@/lib/livestock/breeding";
 
 export function BreedingRecordActions({
   event,
+  femaleLabel,
   ultrasoundStatus,
   daysSinceCrossed,
   maleAnimals,
@@ -16,6 +17,7 @@ export function BreedingRecordActions({
   supabaseEnabled,
 }: {
   event: BreedingEditorEvent;
+  femaleLabel: string;
   ultrasoundStatus: UltrasoundStatus;
   daysSinceCrossed: number | null;
   maleAnimals: { id: number; label: string }[];
@@ -66,8 +68,14 @@ export function BreedingRecordActions({
       </div>
       {recording && (
         <RecordUltrasoundForm
-          breedingId={event.id}
-          femaleId={event.femaleId}
+          eligible={[
+            {
+              breedingId: event.id,
+              femaleId: event.femaleId,
+              label: femaleLabel,
+            } satisfies UltrasoundTarget,
+          ]}
+          defaultSelectedBreedingIds={[event.id]}
           defaultUltrasoundDate={event.ultrasound_date}
           defaultFetusCount={event.fetus_count}
           supabaseEnabled={supabaseEnabled}
