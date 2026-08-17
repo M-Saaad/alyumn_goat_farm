@@ -17,7 +17,7 @@ import {
 import { DeleteAnimalButton } from "@/components/DeleteAnimalButton";
 import { BreedingRecordActions } from "@/components/BreedingRecordActions";
 import { backFromAnimalProfile } from "@/lib/livestock/health-nav";
-import { computeUltrasoundStatus, daysSinceCrossed } from "@/lib/livestock/breeding";
+import { computeUltrasoundStatus, daysSinceCrossed, breedingRecordStatusLabel } from "@/lib/livestock/breeding";
 import { estimateAnimalAge } from "@/lib/livestock/age";
 
 export const dynamic = "force-dynamic";
@@ -313,7 +313,7 @@ export default async function AnimalProfilePage({
               return (
               <li key={b.id} className="border-b border-stone-100 pb-2">
                 <p className="font-medium">
-                  {b.buck_name || "Unknown buck"} · {b.status || b.outcome}
+                  {b.buck_name || "Unknown buck"} · {breedingRecordStatusLabel(b)}
                 </p>
                 <p className="text-stone-500">
                   Crossed {formatDate(b.date_crossed)} · Due {formatDate(b.expected_due_date)}

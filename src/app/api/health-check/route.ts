@@ -7,6 +7,7 @@ import {
   loadTransactionsData,
 } from "@/lib/db/queries";
 import { isSupabaseDb } from "@/lib/db";
+import { createServiceClient } from "@/lib/supabase/admin";
 
 export const dynamic = "force-dynamic";
 
@@ -60,6 +61,24 @@ export async function GET() {
     checks.env_anon === "set" &&
     (checks.mode === "json" || checks.env_service === "set");
 
-  const ok = loadersOk && envOk;
+  if (checks.mode === "supabase") {
+    try {
+      const client = createServiceClient();
+      const { error } = await client
+        .from("breeding_events")
+        .select("ultrasound_date, fetus_count")
+        .limit(1);
+      checks.breeding_ultrasound_schema = error ? error.message : "ok";
+    } catch (e) {
+      checks.breeding_ultrasound_schema = e instanceof Error ? e.message : "error";
+    }
+  } else {
+    checks.breeding_ultrasound_schema = "n/a";
+  }
+
+  const ok =
+    loadersOk &&
+    envOk &&
+    (checks.breeding_ultrasound_schema === "ok" || checks.breeding_ultrasound_schema === "n/a");
   return NextResponse.json({ ok, checks }, { status: ok ? 200 : 500 });
 }

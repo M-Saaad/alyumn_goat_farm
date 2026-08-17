@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { isBreedingInPipeline } from "@/lib/livestock/breeding";
+import { isBreedingInPipeline, hasDefinitiveUltrasoundResult } from "@/lib/livestock/breeding";
 import { BreedingEventEditor, type BreedingEditorEvent } from "@/components/BreedingEventEditor";
 import { RecordUltrasoundForm } from "@/components/RecordUltrasoundForm";
 import { UltrasoundStatusLine } from "@/components/UltrasoundStatusLine";
@@ -23,21 +23,24 @@ export function BreedingRecordActions({
   supabaseEnabled: boolean;
 }) {
   const [recording, setRecording] = useState(false);
+  const breedingEvent = {
+    id: event.id,
+    female_animal_id: event.femaleId,
+    male_animal_id: event.male_animal_id,
+    buck_name: event.buck_name,
+    date_crossed: event.date_crossed,
+    expected_due_date: event.expected_due_date,
+    delivered_date: event.delivered_date,
+    ultrasound_date: event.ultrasound_date,
+    fetus_count: event.fetus_count,
+    outcome: event.outcome,
+    status: event.status,
+    notes: event.notes,
+  };
   const canRecord =
-    isBreedingInPipeline({
-      id: event.id,
-      female_animal_id: event.femaleId,
-      male_animal_id: event.male_animal_id,
-      buck_name: event.buck_name,
-      date_crossed: event.date_crossed,
-      expected_due_date: event.expected_due_date,
-      delivered_date: event.delivered_date,
-      ultrasound_date: event.ultrasound_date,
-      fetus_count: event.fetus_count,
-      outcome: event.outcome,
-      status: event.status,
-      notes: event.notes,
-    }) && Boolean(event.date_crossed);
+    isBreedingInPipeline(breedingEvent) &&
+    Boolean(event.date_crossed) &&
+    !hasDefinitiveUltrasoundResult(breedingEvent);
 
   return (
     <div className="mt-1">

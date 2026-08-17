@@ -6,15 +6,26 @@ import type { MediaType } from "../types";
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 const MAX_VIDEO_BYTES = 50 * 1024 * 1024;
 
-function mediaTypeFromMime(mime: string): MediaType {
+const VIDEO_EXTENSIONS = new Set(["mp4", "webm", "mov", "m4v", "3gp", "mkv"]);
+const IMAGE_EXTENSIONS = new Set(["jpg", "jpeg", "png", "webp", "gif"]);
+
+function extensionFromName(name: string): string {
+  const fromName = name.includes(".") ? name.split(".").pop()!.toLowerCase() : "";
+  return fromName && /^[a-z0-9]+$/.test(fromName) ? fromName : "";
+}
+
+function mediaTypeFromFile(mime: string, filename: string): MediaType {
   if (mime.startsWith("video/")) return "video";
   if (mime.startsWith("image/")) return "image";
+  const ext = extensionFromName(filename);
+  if (VIDEO_EXTENSIONS.has(ext)) return "video";
+  if (IMAGE_EXTENSIONS.has(ext)) return "image";
   throw new Error("Only image and video uploads are supported");
 }
 
 function extFromName(name: string, mime: string): string {
-  const fromName = name.includes(".") ? name.split(".").pop()!.toLowerCase() : "";
-  if (fromName && /^[a-z0-9]+$/.test(fromName)) return fromName;
+  const ext = extensionFromName(name);
+  if (ext) return ext;
   if (mime === "image/jpeg") return "jpg";
   if (mime === "image/png") return "png";
   if (mime === "image/webp") return "webp";
@@ -34,7 +45,7 @@ export async function uploadAnimalMedia(input: {
   }
 
   const mime = input.file.type || "application/octet-stream";
-  const mediaType = mediaTypeFromMime(mime);
+  const mediaType = mediaTypeFromFile(mime, input.file.name);
   const max = mediaType === "video" ? MAX_VIDEO_BYTES : MAX_IMAGE_BYTES;
   if (input.file.size > max) {
     throw new Error(

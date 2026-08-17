@@ -11,6 +11,10 @@ This app needs Postgres + auth for production. Local JSON (`data/farm.db.json`) 
    - [`supabase/migrations/003_drop_customer_wallet.sql`](supabase/migrations/003_drop_customer_wallet.sql)
    - [`supabase/migrations/004_installments.sql`](supabase/migrations/004_installments.sql)
    - [`supabase/migrations/005_palai_service_month.sql`](supabase/migrations/005_palai_service_month.sql)
+   - [`supabase/migrations/006_breeding_ultrasound_date.sql`](supabase/migrations/006_breeding_ultrasound_date.sql)
+   - [`supabase/migrations/007_backfill_settled_purchases.sql`](supabase/migrations/007_backfill_settled_purchases.sql)
+   - [`supabase/migrations/008_animal_parents.sql`](supabase/migrations/008_animal_parents.sql)
+   - [`supabase/migrations/009_breeding_fetus_count.sql`](supabase/migrations/009_breeding_fetus_count.sql)
 3. Confirm Storage bucket `animal-media` exists (created by migration 002).
 4. Copy from **Project Settings → API**:
    - Project URL → `NEXT_PUBLIC_SUPABASE_URL`
@@ -62,6 +66,8 @@ SUPABASE_SERVICE_ROLE_KEY=...
 - [ ] Quick Entry expense/sale/Palai persists after refresh
 - [ ] Animal profile shows linked transactions
 - [ ] Photo/video upload works on a goat profile
+- [ ] Herd Health → Breeding → record ultrasound saves without error
+- [ ] `/api/health-check` returns `"breeding_ultrasound_schema": "ok"` in production
 
 ## Auth redirect URL
 

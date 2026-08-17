@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { formatDate } from "@/lib/format";
 import { animalLinkFromHealth } from "@/lib/livestock/health-nav";
-import { isBreedingInPipeline } from "@/lib/livestock/breeding";
+import { isBreedingInPipeline, hasDefinitiveUltrasoundResult } from "@/lib/livestock/breeding";
 import type { BreedingRow } from "@/lib/livestock/herd-health";
 import { UltrasoundStatusLine } from "@/components/UltrasoundStatusLine";
 import { RecordUltrasoundForm } from "@/components/RecordUltrasoundForm";
@@ -49,7 +49,9 @@ export function HealthBreedingList({
     <ul className="divide-y divide-stone-100">
       {rows.map((b) => {
         const canRecord =
-          isBreedingInPipeline(b.event) && Boolean(b.event.date_crossed);
+          isBreedingInPipeline(b.event) &&
+          Boolean(b.event.date_crossed) &&
+          !hasDefinitiveUltrasoundResult(b.event);
         const showUltrasound =
           canRecord || b.ultrasoundStatus === "confirmed";
 

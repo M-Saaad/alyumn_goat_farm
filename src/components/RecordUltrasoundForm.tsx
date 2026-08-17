@@ -48,7 +48,11 @@ export function RecordUltrasoundForm({
     const form = e.currentTarget;
     const fd = new FormData(form);
     try {
-      await actionRecordBreedingUltrasound(fd);
+      const result = await actionRecordBreedingUltrasound(fd);
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
       router.refresh();
       onDone?.();
     } catch (err) {
@@ -62,7 +66,6 @@ export function RecordUltrasoundForm({
     <form onSubmit={onSubmit} className="mt-2 space-y-2 rounded-xl bg-stone-50 p-3 ring-1 ring-stone-100">
       <input type="hidden" name="id" value={breedingId} />
       <input type="hidden" name="femaleId" value={femaleId} />
-      <input type="hidden" name="status" value="Ready" />
       <p className="text-sm font-semibold text-stone-800">Record ultrasound</p>
       <div>
         <label className={labelCls}>Ultrasound date</label>
@@ -125,7 +128,7 @@ export function RecordUltrasoundForm({
             className={field}
             type="file"
             name="file"
-            accept="video/mp4,video/webm,video/quicktime"
+            accept="video/mp4,video/webm,video/quicktime,video/*,.mp4,.mov,.webm,.m4v,.3gp"
           />
           <p className="mt-1 text-xs text-stone-500">MP4, WebM, or MOV up to 50MB</p>
         </div>

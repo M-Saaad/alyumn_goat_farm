@@ -39,6 +39,26 @@ function revalidateTxnPaths() {
   revalidatePath("/health");
 }
 
+export type UltrasoundActionResult = { ok: true } | { ok: false; error: string };
+
+function friendlyUltrasoundError(err: unknown): string {
+  const message = err instanceof Error ? err.message : "Could not save ultrasound";
+  const lower = message.toLowerCase();
+  if (lower.includes("ultrasound_date") || lower.includes("fetus_count")) {
+    return "Database is missing ultrasound columns. In Supabase SQL Editor, run migrations 006_breeding_ultrasound_date.sql and 009_breeding_fetus_count.sql (see DEPLOY.md).";
+  }
+  if (lower.includes("supabase_service_role_key")) {
+    return "Server is missing SUPABASE_SERVICE_ROLE_KEY. Add it in Vercel environment variables.";
+  }
+  if (lower.includes("upload failed") || lower.includes("bucket")) {
+    return message;
+  }
+  if (lower.includes("only image and video uploads are supported")) {
+    return "Could not upload that file. Use MP4, WebM, or MOV video.";
+  }
+  return message;
+}
+
 export async function actionLogExpense(formData: FormData) {
   const date = String(formData.get("date") || "").trim();
   const amountRaw = String(formData.get("amount") || "").trim();
@@ -237,40 +257,45 @@ export async function actionUpdateBreeding(formData: FormData) {
   revalidateTxnPaths();
 }
 
-export async function actionRecordBreedingUltrasound(formData: FormData) {
-  const file = formData.get("file");
-  const statusRaw = String(formData.get("status") || "").trim();
-  const pregnancyResult = String(formData.get("pregnancyResult") || "").trim();
-  const kidCountRaw = String(formData.get("kidCount") || "").trim();
-  const comments = String(formData.get("comments") || "").trim();
+export async function actionRecordBreedingUltrasound(
+  formData: FormData
+): Promise<UltrasoundActionResult> {
+  try {
+    const file = formData.get("file");
+    const pregnancyResult = String(formData.get("pregnancyResult") || "").trim();
+    const kidCountRaw = String(formData.get("kidCount") || "").trim();
+    const comments = String(formData.get("comments") || "").trim();
 
-  let fetusCount: number | null = null;
-  if (pregnancyResult === "confirmed") {
-    const count = Number(kidCountRaw);
-    if (!kidCountRaw || Number.isNaN(count) || count < 1) {
-      throw new Error("Number of kids is required when pregnancy is confirmed");
+    let fetusCount: number | null = null;
+    if (pregnancyResult === "confirmed") {
+      const count = Number(kidCountRaw);
+      if (!kidCountRaw || Number.isNaN(count) || count < 1) {
+        return { ok: false, error: "Number of kids is required when pregnancy is confirmed" };
+      }
+      fetusCount = count;
+    } else if (pregnancyResult === "not_pregnant") {
+      fetusCount = 0;
     }
-    fetusCount = count;
-  } else if (pregnancyResult === "not_pregnant") {
-    fetusCount = 0;
+
+    const id = String(formData.get("id") || "").trim();
+    const femaleId = Number(formData.get("femaleId"));
+    if (!id) return { ok: false, error: "Breeding record not found" };
+    if (!femaleId || Number.isNaN(femaleId)) return { ok: false, error: "Goat not found" };
+
+    await recordBreedingUltrasound({
+      id,
+      femaleId,
+      ultrasoundDate: String(formData.get("ultrasoundDate")),
+      fetusCount,
+      comments: comments || null,
+      file: file instanceof File && file.size > 0 ? file : null,
+    });
+    revalidatePath(`/animals/${femaleId}`);
+    revalidateTxnPaths();
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: friendlyUltrasoundError(err) };
   }
-
-  const id = String(formData.get("id") || "").trim();
-  const femaleId = Number(formData.get("femaleId"));
-  if (!id) throw new Error("Breeding record not found");
-  if (!femaleId || Number.isNaN(femaleId)) throw new Error("Goat not found");
-
-  await recordBreedingUltrasound({
-    id,
-    femaleId,
-    ultrasoundDate: String(formData.get("ultrasoundDate")),
-    status: statusRaw as import("@/lib/types").BreedingStatus | "",
-    fetusCount,
-    comments: comments || null,
-    file: file instanceof File && file.size > 0 ? file : null,
-  });
-  revalidatePath(`/animals/${femaleId}`);
-  revalidateTxnPaths();
 }
 
 export async function actionDeleteBreeding(formData: FormData) {

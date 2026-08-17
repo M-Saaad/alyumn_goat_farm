@@ -9,6 +9,8 @@ import {
   computeUltrasoundStatus,
   needsUltrasound,
   ultrasoundConfirmedText,
+  resolveBreedingAfterUltrasound,
+  breedingRecordStatusLabel,
   ULTRASOUND_WINDOW_END_DAYS,
   ULTRASOUND_WINDOW_START_DAYS,
 } from "../lib/livestock/breeding.ts";
@@ -200,6 +202,15 @@ assert(
     "Not pregnant · Ultrasound 2026-06-10",
   "not pregnant text"
 );
+
+const pending = breedingEvent({ id: "br-7", female_animal_id: 8, outcome: "Pending", status: "Doubt" });
+const confirmedPregnant = resolveBreedingAfterUltrasound(pending, 2);
+assert(confirmedPregnant.status === "Ready" && confirmedPregnant.outcome === "Pending", "pregnant ultrasound → Ready / Pending");
+assert(breedingRecordStatusLabel({ ...pending, ultrasound_date: "2026-06-10", fetus_count: 2, ...confirmedPregnant }) === "Confirmed", "pregnant label");
+
+const confirmedEmpty = resolveBreedingAfterUltrasound(pending, 0);
+assert(confirmedEmpty.outcome === "Miscarriage", "not pregnant ultrasound → Miscarriage");
+assert(breedingRecordStatusLabel({ ...pending, ultrasound_date: "2026-06-10", fetus_count: 0, ...confirmedEmpty }) === "Not pregnant", "not pregnant label");
 
 const herdUltrasound = computeHerdHealth({
   animals: [animal],

@@ -23,6 +23,7 @@ import {
 import {
   assertFemaleAvailableForBreeding,
   expectedDueDate,
+  resolveBreedingAfterUltrasound,
 } from "./livestock/breeding";
 import { applyDeleteAnimal } from "./animals/delete";
 import { applyUpdateAnimalDetails, type UpdateAnimalInput } from "./animals/update";
@@ -718,7 +719,6 @@ export async function recordBreedingUltrasounds(input: {
   if (!ultrasoundDate) throw new Error("Ultrasound date is required");
 
   const before = await fetchDb();
-  const resolvedStatus: BreedingStatus = (input.status?.trim() as BreedingStatus) || "Ready";
   const updated: BreedingEvent[] = [];
 
   for (const record of input.records) {
@@ -736,14 +736,13 @@ export async function recordBreedingUltrasounds(input: {
       });
     }
 
-    let outcome: BreedingOutcome = existing.outcome;
-    if (outcome === "Doubt") outcome = "Pending";
+    const { status, outcome } = resolveBreedingAfterUltrasound(existing, input.fetusCount);
 
     updated.push({
       ...existing,
       ultrasound_date: ultrasoundDate,
       fetus_count: input.fetusCount !== undefined ? input.fetusCount : (existing.fetus_count ?? null),
-      status: resolvedStatus,
+      status,
       outcome,
       notes: mergeUltrasoundNotes(existing.notes, input.comments, ultrasoundDate),
     });
