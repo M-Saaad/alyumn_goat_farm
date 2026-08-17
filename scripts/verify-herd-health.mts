@@ -14,6 +14,7 @@ import {
   findActiveBreedingForDam,
   resolveBreedingAfterBirth,
   breedingUpdatesFromBirths,
+  canRecordOrEditUltrasound,
   ULTRASOUND_WINDOW_END_DAYS,
   ULTRASOUND_WINDOW_START_DAYS,
 } from "../lib/livestock/breeding.ts";
@@ -218,6 +219,15 @@ assert(breedingRecordStatusLabel({ ...pending, ultrasound_date: "2026-06-10", fe
 const delivered = resolveBreedingAfterBirth(pending, "2026-08-15");
 assert(delivered.outcome === "Delivered" && delivered.status === "Delivered", "birth closes breeding");
 assert(breedingRecordStatusLabel({ ...pending, ...delivered }) === "Delivered", "delivered label");
+
+assert(
+  canRecordOrEditUltrasound({ ...pending, ultrasound_date: "2026-06-10", fetus_count: 2 }),
+  "can edit after confirmed ultrasound"
+);
+assert(
+  !canRecordOrEditUltrasound({ ...delivered, ultrasound_date: "2026-06-10", fetus_count: 2 }),
+  "cannot edit ultrasound after delivery"
+);
 
 const cadburyBreeding = breedingEvent({
   id: "br-cadbury",

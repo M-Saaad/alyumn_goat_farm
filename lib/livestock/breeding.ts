@@ -110,8 +110,12 @@ export function resolveBreedingAfterUltrasound(
   return { status, outcome };
 }
 
-export function hasDefinitiveUltrasoundResult(event: BreedingEvent): boolean {
-  return Boolean(event.ultrasound_date && event.fetus_count != null);
+/** Record a new ultrasound or edit an existing one (until kidding is logged). */
+export function canRecordOrEditUltrasound(event: BreedingEvent): boolean {
+  if (!event.date_crossed) return false;
+  if (event.outcome === "Delivered" || event.outcome === "Stillbirth") return false;
+  if (event.ultrasound_date) return true;
+  return isBreedingInPipeline(event);
 }
 
 /** Pick the active breeding record to close when a kid is born. */

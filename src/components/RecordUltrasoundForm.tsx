@@ -40,6 +40,7 @@ export function RecordUltrasoundForm({
   const [pregnancyResult, setPregnancyResult] = useState<PregnancyResult>(
     defaultPregnancyResult(defaultFetusCount)
   );
+  const isEditing = Boolean(defaultUltrasoundDate);
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -66,7 +67,9 @@ export function RecordUltrasoundForm({
     <form onSubmit={onSubmit} className="mt-2 space-y-2 rounded-xl bg-stone-50 p-3 ring-1 ring-stone-100">
       <input type="hidden" name="id" value={breedingId} />
       <input type="hidden" name="femaleId" value={femaleId} />
-      <p className="text-sm font-semibold text-stone-800">Record ultrasound</p>
+      <p className="text-sm font-semibold text-stone-800">
+        {isEditing ? "Edit ultrasound" : "Record ultrasound"}
+      </p>
       <div>
         <label className={labelCls}>Ultrasound date</label>
         <input
@@ -141,7 +144,7 @@ export function RecordUltrasoundForm({
         disabled={busy}
         className="w-full rounded-xl bg-emerald-700 py-2 text-sm font-semibold text-white disabled:opacity-60"
       >
-        {busy ? "Saving…" : "Save ultrasound"}
+        {busy ? "Saving…" : isEditing ? "Save changes" : "Save ultrasound"}
       </button>
     </form>
   );

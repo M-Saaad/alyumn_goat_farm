@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { isBreedingInPipeline, hasDefinitiveUltrasoundResult } from "@/lib/livestock/breeding";
+import { canRecordOrEditUltrasound } from "@/lib/livestock/breeding";
 import { BreedingEventEditor, type BreedingEditorEvent } from "@/components/BreedingEventEditor";
 import { RecordUltrasoundForm } from "@/components/RecordUltrasoundForm";
 import { UltrasoundStatusLine } from "@/components/UltrasoundStatusLine";
@@ -37,10 +37,8 @@ export function BreedingRecordActions({
     status: event.status,
     notes: event.notes,
   };
-  const canRecord =
-    isBreedingInPipeline(breedingEvent) &&
-    Boolean(event.date_crossed) &&
-    !hasDefinitiveUltrasoundResult(breedingEvent);
+  const canUltrasound = canRecordOrEditUltrasound(breedingEvent);
+  const isEditing = Boolean(event.ultrasound_date);
 
   return (
     <div className="mt-1">
@@ -49,16 +47,16 @@ export function BreedingRecordActions({
         ultrasoundDate={event.ultrasound_date}
         fetusCount={event.fetus_count}
         daysSinceCrossed={daysSinceCrossed}
-        showWhenIdle={canRecord}
+        showWhenIdle={canUltrasound && !isEditing}
       />
       <div className="mt-1 flex flex-wrap gap-3">
-        {canRecord && !recording && (
+        {canUltrasound && !recording && (
           <button
             type="button"
             onClick={() => setRecording(true)}
             className="text-xs font-semibold text-emerald-700"
           >
-            Record ultrasound
+            {isEditing ? "Edit ultrasound" : "Record ultrasound"}
           </button>
         )}
         <BreedingEventEditor
