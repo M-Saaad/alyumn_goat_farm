@@ -66,7 +66,6 @@ export function RecordUltrasoundForm({
     <form onSubmit={onSubmit} className="mt-2 space-y-2 rounded-xl bg-stone-50 p-3 ring-1 ring-stone-100">
       <input type="hidden" name="id" value={breedingId} />
       <input type="hidden" name="femaleId" value={femaleId} />
-      <input type="hidden" name="status" value="Ready" />
       <p className="text-sm font-semibold text-stone-800">Record ultrasound</p>
       <div>
         <label className={labelCls}>Ultrasound date</label>

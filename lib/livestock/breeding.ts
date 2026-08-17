@@ -1,4 +1,4 @@
-import type { BreedingEvent } from "../types";
+import type { BreedingEvent, BreedingOutcome, BreedingStatus } from "../types";
 
 export const GESTATION_DAYS = 150;
 /** Ultrasound window starts day 40 after crossing (inclusive). */
@@ -77,6 +77,38 @@ export function ultrasoundConfirmedText(
     return `Confirmed · ${formatKidCount(fetusCount)} · ${datePart}`;
   }
   return datePart;
+}
+
+/** Short label for breeding rows after ultrasound (animal profile, lists). */
+export function breedingRecordStatusLabel(event: BreedingEvent): string {
+  if (event.ultrasound_date) {
+    if (event.fetus_count != null && event.fetus_count > 0) return "Confirmed";
+    if (event.fetus_count === 0) return "Not pregnant";
+  }
+  return event.status || event.outcome;
+}
+
+/** Update breeding status/outcome when an ultrasound result is saved. */
+export function resolveBreedingAfterUltrasound(
+  existing: BreedingEvent,
+  fetusCount: number | null | undefined
+): { status: BreedingStatus | null; outcome: BreedingOutcome } {
+  if (fetusCount === 0) {
+    return { status: null, outcome: "Miscarriage" };
+  }
+  if (fetusCount != null && fetusCount > 0) {
+    return { status: "Ready", outcome: "Pending" };
+  }
+
+  let outcome: BreedingOutcome = existing.outcome;
+  if (outcome === "Doubt") outcome = "Pending";
+  let status: BreedingStatus | null = existing.status;
+  if (!status || status === "Doubt") status = "Ready";
+  return { status, outcome };
+}
+
+export function hasDefinitiveUltrasoundResult(event: BreedingEvent): boolean {
+  return Boolean(event.ultrasound_date && event.fetus_count != null);
 }
 
 /** Active pregnancy / not yet closed out — matches Goats "Breeding" filter. */

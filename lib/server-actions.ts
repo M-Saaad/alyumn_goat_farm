@@ -262,7 +262,6 @@ export async function actionRecordBreedingUltrasound(
 ): Promise<UltrasoundActionResult> {
   try {
     const file = formData.get("file");
-    const statusRaw = String(formData.get("status") || "").trim();
     const pregnancyResult = String(formData.get("pregnancyResult") || "").trim();
     const kidCountRaw = String(formData.get("kidCount") || "").trim();
     const comments = String(formData.get("comments") || "").trim();
@@ -287,7 +286,6 @@ export async function actionRecordBreedingUltrasound(
       id,
       femaleId,
       ultrasoundDate: String(formData.get("ultrasoundDate")),
-      status: statusRaw as import("@/lib/types").BreedingStatus | "",
       fetusCount,
       comments: comments || null,
       file: file instanceof File && file.size > 0 ? file : null,
