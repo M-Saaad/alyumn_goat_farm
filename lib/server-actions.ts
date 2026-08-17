@@ -15,7 +15,6 @@ import {
   partnerTransfer,
   recordBreeding,
   recordBreedingUltrasound,
-  recordBreedingUltrasounds,
   updateBreeding,
   deleteBreeding,
   recordLivestockSale,
@@ -243,15 +242,7 @@ export async function actionRecordBreedingUltrasound(formData: FormData) {
   const statusRaw = String(formData.get("status") || "").trim();
   const pregnancyResult = String(formData.get("pregnancyResult") || "").trim();
   const kidCountRaw = String(formData.get("kidCount") || "").trim();
-  const breedingIds = formData.getAll("breedingIds").map((v) => String(v).trim()).filter(Boolean);
-  const femaleIds = formData.getAll("femaleIds").map((v) => Number(v)).filter((n) => !Number.isNaN(n));
-
-  if (breedingIds.length === 0) {
-    throw new Error("Select at least one goat to record ultrasound");
-  }
-  if (breedingIds.length !== femaleIds.length) {
-    throw new Error("Selected goats are invalid");
-  }
+  const comments = String(formData.get("comments") || "").trim();
 
   let fetusCount: number | null = null;
   if (pregnancyResult === "confirmed") {
@@ -264,18 +255,21 @@ export async function actionRecordBreedingUltrasound(formData: FormData) {
     fetusCount = 0;
   }
 
-  await recordBreedingUltrasounds({
-    records: breedingIds.map((id, index) => ({ id, femaleId: femaleIds[index]! })),
+  const id = String(formData.get("id") || "").trim();
+  const femaleId = Number(formData.get("femaleId"));
+  if (!id) throw new Error("Breeding record not found");
+  if (!femaleId || Number.isNaN(femaleId)) throw new Error("Goat not found");
+
+  await recordBreedingUltrasound({
+    id,
+    femaleId,
     ultrasoundDate: String(formData.get("ultrasoundDate")),
     status: statusRaw as import("@/lib/types").BreedingStatus | "",
     fetusCount,
+    comments: comments || null,
     file: file instanceof File && file.size > 0 ? file : null,
   });
-  for (const femaleId of new Set(femaleIds)) {
-    if (femaleId && !Number.isNaN(femaleId)) {
-      revalidatePath(`/animals/${femaleId}`);
-    }
-  }
+  revalidatePath(`/animals/${femaleId}`);
   revalidateTxnPaths();
 }
 

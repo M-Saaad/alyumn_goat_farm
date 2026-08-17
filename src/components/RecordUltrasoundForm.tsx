@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { actionRecordBreedingUltrasound } from "@/lib/server-actions";
 import { todayIso } from "@/lib/format";
@@ -11,12 +11,6 @@ const labelCls = "block text-sm font-medium text-stone-700";
 
 type PregnancyResult = "confirmed" | "not_pregnant" | "unknown";
 
-export type UltrasoundTarget = {
-  breedingId: string;
-  femaleId: number;
-  label: string;
-};
-
 function defaultPregnancyResult(fetusCount?: number | null): PregnancyResult {
   if (fetusCount === 0) return "not_pregnant";
   if (fetusCount != null && fetusCount > 0) return "confirmed";
@@ -24,17 +18,19 @@ function defaultPregnancyResult(fetusCount?: number | null): PregnancyResult {
 }
 
 export function RecordUltrasoundForm({
-  eligible,
-  defaultSelectedBreedingIds,
+  breedingId,
+  femaleId,
   defaultUltrasoundDate,
   defaultFetusCount,
+  defaultComments,
   supabaseEnabled,
   onDone,
 }: {
-  eligible: UltrasoundTarget[];
-  defaultSelectedBreedingIds: string[];
+  breedingId: string;
+  femaleId: number;
   defaultUltrasoundDate?: string | null;
   defaultFetusCount?: number | null;
+  defaultComments?: string | null;
   supabaseEnabled: boolean;
   onDone?: () => void;
 }) {
@@ -44,27 +40,10 @@ export function RecordUltrasoundForm({
   const [pregnancyResult, setPregnancyResult] = useState<PregnancyResult>(
     defaultPregnancyResult(defaultFetusCount)
   );
-  const eligibleIds = useMemo(() => new Set(eligible.map((t) => t.breedingId)), [eligible]);
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(
-    () => new Set(defaultSelectedBreedingIds.filter((id) => eligibleIds.has(id)))
-  );
-
-  function toggleTarget(breedingId: string) {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(breedingId)) next.delete(breedingId);
-      else next.add(breedingId);
-      return next;
-    });
-  }
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError(null);
-    if (selectedIds.size === 0) {
-      setError("Select at least one goat");
-      return;
-    }
     setBusy(true);
     const form = e.currentTarget;
     const fd = new FormData(form);
@@ -79,54 +58,12 @@ export function RecordUltrasoundForm({
     }
   }
 
-  const selectedTargets = eligible.filter((t) => selectedIds.has(t.breedingId));
-  const saveLabel =
-    selectedTargets.length > 1
-      ? `Save ultrasound for ${selectedTargets.length} goats`
-      : "Save ultrasound";
-
   return (
     <form onSubmit={onSubmit} className="mt-2 space-y-2 rounded-xl bg-stone-50 p-3 ring-1 ring-stone-100">
+      <input type="hidden" name="id" value={breedingId} />
+      <input type="hidden" name="femaleId" value={femaleId} />
       <input type="hidden" name="status" value="Ready" />
       <p className="text-sm font-semibold text-stone-800">Record ultrasound</p>
-      {eligible.length > 1 ? (
-        <div>
-          <label className={labelCls}>Goats</label>
-          <div className="mt-1 space-y-2 rounded-xl border border-stone-200 bg-white p-2">
-            {eligible.map((target) => (
-              <label
-                key={target.breedingId}
-                className="flex items-center gap-2 text-sm text-stone-800"
-              >
-                <input
-                  type="checkbox"
-                  className="h-4 w-4 rounded border-stone-300 text-emerald-700 focus:ring-emerald-600"
-                  checked={selectedIds.has(target.breedingId)}
-                  onChange={() => toggleTarget(target.breedingId)}
-                />
-                <span>{target.label}</span>
-              </label>
-            ))}
-          </div>
-          <p className="mt-1 text-xs text-stone-500">
-            Select every goat scanned during this ultrasound visit.
-          </p>
-        </div>
-      ) : (
-        eligible.map((target) => (
-          <div key={target.breedingId}>
-            <input type="hidden" name="breedingIds" value={target.breedingId} />
-            <input type="hidden" name="femaleIds" value={target.femaleId} />
-          </div>
-        ))
-      )}
-      {eligible.length > 1 &&
-        selectedTargets.map((target) => (
-          <div key={target.breedingId} className="hidden" aria-hidden>
-            <input type="hidden" name="breedingIds" value={target.breedingId} />
-            <input type="hidden" name="femaleIds" value={target.femaleId} />
-          </div>
-        ))}
       <div>
         <label className={labelCls}>Ultrasound date</label>
         <input
@@ -171,6 +108,16 @@ export function RecordUltrasoundForm({
           </select>
         </div>
       )}
+      <div>
+        <label className={labelCls}>Comments</label>
+        <textarea
+          className={field}
+          name="comments"
+          rows={2}
+          placeholder="Optional notes from the ultrasound visit"
+          defaultValue={defaultComments ?? ""}
+        />
+      </div>
       {supabaseEnabled ? (
         <div>
           <label className={labelCls}>Ultrasound video (optional)</label>
@@ -180,9 +127,7 @@ export function RecordUltrasoundForm({
             name="file"
             accept="video/mp4,video/webm,video/quicktime"
           />
-          <p className="mt-1 text-xs text-stone-500">
-            MP4, WebM, or MOV up to 50MB. Uploaded to each selected goat.
-          </p>
+          <p className="mt-1 text-xs text-stone-500">MP4, WebM, or MOV up to 50MB</p>
         </div>
       ) : (
         <p className="text-xs text-stone-500">Video upload requires Supabase storage.</p>
@@ -193,7 +138,7 @@ export function RecordUltrasoundForm({
         disabled={busy}
         className="w-full rounded-xl bg-emerald-700 py-2 text-sm font-semibold text-white disabled:opacity-60"
       >
-        {busy ? "Saving…" : saveLabel}
+        {busy ? "Saving…" : "Save ultrasound"}
       </button>
     </form>
   );

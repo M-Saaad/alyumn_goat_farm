@@ -24,7 +24,7 @@ export function HealthFilters() {
   }
 
   return (
-    <div className="mb-4 flex gap-2 overflow-x-auto pb-1">
+    <div className="mb-4 flex flex-wrap gap-2">
       {HEALTH_TABS.map((t) => (
         <button
           key={t}

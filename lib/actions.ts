@@ -707,6 +707,7 @@ export async function recordBreedingUltrasounds(input: {
   ultrasoundDate: string;
   status?: BreedingStatus | "";
   fetusCount?: number | null;
+  comments?: string | null;
   file?: File | null;
 }) {
   if (input.records.length === 0) {
@@ -741,9 +742,10 @@ export async function recordBreedingUltrasounds(input: {
     updated.push({
       ...existing,
       ultrasound_date: ultrasoundDate,
-      fetus_count: input.fetusCount !== undefined ? input.fetusCount : existing.fetus_count,
+      fetus_count: input.fetusCount !== undefined ? input.fetusCount : (existing.fetus_count ?? null),
       status: resolvedStatus,
       outcome,
+      notes: mergeUltrasoundNotes(existing.notes, input.comments, ultrasoundDate),
     });
   }
 
@@ -759,12 +761,24 @@ export async function recordBreedingUltrasounds(input: {
   return persistMutation(before, after);
 }
 
+function mergeUltrasoundNotes(
+  existing: string | null,
+  comment: string | null | undefined,
+  ultrasoundDate: string
+): string | null {
+  const trimmed = comment?.trim();
+  if (!trimmed) return existing;
+  const entry = `Ultrasound ${ultrasoundDate}: ${trimmed}`;
+  return existing?.trim() ? `${existing.trim()}\n${entry}` : entry;
+}
+
 export async function recordBreedingUltrasound(input: {
   id: string;
   femaleId: number;
   ultrasoundDate: string;
   status?: BreedingStatus | "";
   fetusCount?: number | null;
+  comments?: string | null;
   file?: File | null;
 }) {
   return recordBreedingUltrasounds({
@@ -772,6 +786,7 @@ export async function recordBreedingUltrasound(input: {
     ultrasoundDate: input.ultrasoundDate,
     status: input.status,
     fetusCount: input.fetusCount,
+    comments: input.comments,
     file: input.file,
   });
 }
