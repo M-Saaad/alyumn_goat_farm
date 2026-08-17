@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { formatDate } from "@/lib/format";
 import { animalLinkFromHealth } from "@/lib/livestock/health-nav";
-import { isBreedingInPipeline, hasDefinitiveUltrasoundResult } from "@/lib/livestock/breeding";
+import { canRecordOrEditUltrasound } from "@/lib/livestock/breeding";
 import type { BreedingRow } from "@/lib/livestock/herd-health";
 import { UltrasoundStatusLine } from "@/components/UltrasoundStatusLine";
 import { RecordUltrasoundForm } from "@/components/RecordUltrasoundForm";
@@ -48,12 +48,11 @@ export function HealthBreedingList({
   return (
     <ul className="divide-y divide-stone-100">
       {rows.map((b) => {
-        const canRecord =
-          isBreedingInPipeline(b.event) &&
-          Boolean(b.event.date_crossed) &&
-          !hasDefinitiveUltrasoundResult(b.event);
+        const canUltrasound =
+          canRecordOrEditUltrasound(b.event);
+        const isEditing = Boolean(b.event.ultrasound_date);
         const showUltrasound =
-          canRecord || b.ultrasoundStatus === "confirmed";
+          canUltrasound || b.ultrasoundStatus === "confirmed";
 
         return (
           <li key={b.event.id} className="py-3">
@@ -86,19 +85,19 @@ export function HealthBreedingList({
                     ultrasoundDate={b.event.ultrasound_date}
                     fetusCount={b.event.fetus_count}
                     daysSinceCrossed={b.daysSinceCrossed}
-                    showWhenIdle={canRecord}
+                    showWhenIdle={canUltrasound && !isEditing}
                   />
                 )}
                 {b.event.notes && (
                   <p className="mt-1 text-xs text-stone-500">{b.event.notes}</p>
                 )}
-                {canRecord && recordingId !== b.event.id && (
+                {canUltrasound && recordingId !== b.event.id && (
                   <button
                     type="button"
                     onClick={() => setRecordingId(b.event.id)}
                     className="mt-1 text-xs font-semibold text-emerald-700"
                   >
-                    Record ultrasound
+                    {isEditing ? "Edit ultrasound" : "Record ultrasound"}
                   </button>
                 )}
               </div>
