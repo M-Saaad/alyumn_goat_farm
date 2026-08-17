@@ -5,7 +5,7 @@ import { loadDb, saveDb } from "../lib/db";
 import { computeSettlement, assertCanonicalSettlement } from "../lib/partner-equity/settlement";
 import { recognizePalaiPayment, applyPalaiToDb } from "../lib/palai/recognize-payment";
 import { computeSaleSplit, saleAdjustmentAmount } from "../lib/livestock/record-sale";
-import { buyGoat, logExpense, logMedical, recordBreeding, recordLivestockSale, addSaleReceipt, updateAnimal, deleteSaleReceipt, undoLivestockSale } from "../lib/actions";
+import { buyGoat, logExpense, logMedical, recordBreeding, recordLivestockSale, addSaleReceipt, updateAnimal, deleteSaleReceipt, undoLivestockSale, registerBornGoat } from "../lib/actions";
 import { isSoldOnPalaiSale } from "../lib/livestock/cancel-sale";
 import fs from "fs";
 import path from "path";
@@ -221,6 +221,25 @@ async function main() {
       throw new Error(`due date ${br?.expected_due_date}`);
     }
     console.log("PASS breeding due date = crossed + 150 days");
+
+    await registerBornGoat({
+      date: "2026-08-15",
+      breed: "Teddy",
+      sex: "Female",
+      description: "Verify kid",
+      ownerName: "Farm",
+      damId: vg.id,
+      sireName: "Shelby",
+    });
+    const afterBirth = loadDb();
+    const delivered = afterBirth.breeding_events.find((b) => b.female_animal_id === vg.id);
+    if (!delivered || delivered.outcome !== "Delivered" || delivered.status !== "Delivered") {
+      throw new Error(`birth should mark dam breeding delivered, got ${delivered?.outcome}/${delivered?.status}`);
+    }
+    if (delivered.delivered_date !== "2026-08-15") {
+      throw new Error(`delivered date expected 2026-08-15 got ${delivered.delivered_date}`);
+    }
+    console.log("PASS record birth closes dam breeding as Delivered");
 
     await logExpense({
       date: "2026-07-26",

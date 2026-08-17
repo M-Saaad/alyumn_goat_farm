@@ -11,6 +11,9 @@ import {
   ultrasoundConfirmedText,
   resolveBreedingAfterUltrasound,
   breedingRecordStatusLabel,
+  findActiveBreedingForDam,
+  resolveBreedingAfterBirth,
+  breedingUpdatesFromBirths,
   ULTRASOUND_WINDOW_END_DAYS,
   ULTRASOUND_WINDOW_START_DAYS,
 } from "../lib/livestock/breeding.ts";
@@ -211,6 +214,31 @@ assert(breedingRecordStatusLabel({ ...pending, ultrasound_date: "2026-06-10", fe
 const confirmedEmpty = resolveBreedingAfterUltrasound(pending, 0);
 assert(confirmedEmpty.outcome === "Miscarriage", "not pregnant ultrasound → Miscarriage");
 assert(breedingRecordStatusLabel({ ...pending, ultrasound_date: "2026-06-10", fetus_count: 0, ...confirmedEmpty }) === "Not pregnant", "not pregnant label");
+
+const delivered = resolveBreedingAfterBirth(pending, "2026-08-15");
+assert(delivered.outcome === "Delivered" && delivered.status === "Delivered", "birth closes breeding");
+assert(breedingRecordStatusLabel({ ...pending, ...delivered }) === "Delivered", "delivered label");
+
+const cadburyBreeding = breedingEvent({
+  id: "br-cadbury",
+  female_animal_id: 43,
+  buck_name: "Black Abluk Breeder",
+  date_crossed: "2026-04-07",
+  outcome: "Doubt",
+  status: "Doubt",
+});
+const found = findActiveBreedingForDam([cadburyBreeding], 43, { sireName: "Black Abluk Breeder" });
+assert(found?.id === "br-cadbury", "find active breeding for dam");
+
+const deliveredBreeding = resolveBreedingAfterBirth(cadburyBreeding, "2026-08-15");
+const herdAfterBirth = computeHerdHealth({
+  animals: [{ ...animal, id: 43, name: "Cadbury", sex: "Female" }],
+  medical_events: [],
+  breeding_events: [deliveredBreeding],
+  weight_logs: [],
+  today: "2026-08-17",
+});
+assert(herdAfterBirth.breeding[0]?.status === "completed", "delivered breeding not pending in herd");
 
 const herdUltrasound = computeHerdHealth({
   animals: [animal],

@@ -1,4 +1,4 @@
-import type { BreedingEvent, BreedingOutcome, BreedingStatus } from "../types";
+import type { Animal, BreedingEvent, BreedingOutcome, BreedingStatus } from "../types";
 
 export const GESTATION_DAYS = 150;
 /** Ultrasound window starts day 40 after crossing (inclusive). */
@@ -81,6 +81,9 @@ export function ultrasoundConfirmedText(
 
 /** Short label for breeding rows after ultrasound (animal profile, lists). */
 export function breedingRecordStatusLabel(event: BreedingEvent): string {
+  if (event.outcome === "Delivered") return "Delivered";
+  if (event.outcome === "Stillbirth") return "Stillbirth";
+  if (event.outcome === "Miscarriage") return "Not pregnant";
   if (event.ultrasound_date) {
     if (event.fetus_count != null && event.fetus_count > 0) return "Confirmed";
     if (event.fetus_count === 0) return "Not pregnant";
@@ -109,6 +112,75 @@ export function resolveBreedingAfterUltrasound(
 
 export function hasDefinitiveUltrasoundResult(event: BreedingEvent): boolean {
   return Boolean(event.ultrasound_date && event.fetus_count != null);
+}
+
+/** Pick the active breeding record to close when a kid is born. */
+export function findActiveBreedingForDam(
+  events: BreedingEvent[],
+  damId: number,
+  match?: { sireId?: number | null; sireName?: string | null }
+): BreedingEvent | null {
+  const active = events.filter(
+    (e) => e.female_animal_id === damId && isBreedingInPipeline(e)
+  );
+  if (active.length === 0) return null;
+  if (active.length === 1) return active[0];
+
+  if (match?.sireId) {
+    const bySire = active.find((e) => e.male_animal_id === match.sireId);
+    if (bySire) return bySire;
+  }
+  if (match?.sireName?.trim()) {
+    const name = match.sireName.trim().toLowerCase();
+    const byName = active.find((e) => (e.buck_name ?? "").toLowerCase() === name);
+    if (byName) return byName;
+  }
+
+  return active.sort((a, b) => (b.date_crossed ?? "").localeCompare(a.date_crossed ?? ""))[0];
+}
+
+/** Close a breeding record when kids are born. */
+export function resolveBreedingAfterBirth(
+  existing: BreedingEvent,
+  birthDate: string
+): BreedingEvent {
+  return {
+    ...existing,
+    outcome: "Delivered",
+    status: "Delivered",
+    delivered_date: birthDate.trim().slice(0, 10),
+  };
+}
+
+/** Backfill breeding deliveries from existing farm-born kid records. */
+export function breedingUpdatesFromBirths(
+  animals: Animal[],
+  breedingEvents: BreedingEvent[]
+): BreedingEvent[] {
+  const byBreedingId = new Map<string, BreedingEvent>();
+
+  for (const kid of animals) {
+    if (!kid.home_bred || !kid.dam_id || !kid.date_of_purchase) continue;
+    const breeding = findActiveBreedingForDam(breedingEvents, kid.dam_id, {
+      sireId: kid.sire_id,
+      sireName: kid.sire_name,
+    });
+    if (!breeding) continue;
+    if (breeding.date_crossed && kid.date_of_purchase < breeding.date_crossed) continue;
+
+    const birthDate = kid.date_of_purchase.slice(0, 10);
+    const prev = byBreedingId.get(breeding.id);
+    if (!prev) {
+      byBreedingId.set(breeding.id, resolveBreedingAfterBirth(breeding, birthDate));
+      continue;
+    }
+    const prevDate = prev.delivered_date ?? birthDate;
+    if (birthDate < prevDate) {
+      byBreedingId.set(breeding.id, resolveBreedingAfterBirth(breeding, birthDate));
+    }
+  }
+
+  return [...byBreedingId.values()];
 }
 
 /** Active pregnancy / not yet closed out — matches Goats "Breeding" filter. */
