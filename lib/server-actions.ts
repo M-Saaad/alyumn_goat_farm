@@ -155,6 +155,7 @@ export async function actionRegisterBornGoat(formData: FormData) {
   const sireAnimalRaw = String(formData.get("sireAnimalId") || "").trim();
   const sireNameRaw = String(formData.get("sireName") || "").trim();
   if (!damRaw) throw new Error("Select the dam (mother)");
+  const damId = Number(damRaw);
   await registerBornGoat({
     date: String(formData.get("date")),
     breed: String(formData.get("breed")) as AnimalBreed,
@@ -164,10 +165,11 @@ export async function actionRegisterBornGoat(formData: FormData) {
     ownerName: String(formData.get("ownerName")),
     comment: String(formData.get("comment") || "") || undefined,
     palaiRate: palaiRaw ? Number(palaiRaw) : null,
-    damId: Number(damRaw),
+    damId,
     sireId: sireAnimalRaw ? Number(sireAnimalRaw) : null,
     sireName: sireNameRaw || null,
   });
+  revalidatePath(`/animals/${damId}`);
   revalidateTxnPaths();
 }
 

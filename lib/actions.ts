@@ -23,6 +23,8 @@ import {
 import {
   assertFemaleAvailableForBreeding,
   expectedDueDate,
+  findActiveBreedingForDam,
+  resolveBreedingAfterBirth,
   resolveBreedingAfterUltrasound,
 } from "./livestock/breeding";
 import { applyDeleteAnimal } from "./animals/delete";
@@ -413,12 +415,28 @@ export async function registerBornGoat(input: {
     out_date: null,
     palai_rate: palaiRate,
   };
-  const after = { ...db, animals: [...db.animals, animal] };
+
+  const activeBreeding = findActiveBreedingForDam(db.breeding_events, input.damId, {
+    sireId: input.sireId,
+    sireName: input.sireName,
+  });
+  const updatedBreeding = activeBreeding
+    ? resolveBreedingAfterBirth(activeBreeding, input.date)
+    : null;
+
+  const after = {
+    ...db,
+    animals: [...db.animals, animal],
+    breeding_events: updatedBreeding
+      ? db.breeding_events.map((b) => (b.id === updatedBreeding.id ? updatedBreeding : b))
+      : db.breeding_events,
+  };
 
   if (isSupabaseDb()) {
     await applyWritePlan({
       upsertContacts: newContacts.length ? newContacts : undefined,
       upsertAnimals: [animal],
+      upsertBreeding: updatedBreeding ? [updatedBreeding] : undefined,
     });
     return after;
   }
