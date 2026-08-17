@@ -48,7 +48,11 @@ export function RecordUltrasoundForm({
     const form = e.currentTarget;
     const fd = new FormData(form);
     try {
-      await actionRecordBreedingUltrasound(fd);
+      const result = await actionRecordBreedingUltrasound(fd);
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
       router.refresh();
       onDone?.();
     } catch (err) {
@@ -125,7 +129,7 @@ export function RecordUltrasoundForm({
             className={field}
             type="file"
             name="file"
-            accept="video/mp4,video/webm,video/quicktime"
+            accept="video/mp4,video/webm,video/quicktime,video/*,.mp4,.mov,.webm,.m4v,.3gp"
           />
           <p className="mt-1 text-xs text-stone-500">MP4, WebM, or MOV up to 50MB</p>
         </div>
