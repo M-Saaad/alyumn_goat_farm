@@ -1,11 +1,18 @@
 import { normalizeServiceMonth, palaiServiceMonth } from "../palai/service-month";
 import type { LedgerCategory, PalaiPayment, Transaction } from "../types";
 import { currentMonthIso } from "../format";
+import { computeCategoryBreakdown } from "./category-breakdown";
 
 export type MonthlyCategoryReport = {
   month: string;
   byCategory: Partial<Record<LedgerCategory, number>>;
+  investedByCategory: Partial<Record<LedgerCategory, number>>;
+  receivedByCategory: Partial<Record<LedgerCategory, number>>;
+  transfersByCategory: Partial<Record<LedgerCategory, number>>;
   total: number;
+  totalInvested: number;
+  totalReceived: number;
+  totalTransfers: number;
   transactionCount: number;
 };
 
@@ -31,6 +38,12 @@ export function computeMonthlyCategoryReport(input: {
   month: string;
 }): MonthlyCategoryReport {
   const month = parseFinanceMonth(input.month);
+  const breakdown = computeCategoryBreakdown({
+    transactions: input.transactions,
+    palaiPayments: input.palaiPayments,
+    month,
+  });
+
   const byCategory: Partial<Record<LedgerCategory, number>> = {};
   let transactionCount = 0;
 
@@ -50,5 +63,16 @@ export function computeMonthlyCategoryReport(input: {
 
   const total = Object.values(byCategory).reduce((sum, n) => sum + (n || 0), 0);
 
-  return { month, byCategory, total, transactionCount };
+  return {
+    month,
+    byCategory,
+    investedByCategory: breakdown.investedByCategory,
+    receivedByCategory: breakdown.receivedByCategory,
+    transfersByCategory: breakdown.transfersByCategory,
+    total,
+    totalInvested: breakdown.totalInvested,
+    totalReceived: breakdown.totalReceived,
+    totalTransfers: breakdown.totalTransfers,
+    transactionCount,
+  };
 }

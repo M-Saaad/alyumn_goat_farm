@@ -190,6 +190,7 @@ export interface FarmDatabase {
 
 export interface SettlementResult {
   costBase: number;
+  totalReceived: number;
   fairShare: number;
   monisFunded: number;
   saadFunded: number;

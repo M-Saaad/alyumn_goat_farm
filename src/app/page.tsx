@@ -5,9 +5,10 @@ import { computeSettlement } from "@/lib/partner-equity/settlement";
 import { formatPkr, formatDate, currentMonthIso } from "@/lib/format";
 import { palaiServiceMonth } from "@/lib/palai/service-month";
 import { computeMonthlyCategoryReport, parseFinanceMonth } from "@/lib/transactions/monthly-report";
-import { CATEGORY_DISPLAY_ORDER } from "@/lib/constants";
+import { computeCategoryBreakdown } from "@/lib/transactions/category-breakdown";
 import { AppHeader } from "@/components/AppHeader";
 import { BottomNav } from "@/components/BottomNav";
+import { FinanceCategoryBreakdown } from "@/components/FinanceCategoryBreakdown";
 import { FinanceMonthPicker } from "@/components/FinanceMonthPicker";
 import { QuickEntryLoader } from "@/components/QuickEntryLoader";
 import { SignOutButton } from "@/components/SignOutButton";
@@ -55,6 +56,10 @@ async function HomePageContent({
     transactions: data.transactions,
     palaiPayments: data.palai_payments,
     month,
+  });
+  const allTime = computeCategoryBreakdown({
+    transactions: data.transactions,
+    palaiPayments: data.palai_payments,
   });
   const recent = [...data.transactions].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 12);
 
@@ -129,33 +134,27 @@ async function HomePageContent({
         {monthly.transactionCount === 0 ? (
           <p className="text-sm text-stone-500">No transactions this month.</p>
         ) : (
-          <>
-            <ul className="space-y-1">
-              {CATEGORY_DISPLAY_ORDER.filter((c) => monthly.byCategory[c]).map((c) => (
-                <li key={c} className="flex justify-between text-sm">
-                  <span className="text-stone-600">{c}</span>
-                  <span className="font-medium">{formatPkr(monthly.byCategory[c]!)}</span>
-                </li>
-              ))}
-            </ul>
-            <div className="mt-3 flex justify-between border-t border-stone-100 pt-2 text-sm font-bold">
-              <span>Total</span>
-              <span>{formatPkr(monthly.total)}</span>
-            </div>
-          </>
+          <FinanceCategoryBreakdown
+            investedByCategory={monthly.investedByCategory}
+            receivedByCategory={monthly.receivedByCategory}
+            transfersByCategory={monthly.transfersByCategory}
+            totalInvested={monthly.totalInvested}
+            totalReceived={monthly.totalReceived}
+            totalTransfers={monthly.totalTransfers}
+          />
         )}
       </section>
 
       <section className="mb-4 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-stone-200">
-        <h2 className="mb-2 text-sm font-bold text-stone-800">Spending by category (all time)</h2>
-        <ul className="space-y-1">
-          {CATEGORY_DISPLAY_ORDER.filter((c) => s.byCategory[c]).map((c) => (
-            <li key={c} className="flex justify-between text-sm">
-              <span className="text-stone-600">{c}</span>
-              <span className="font-medium">{formatPkr(s.byCategory[c])}</span>
-            </li>
-          ))}
-        </ul>
+        <h2 className="mb-3 text-sm font-bold text-stone-800">All time by category</h2>
+        <FinanceCategoryBreakdown
+          investedByCategory={allTime.investedByCategory}
+          receivedByCategory={allTime.receivedByCategory}
+          transfersByCategory={allTime.transfersByCategory}
+          totalInvested={allTime.totalInvested}
+          totalReceived={allTime.totalReceived}
+          totalTransfers={allTime.totalTransfers}
+        />
       </section>
 
       <section className="mb-4 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-stone-200">

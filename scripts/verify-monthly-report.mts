@@ -57,6 +57,8 @@ assert(report.byCategory["Vet/Medicine"] === 2000, "Vet in July");
 assert(report.byCategory["Livestock Sale"] === 24000, "Livestock sale shows full net");
 assert(report.byCategory["Palai Income"] === 14000, "Palai by service month");
 assert(report.total === 45000, `total expected 45000 got ${report.total}`);
+assert(report.totalInvested === 7000, `invested expected 7000 got ${report.totalInvested}`);
+assert(report.totalReceived === 38000, `received expected 38000 got ${report.totalReceived}`);
 assert(report.transactionCount === 4, "four items in July");
 
 const empty = computeMonthlyCategoryReport({
@@ -66,6 +68,8 @@ const empty = computeMonthlyCategoryReport({
 });
 assert(empty.transactionCount === 0, "no txs in empty month");
 assert(empty.total === 0, "empty month total is zero");
+assert(empty.totalInvested === 0, "empty month invested is zero");
+assert(empty.totalReceived === 0, "empty month received is zero");
 
 assert(parseFinanceMonth(undefined) === new Date().toISOString().slice(0, 7), "default current month");
 assert(parseFinanceMonth("2026-03") === "2026-03", "valid month");

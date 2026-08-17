@@ -27,6 +27,7 @@ export function getPartnerIds(db: FarmDatabase) {
 export function computeSettlement(db: FarmDatabase): SettlementResult {
   const { monisId, saadId } = getPartnerIds(db);
   let costBase = 0;
+  let totalReceived = 0;
   let monisFunded = 0;
   let saadFunded = 0;
   const byCategory: Record<string, number> = {};
@@ -44,6 +45,9 @@ export function computeSettlement(db: FarmDatabase): SettlementResult {
       if (tx.paid_by_partner_id === monisId) monisFunded += tx.amount;
       else if (tx.paid_by_partner_id === saadId) saadFunded += tx.amount;
     } else if (tx.kind === "partner_adjustment") {
+      if (tx.category === "Palai Income" || tx.category === "Livestock Sale") {
+        totalReceived += Math.abs(tx.amount) * 2;
+      }
       // partner_adjustment: signed amount on Monis's side of the book
       const adj = tx.amount;
       monisFunded += adj;
@@ -61,6 +65,7 @@ export function computeSettlement(db: FarmDatabase): SettlementResult {
 
   return {
     costBase,
+    totalReceived,
     fairShare,
     monisFunded,
     saadFunded,
