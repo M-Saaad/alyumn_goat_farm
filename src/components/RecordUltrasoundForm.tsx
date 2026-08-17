@@ -91,7 +91,7 @@ export function RecordUltrasoundForm({
         >
           <option value="unknown">Unknown / not recorded</option>
           <option value="confirmed">Confirmed pregnant</option>
-          <option value="not_pregnant">Not pregnant</option>
+          <option value="not_pregnant">Ready</option>
         </select>
       </div>
       {pregnancyResult === "confirmed" && (

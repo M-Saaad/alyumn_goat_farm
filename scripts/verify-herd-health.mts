@@ -11,7 +11,10 @@ import {
   ultrasoundConfirmedText,
   resolveBreedingAfterUltrasound,
   breedingRecordStatusLabel,
+  breedingTimeline,
   findActiveBreedingForDam,
+  isBreedingInPipeline,
+  isRecentDelivery,
   resolveBreedingAfterBirth,
   breedingUpdatesFromBirths,
   canRecordOrEditUltrasound,
@@ -203,8 +206,8 @@ const notPregnant = breedingEvent({
 });
 assert(
   ultrasoundConfirmedText(notPregnant.ultrasound_date, notPregnant.fetus_count) ===
-    "Not pregnant · Ultrasound 2026-06-10",
-  "not pregnant text"
+    "Ready · Ultrasound 2026-06-10",
+  "ready after empty ultrasound text"
 );
 
 const pending = breedingEvent({ id: "br-7", female_animal_id: 8, outcome: "Pending", status: "Doubt" });
@@ -213,12 +216,31 @@ assert(confirmedPregnant.status === "Ready" && confirmedPregnant.outcome === "Pe
 assert(breedingRecordStatusLabel({ ...pending, ultrasound_date: "2026-06-10", fetus_count: 2, ...confirmedPregnant }) === "Confirmed", "pregnant label");
 
 const confirmedEmpty = resolveBreedingAfterUltrasound(pending, 0);
-assert(confirmedEmpty.outcome === "Miscarriage", "not pregnant ultrasound → Miscarriage");
-assert(breedingRecordStatusLabel({ ...pending, ultrasound_date: "2026-06-10", fetus_count: 0, ...confirmedEmpty }) === "Not pregnant", "not pregnant label");
+assert(confirmedEmpty.outcome === "Miscarriage" && confirmedEmpty.status === "Ready", "empty ultrasound → Ready / Miscarriage");
+assert(breedingRecordStatusLabel({ ...pending, ultrasound_date: "2026-06-10", fetus_count: 0, ...confirmedEmpty }) === "Ready", "ready label");
 
 const delivered = resolveBreedingAfterBirth(pending, "2026-08-15");
 assert(delivered.outcome === "Delivered" && delivered.status === "Delivered", "birth closes breeding");
-assert(breedingRecordStatusLabel({ ...pending, ...delivered }) === "Delivered", "delivered label");
+assert(breedingRecordStatusLabel({ ...pending, ...delivered }) === "Delivered", "delivered label within 60 days");
+assert(
+  breedingRecordStatusLabel({ ...pending, ...delivered, delivered_date: "2026-04-01" }, "2026-08-17") === "Ready",
+  "delivered label after 60 days becomes ready"
+);
+assert(
+  isRecentDelivery({ ...pending, ...delivered, delivered_date: "2026-08-15" }, "2026-08-17"),
+  "recent delivery within 60 days"
+);
+assert(
+  !isRecentDelivery({ ...pending, ...delivered, delivered_date: "2026-04-01" }, "2026-08-17"),
+  "old delivery not recent"
+);
+
+const deliveredTimeline = breedingTimeline({ ...pending, ...delivered });
+assert(deliveredTimeline?.type === "delivered" && deliveredTimeline.date === "2026-08-15", "delivered timeline uses birth date");
+assert(
+  breedingTimeline({ ...pending, ...delivered, expected_due_date: "2026-09-03" })?.type === "delivered",
+  "delivered timeline ignores expected due date"
+);
 
 assert(
   canRecordOrEditUltrasound({ ...pending, ultrasound_date: "2026-06-10", fetus_count: 2 }),
@@ -228,6 +250,25 @@ assert(
   !canRecordOrEditUltrasound({ ...delivered, ultrasound_date: "2026-06-10", fetus_count: 2 }),
   "cannot edit ultrasound after delivery"
 );
+
+const notPregnantUltrasound = breedingEvent({
+  id: "br-ready",
+  female_animal_id: 6,
+  ultrasound_date: "2026-08-15",
+  fetus_count: 0,
+  outcome: "Pending",
+  status: "Ready",
+});
+assert(!isBreedingInPipeline(notPregnantUltrasound), "0-kid ultrasound closes pipeline");
+const readyHerd = computeHerdHealth({
+  animals: [{ ...animal, id: 6, name: "Guriya", sex: "Female" }],
+  medical_events: [],
+  breeding_events: [notPregnantUltrasound],
+  weight_logs: [],
+  today: "2026-08-17",
+});
+assert(readyHerd.breeding[0]?.status === "ready", "not pregnant doe shows ready badge tone");
+assert(readyHerd.breeding[0]?.statusLabel === "Ready", "not pregnant doe shows ready label");
 
 const cadburyBreeding = breedingEvent({
   id: "br-cadbury",
@@ -249,6 +290,42 @@ const herdAfterBirth = computeHerdHealth({
   today: "2026-08-17",
 });
 assert(herdAfterBirth.breeding[0]?.status === "completed", "delivered breeding not pending in herd");
+assert(herdAfterBirth.breeding[0]?.statusLabel === "Delivered", "delivered doe shows delivered label");
+
+const oldDelivery = resolveBreedingAfterBirth(cadburyBreeding, "2026-04-01");
+const herdOldDelivery = computeHerdHealth({
+  animals: [{ ...animal, id: 43, name: "Cadbury", sex: "Female" }],
+  medical_events: [],
+  breeding_events: [oldDelivery],
+  weight_logs: [],
+  today: "2026-08-17",
+});
+assert(herdOldDelivery.breeding[0]?.status === "ready", "old delivery shows ready badge");
+assert(herdOldDelivery.breeding[0]?.statusLabel === "Ready", "old delivery shows ready label");
+
+const kidDoe: Animal = {
+  ...animal,
+  id: 99,
+  name: "KidDoe",
+  sex: "Female",
+  home_bred: true,
+  date_of_purchase: "2026-07-01",
+  age_at_purchase: "0",
+};
+const openDoe: Animal = { ...animal, id: 100, name: "OpenDoe", sex: "Female" };
+const herdRoster = computeHerdHealth({
+  animals: [animal, kidDoe, openDoe],
+  medical_events: [],
+  breeding_events: [inWindow],
+  weight_logs: [],
+  today: ultrasoundToday,
+});
+assert(!herdRoster.breeding.some((b) => b.femaleId === 99), "kids excluded from breeding roster");
+assert(
+  herdRoster.breeding.some((b) => b.femaleId === 100 && b.status === "ready"),
+  "adult doe without breeding shows ready"
+);
+assert(herdRoster.breeding.length === 2, "roster lists each adult female once");
 
 const herdUltrasound = computeHerdHealth({
   animals: [animal],
@@ -271,10 +348,10 @@ const herdActiveOnly = computeHerdHealth({
   weight_logs: [],
   today: ultrasoundToday,
 });
-assert(herdActiveOnly.breeding.length === 1, "only active goat breeding rows");
+assert(herdActiveOnly.breeding.length === 1, "only active adult female in breeding roster");
 assert(
-  herdActiveOnly.breeding[0]?.event.female_animal_id === 1,
-  "active doe only in breeding list"
+  herdActiveOnly.breeding[0]?.femaleId === 1,
+  "active doe in breeding roster"
 );
 
 console.log("PASS herd health intervals (PPR yearly, ETV & deworm twice yearly)");

@@ -17,7 +17,7 @@ import {
 import { DeleteAnimalButton } from "@/components/DeleteAnimalButton";
 import { BreedingRecordActions } from "@/components/BreedingRecordActions";
 import { backFromAnimalProfile } from "@/lib/livestock/health-nav";
-import { computeUltrasoundStatus, daysSinceCrossed, breedingRecordStatusLabel } from "@/lib/livestock/breeding";
+import { computeUltrasoundStatus, daysSinceCrossed, breedingRecordStatusLabel, breedingTimeline } from "@/lib/livestock/breeding";
 import { estimateAnimalAge } from "@/lib/livestock/age";
 
 export const dynamic = "force-dynamic";
@@ -310,13 +310,23 @@ export default async function AnimalProfilePage({
               const ultrasoundStatus = computeUltrasoundStatus(b, today);
               const crossedDays =
                 b.date_crossed ? daysSinceCrossed(b.date_crossed, today) : null;
+              const timeline = breedingTimeline(b, undefined, today);
+              const timelineLabel =
+                timeline?.type === "delivered"
+                  ? `Delivered ${formatDate(timeline.date)}`
+                  : timeline?.type === "stillbirth"
+                    ? `Stillbirth ${formatDate(timeline.date)}`
+                    : timeline?.type === "due"
+                        ? `Due ${formatDate(timeline.date)}`
+                        : null;
               return (
               <li key={b.id} className="border-b border-stone-100 pb-2">
                 <p className="font-medium">
-                  {b.buck_name || "Unknown buck"} · {breedingRecordStatusLabel(b)}
+                  {b.buck_name || "Unknown buck"} · {breedingRecordStatusLabel(b, today)}
                 </p>
                 <p className="text-stone-500">
-                  Crossed {formatDate(b.date_crossed)} · Due {formatDate(b.expected_due_date)}
+                  Crossed {formatDate(b.date_crossed)}
+                  {timelineLabel ? ` · ${timelineLabel}` : ""}
                 </p>
                 {b.notes && <p className="text-xs text-stone-500">{b.notes}</p>}
                 <BreedingRecordActions

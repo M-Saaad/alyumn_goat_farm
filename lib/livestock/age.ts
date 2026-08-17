@@ -2,6 +2,9 @@ import type { Animal, AnimalStatus } from "@/lib/types";
 
 const MS_PER_MONTH = 1000 * 60 * 60 * 24 * 30.437;
 
+/** Goats under 12 months are treated as kids for breeding views. */
+export const KID_MAX_MONTHS = 12;
+
 export type ParsedAgeAtAcquisition = {
   months: number;
   kind: "months" | "teeth" | "days" | "zero" | "unknown";
@@ -144,4 +147,16 @@ export function estimateAnimalAge(
     teeth: teeth.teeth,
     asOf: reference,
   };
+}
+
+export function isKidAnimal(
+  animal: Pick<Animal, "date_of_purchase" | "age_at_purchase" | "out_date" | "status" | "sex">,
+  asOf: string
+): boolean {
+  const age = estimateAnimalAge(animal, asOf);
+  if (age) return age.months < KID_MAX_MONTHS;
+  const parsed = parseAgeAtAcquisition(animal.age_at_purchase);
+  if (parsed?.kind === "zero") return true;
+  if (parsed && parsed.months < KID_MAX_MONTHS) return true;
+  return false;
 }

@@ -40,14 +40,15 @@ export async function GET() {
 
   try {
     const { herd } = await loadHerdHealthData();
-    const samples = herd.breeding.slice(0, 5);
+    const samples = herd.breeding.filter((row) => row.event).slice(0, 5);
     for (const row of samples) {
-      const profile = await loadAnimalProfileData(row.event.female_animal_id);
+      const event = row.event!;
+      const profile = await loadAnimalProfileData(row.femaleId);
       if (!profile) {
-        throw new Error(`animal ${row.event.female_animal_id} not found`);
+        throw new Error(`animal ${row.femaleId} not found`);
       }
-      if (!profile.breeding_events.some((b) => b.id === row.event.id)) {
-        throw new Error(`breeding ${row.event.id} missing on profile`);
+      if (!profile.breeding_events.some((b) => b.id === event.id)) {
+        throw new Error(`breeding ${event.id} missing on profile`);
       }
     }
     checks.breeding_profiles = samples.length > 0 ? `ok (${samples.length} sampled)` : "ok (none)";

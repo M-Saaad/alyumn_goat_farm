@@ -115,7 +115,7 @@ export function BreedingEventEditor({
             type="number"
             min={0}
             max={10}
-            placeholder="Blank = unknown, 0 = not pregnant"
+            placeholder="Blank = unknown, 0 = ready"
             defaultValue={event.fetus_count ?? ""}
           />
           <p className="mt-1 text-xs text-stone-500">

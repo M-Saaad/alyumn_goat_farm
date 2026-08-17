@@ -2,32 +2,42 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { formatDate } from "@/lib/format";
+import { formatDate, todayIso } from "@/lib/format";
 import { animalLinkFromHealth } from "@/lib/livestock/health-nav";
-import { canRecordOrEditUltrasound } from "@/lib/livestock/breeding";
+import { canRecordOrEditUltrasound, breedingTimeline } from "@/lib/livestock/breeding";
 import type { BreedingRow } from "@/lib/livestock/herd-health";
 import { UltrasoundStatusLine } from "@/components/UltrasoundStatusLine";
 import { RecordUltrasoundForm } from "@/components/RecordUltrasoundForm";
 
+function timelineText(
+  timeline: ReturnType<typeof breedingTimeline>,
+  formatDate: (iso: string) => string
+): string | null {
+  if (!timeline) return null;
+  if (timeline.type === "delivered") return `Delivered ${formatDate(timeline.date)}`;
+  if (timeline.type === "stillbirth") return `Stillbirth ${formatDate(timeline.date)}`;
+  const due = `Due ${formatDate(timeline.date)}`;
+  if (timeline.daysUntilDue == null) return due;
+  if (timeline.daysUntilDue < 0) {
+    return `${due} · ${Math.abs(timeline.daysUntilDue)}d overdue`;
+  }
+  return `${due} · ${timeline.daysUntilDue}d left`;
+}
+
 function statusBadge(
-  status: "overdue" | "due_soon" | "pending" | "completed" | undefined
+  status: BreedingRow["status"],
+  label: string
 ) {
-  const key = status ?? "completed";
-  const styles: Record<string, string> = {
+  const styles: Record<BreedingRow["status"], string> = {
     overdue: "bg-red-100 text-red-800",
     due_soon: "bg-amber-100 text-amber-900",
     pending: "bg-sky-100 text-sky-800",
     completed: "bg-stone-100 text-stone-600",
-  };
-  const labels: Record<string, string> = {
-    overdue: "Overdue",
-    due_soon: "Due soon",
-    pending: "Pending",
-    completed: "Done",
+    ready: "bg-stone-100 text-stone-500",
   };
   return (
-    <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold ${styles[key] ?? styles.completed}`}>
-      {labels[key] ?? "—"}
+    <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold ${styles[status]}`}>
+      {label}
     </span>
   );
 }
@@ -42,73 +52,68 @@ export function HealthBreedingList({
   const [recordingId, setRecordingId] = useState<string | null>(null);
 
   if (rows.length === 0) {
-    return <p className="text-sm text-stone-500">No active goats.</p>;
+    return <p className="text-sm text-stone-500">No adult females in the herd.</p>;
   }
 
   return (
     <ul className="divide-y divide-stone-100">
       {rows.map((b) => {
-        const canUltrasound =
-          canRecordOrEditUltrasound(b.event);
-        const isEditing = Boolean(b.event.ultrasound_date);
-        const showUltrasound =
-          canUltrasound || b.ultrasoundStatus === "confirmed";
+        const event = b.event;
+        const canUltrasound = event ? canRecordOrEditUltrasound(event) : false;
+        const isEditing = Boolean(event?.ultrasound_date);
+        const showUltrasound = event && (canUltrasound || b.ultrasoundStatus === "confirmed");
+        const timeline = event ? breedingTimeline(event, b.daysUntilDue, todayIso()) : null;
+        const dateLine = timelineText(timeline, formatDate);
 
         return (
-          <li key={b.event.id} className="py-3">
+          <li key={event?.id ?? `female-${b.femaleId}`} className="py-3">
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0 flex-1">
                 <Link
-                  href={animalLinkFromHealth(b.event.female_animal_id, "breeding")}
+                  href={animalLinkFromHealth(b.femaleId, "breeding")}
                   className="font-semibold text-stone-900 hover:text-emerald-800"
                 >
                   {b.femaleLabel}
                 </Link>
-                <p className="text-sm text-stone-600">
-                  {b.event.buck_name || "Unknown buck"} · crossed{" "}
-                  {formatDate(b.event.date_crossed)}
-                </p>
-                {b.event.expected_due_date && (
-                  <p className="text-sm text-stone-500">
-                    Due {formatDate(b.event.expected_due_date)}
-                    {b.daysUntilDue != null && b.status !== "completed" && (
-                      <span>
-                        {" "}
-                        · {b.daysUntilDue < 0 ? `${Math.abs(b.daysUntilDue)}d overdue` : `${b.daysUntilDue}d left`}
-                      </span>
-                    )}
+                {event ? (
+                  <p className="text-sm text-stone-600">
+                    {event.buck_name || "Unknown buck"} · crossed{" "}
+                    {formatDate(event.date_crossed)}
                   </p>
+                ) : (
+                  <p className="text-sm text-stone-600">Ready to breed</p>
                 )}
-                {showUltrasound && (
+                {dateLine && <p className="text-sm text-stone-500">{dateLine}</p>}
+                {showUltrasound && event && (
                   <UltrasoundStatusLine
                     ultrasoundStatus={b.ultrasoundStatus}
-                    ultrasoundDate={b.event.ultrasound_date}
-                    fetusCount={b.event.fetus_count}
+                    ultrasoundDate={event.ultrasound_date}
+                    fetusCount={event.fetus_count}
                     daysSinceCrossed={b.daysSinceCrossed}
                     showWhenIdle={canUltrasound && !isEditing}
                   />
                 )}
-                {b.event.notes && (
-                  <p className="mt-1 text-xs text-stone-500">{b.event.notes}</p>
+                {event?.notes && (
+                  <p className="mt-1 text-xs text-stone-500">{event.notes}</p>
                 )}
-                {canUltrasound && recordingId !== b.event.id && (
+                {canUltrasound && event && recordingId !== event.id && (
                   <button
                     type="button"
-                    onClick={() => setRecordingId(b.event.id)}
+                    onClick={() => setRecordingId(event.id)}
                     className="mt-1 text-xs font-semibold text-emerald-700"
                   >
                     {isEditing ? "Edit ultrasound" : "Record ultrasound"}
                   </button>
                 )}
               </div>
-              {statusBadge(b.status)}
+              {statusBadge(b.status, b.statusLabel)}
             </div>
-            {recordingId === b.event.id && (
+            {event && recordingId === event.id && (
               <RecordUltrasoundForm
-                breedingId={b.event.id}
-                femaleId={b.event.female_animal_id}
-                defaultUltrasoundDate={b.event.ultrasound_date}
-                defaultFetusCount={b.event.fetus_count}
+                breedingId={event.id}
+                femaleId={b.femaleId}
+                defaultUltrasoundDate={event.ultrasound_date}
+                defaultFetusCount={event.fetus_count}
                 supabaseEnabled={supabaseEnabled}
                 onDone={() => setRecordingId(null)}
               />

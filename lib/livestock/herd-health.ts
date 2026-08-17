@@ -1,8 +1,11 @@
 import { animalLabel } from "@/lib/labels";
+import { isKidAnimal } from "./age";
 import {
+  breedingRecordStatusLabel,
   computeUltrasoundStatus,
   daysSinceCrossed,
   isBreedingInPipeline,
+  isDoeBreedingReady,
   ultrasoundWindowEnd,
   ultrasoundWindowStart,
   type UltrasoundStatus,
@@ -42,10 +45,12 @@ export type AnimalDueItem = {
 };
 
 export type BreedingRow = {
-  event: BreedingEvent;
+  femaleId: number;
   femaleLabel: string;
+  event: BreedingEvent | null;
+  statusLabel: string;
   daysUntilDue: number | null;
-  status: "overdue" | "due_soon" | "pending" | "completed";
+  status: "overdue" | "due_soon" | "pending" | "completed" | "ready";
   daysSinceCrossed: number | null;
   ultrasoundStatus: UltrasoundStatus;
   ultrasoundWindowStart: string | null;
@@ -183,6 +188,74 @@ function buildDueList(
     });
 }
 
+function isAdultBreedingFemale(animal: Animal, today: string): boolean {
+  return animal.status === "Active" && animal.sex === "Female" && !isKidAnimal(animal, today);
+}
+
+function relevantBreedingEvent(
+  events: BreedingEvent[],
+  femaleId: number
+): BreedingEvent | null {
+  const mine = events.filter((e) => e.female_animal_id === femaleId);
+  if (mine.length === 0) return null;
+  const sortByCrossed = (list: BreedingEvent[]) =>
+    [...list].sort((a, b) => (b.date_crossed ?? "").localeCompare(a.date_crossed ?? ""));
+  const active = mine.filter(isBreedingInPipeline);
+  return sortByCrossed(active)[0] ?? sortByCrossed(mine)[0] ?? null;
+}
+
+function buildBreedingRow(
+  female: Animal,
+  event: BreedingEvent | null,
+  today: string
+): BreedingRow {
+  const femaleLabel = animalLabel(female);
+  if (!event || isDoeBreedingReady(event, today)) {
+    return {
+      femaleId: female.id,
+      femaleLabel,
+      event,
+      statusLabel: "Ready",
+      daysUntilDue: null,
+      status: "ready",
+      daysSinceCrossed: null,
+      ultrasoundStatus: event ? computeUltrasoundStatus(event, today) : "not_due",
+      ultrasoundWindowStart: null,
+      ultrasoundWindowEnd: null,
+    };
+  }
+
+  const isPending = isBreedingInPipeline(event);
+  let daysUntilDue: number | null = null;
+  let status: BreedingRow["status"] = "completed";
+  if (isPending && event.expected_due_date) {
+    daysUntilDue = daysBetween(today, event.expected_due_date);
+    if (daysUntilDue < 0) status = "overdue";
+    else if (daysUntilDue <= DUE_SOON_DAYS) status = "due_soon";
+    else status = "pending";
+  }
+  const crossedDays =
+    event.date_crossed && isPending ? daysSinceCrossed(event.date_crossed, today) : null;
+  const ultrasoundStatus = computeUltrasoundStatus(event, today);
+  const windowStart =
+    event.date_crossed && isPending ? ultrasoundWindowStart(event.date_crossed) : null;
+  const windowEnd =
+    event.date_crossed && isPending ? ultrasoundWindowEnd(event.date_crossed) : null;
+
+  return {
+    femaleId: female.id,
+    femaleLabel,
+    event,
+    statusLabel: breedingRecordStatusLabel(event, today),
+    daysUntilDue,
+    status,
+    daysSinceCrossed: crossedDays,
+    ultrasoundStatus,
+    ultrasoundWindowStart: windowStart,
+    ultrasoundWindowEnd: windowEnd,
+  };
+}
+
 export function computeHerdHealth(input: {
   animals: Animal[];
   medical_events: MedicalEvent[];
@@ -195,6 +268,7 @@ export function computeHerdHealth(input: {
   const medicalEvents = input.medical_events ?? [];
   const breedingEvents = input.breeding_events ?? [];
   const activeAnimals = input.animals.filter((a) => a.status === "Active");
+  const adultFemales = activeAnimals.filter((a) => isAdultBreedingFemale(a, today));
   const activeAnimalIds = new Set(activeAnimals.map((a) => a.id));
   const activeBreedingEvents = breedingEvents.filter((e) =>
     activeAnimalIds.has(e.female_animal_id)
@@ -214,42 +288,16 @@ export function computeHerdHealth(input: {
   });
   const deworming = buildDueList(activeAnimals, lastDeworm, DEWORM_INTERVAL_DAYS, today);
 
-  const breeding: BreedingRow[] = activeBreedingEvents
-    .map((event) => {
-      const female = input.animals.find((a) => a.id === event.female_animal_id);
-      const femaleLabel = female ? animalLabel(female) : `Goat #${event.female_animal_id}`;
-      const isPending = isBreedingInPipeline(event);
-      let daysUntilDue: number | null = null;
-      let status: BreedingRow["status"] = "completed";
-      if (isPending && event.expected_due_date) {
-        daysUntilDue = daysBetween(today, event.expected_due_date);
-        if (daysUntilDue < 0) status = "overdue";
-        else if (daysUntilDue <= DUE_SOON_DAYS) status = "due_soon";
-        else status = "pending";
-      }
-      const crossedDays =
-        event.date_crossed && isPending ? daysSinceCrossed(event.date_crossed, today) : null;
-      const ultrasoundStatus = computeUltrasoundStatus(event, today);
-      const windowStart =
-        event.date_crossed && isPending ? ultrasoundWindowStart(event.date_crossed) : null;
-      const windowEnd =
-        event.date_crossed && isPending ? ultrasoundWindowEnd(event.date_crossed) : null;
-      return {
-        event,
-        femaleLabel,
-        daysUntilDue,
-        status,
-        daysSinceCrossed: crossedDays,
-        ultrasoundStatus,
-        ultrasoundWindowStart: windowStart,
-        ultrasoundWindowEnd: windowEnd,
-      };
-    })
+  const breeding: BreedingRow[] = adultFemales
+    .map((female) => buildBreedingRow(female, relevantBreedingEvent(breedingEvents, female.id), today))
     .sort((a, b) => {
-      const pendingOrder = { overdue: 0, due_soon: 1, pending: 2, completed: 3 };
+      const pendingOrder = { overdue: 0, due_soon: 1, pending: 2, completed: 3, ready: 4 };
       const diff = pendingOrder[a.status] - pendingOrder[b.status];
       if (diff !== 0) return diff;
-      return (a.daysUntilDue ?? 999) - (b.daysUntilDue ?? 999);
+      if (a.daysUntilDue != null && b.daysUntilDue != null && a.daysUntilDue !== b.daysUntilDue) {
+        return a.daysUntilDue - b.daysUntilDue;
+      }
+      return a.femaleLabel.localeCompare(b.femaleLabel);
     });
 
   const weightsByAnimal = new Map<number, WeightLog[]>();
@@ -309,9 +357,9 @@ export function computeHerdHealth(input: {
     if (b.status === "overdue" || b.status === "due_soon") {
       actions.push({
         kind: "breeding",
-        animalId: b.event.female_animal_id,
+        animalId: b.femaleId,
         label: b.femaleLabel,
-        detail: `Expected ${b.event.expected_due_date}`,
+        detail: `Expected ${b.event?.expected_due_date}`,
         urgency: b.status === "overdue" ? "overdue" : "due_soon",
       });
     }

@@ -33,26 +33,27 @@ async function main() {
   }
 
   for (const row of data.herd.breeding) {
-    const href = animalLinkFromHealth(row.event.female_animal_id, "breeding");
+    const href = animalLinkFromHealth(row.femaleId, "breeding");
     if (!href.includes("from=health") || !href.includes("tab=breeding")) {
       fail(`bad animal link for ${row.femaleLabel}`, href);
       continue;
     }
 
-    if (!row.event.id) fail(`missing event id for ${row.femaleLabel}`);
-    if (!row.femaleLabel) fail(`missing female label for animal ${row.event.female_animal_id}`);
-    if (!["overdue", "due_soon", "pending", "completed"].includes(row.status)) {
+    if (!row.femaleLabel) fail(`missing female label for animal ${row.femaleId}`);
+    if (!["overdue", "due_soon", "pending", "completed", "ready"].includes(row.status)) {
       fail(`invalid status ${row.status} for ${row.femaleLabel}`);
     }
 
     try {
-      const profile = await loadAnimalProfileData(row.event.female_animal_id);
+      const profile = await loadAnimalProfileData(row.femaleId);
       if (!profile) {
         fail(`profile not found for ${row.femaleLabel}`);
         continue;
       }
-      const hasEvent = profile.breeding_events.some((b) => b.id === row.event.id);
-      if (!hasEvent) fail(`breeding event missing on profile ${row.femaleLabel}`);
+      if (row.event) {
+        const hasEvent = profile.breeding_events.some((b) => b.id === row.event!.id);
+        if (!hasEvent) fail(`breeding event missing on profile ${row.femaleLabel}`);
+      }
       if (!profile.quickEntry.maleAnimals) fail(`missing maleAnimals for ${row.femaleLabel}`);
     } catch (e) {
       fail(`profile load ${row.femaleLabel}`, e);

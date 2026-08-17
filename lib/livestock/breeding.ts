@@ -1,6 +1,9 @@
 import type { Animal, BreedingEvent, BreedingOutcome, BreedingStatus } from "../types";
+import { todayIso } from "../format";
 
 export const GESTATION_DAYS = 150;
+/** Show Delivered status for this many days after kidding, then Ready. */
+export const POST_DELIVERY_READY_DAYS = 60;
 /** Ultrasound window starts day 40 after crossing (inclusive). */
 export const ULTRASOUND_WINDOW_START_DAYS = 40;
 /** Ultrasound window ends day 75 after crossing (inclusive). */
@@ -72,7 +75,7 @@ export function ultrasoundConfirmedText(
   fetusCount: number | null
 ): string {
   const datePart = ultrasoundDate ? `Ultrasound ${ultrasoundDate.slice(0, 10)}` : "Ultrasound";
-  if (fetusCount === 0) return `Not pregnant · ${datePart}`;
+  if (fetusCount === 0) return `Ready · ${datePart}`;
   if (fetusCount != null && fetusCount > 0) {
     return `Confirmed · ${formatKidCount(fetusCount)} · ${datePart}`;
   }
@@ -80,13 +83,25 @@ export function ultrasoundConfirmedText(
 }
 
 /** Short label for breeding rows after ultrasound (animal profile, lists). */
-export function breedingRecordStatusLabel(event: BreedingEvent): string {
-  if (event.outcome === "Delivered") return "Delivered";
+export function isRecentDelivery(event: BreedingEvent, today: string = todayIso()): boolean {
+  if (event.outcome !== "Delivered") return false;
+  const delivered = event.delivered_date?.trim().slice(0, 10);
+  if (!delivered) return false;
+  return daysBetween(delivered, today) <= POST_DELIVERY_READY_DAYS;
+}
+
+export function breedingRecordStatusLabel(
+  event: BreedingEvent,
+  today: string = todayIso()
+): string {
+  if (event.outcome === "Delivered") {
+    return isRecentDelivery(event, today) ? "Delivered" : "Ready";
+  }
   if (event.outcome === "Stillbirth") return "Stillbirth";
-  if (event.outcome === "Miscarriage") return "Not pregnant";
+  if (event.outcome === "Miscarriage") return "Ready";
   if (event.ultrasound_date) {
     if (event.fetus_count != null && event.fetus_count > 0) return "Confirmed";
-    if (event.fetus_count === 0) return "Not pregnant";
+    if (event.fetus_count === 0) return "Ready";
   }
   return event.status || event.outcome;
 }
@@ -97,7 +112,7 @@ export function resolveBreedingAfterUltrasound(
   fetusCount: number | null | undefined
 ): { status: BreedingStatus | null; outcome: BreedingOutcome } {
   if (fetusCount === 0) {
-    return { status: null, outcome: "Miscarriage" };
+    return { status: "Ready", outcome: "Miscarriage" };
   }
   if (fetusCount != null && fetusCount > 0) {
     return { status: "Ready", outcome: "Pending" };
@@ -187,11 +202,24 @@ export function breedingUpdatesFromBirths(
   return [...byBreedingId.values()];
 }
 
+/** Doe is available to breed again (no active pregnancy on this record). */
+export function isDoeBreedingReady(
+  event: BreedingEvent | null,
+  today: string = todayIso()
+): boolean {
+  if (!event) return true;
+  if (event.outcome === "Miscarriage") return true;
+  if (event.ultrasound_date && event.fetus_count === 0) return true;
+  if (event.outcome === "Delivered" && !isRecentDelivery(event, today)) return true;
+  return false;
+}
+
 /** Active pregnancy / not yet closed out — matches Goats "Breeding" filter. */
 export function isBreedingInPipeline(event: BreedingEvent): boolean {
   if (event.outcome === "Delivered" || event.outcome === "Stillbirth" || event.outcome === "Miscarriage") {
     return false;
   }
+  if (event.ultrasound_date && event.fetus_count === 0) return false;
   return event.outcome === "Pending" || event.outcome === "Doubt" || event.status === "Doubt";
 }
 
@@ -201,6 +229,33 @@ export function femalesInBreedingPipeline(events: BreedingEvent[]): Set<number> 
     if (isBreedingInPipeline(e)) ids.add(e.female_animal_id);
   }
   return ids;
+}
+
+/** Secondary date line for breeding rows (delivery, loss, or expected due). */
+export type BreedingTimeline =
+  | { type: "delivered"; date: string }
+  | { type: "stillbirth"; date: string }
+  | { type: "due"; date: string; daysUntilDue: number | null };
+
+export function breedingTimeline(
+  event: BreedingEvent,
+  daysUntilDue?: number | null,
+  today: string = todayIso()
+): BreedingTimeline | null {
+  if (event.outcome === "Delivered") {
+    if (!isRecentDelivery(event, today)) return null;
+    const date = event.delivered_date ?? event.expected_due_date;
+    return date ? { type: "delivered", date } : null;
+  }
+  if (event.outcome === "Stillbirth") {
+    const date = event.delivered_date;
+    return date ? { type: "stillbirth", date } : null;
+  }
+  if (!isBreedingInPipeline(event)) return null;
+  if (event.expected_due_date) {
+    return { type: "due", date: event.expected_due_date, daysUntilDue: daysUntilDue ?? null };
+  }
+  return null;
 }
 
 export function expectedDueDate(dateCrossed: string): string {
