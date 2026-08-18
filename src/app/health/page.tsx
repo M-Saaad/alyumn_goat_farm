@@ -117,7 +117,7 @@ function HealthPageView({
       <AppHeader
         eyebrow="Livestock"
         title="Herd Health"
-        subtitle={`${summary.activeCount} active goats · Ultrasound day 40–75 · PPR yearly · ETV & deworm twice yearly`}
+        subtitle={`${summary.activeCount} active goats · Ultrasound day 40–75 · PPR yearly · ETV & internal deworm twice yearly · external deworm 2d after internal`}
       />
 
       <Suspense fallback={<div className="mb-4 h-10 animate-pulse rounded-xl bg-stone-200" />}>
@@ -229,12 +229,20 @@ function HealthPageView({
       )}
 
       {tab === "deworm" && (
-        <DueList
-          title="Deworming (twice a year)"
-          items={herd.deworming}
-          emptyMessage="No active goats."
-          healthTab="deworm"
-        />
+        <>
+          <DueList
+            title="Internal deworming (twice a year)"
+            items={herd.deworming.filter((d) => d.dewormKind === "internal")}
+            emptyMessage="No active goats."
+            healthTab="deworm"
+          />
+          <DueList
+            title="External deworming (2 days after internal)"
+            items={herd.deworming.filter((d) => d.dewormKind === "external")}
+            emptyMessage="No active goats."
+            healthTab="deworm"
+          />
+        </>
       )}
 
       {tab === "weight" && (

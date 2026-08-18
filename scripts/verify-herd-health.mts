@@ -5,6 +5,7 @@ import {
   PPR_INTERVAL_DAYS,
   vaccineKindFromNotes,
 } from "../lib/livestock/herd-health.ts";
+import { dewormKindFromNotes, EXTERNAL_DEWORM_DELAY_DAYS } from "../lib/livestock/medical-notes.ts";
 import {
   computeUltrasoundStatus,
   needsUltrasound,
@@ -54,6 +55,17 @@ function med(date: string, notes: string): MedicalEvent {
     id: `m-${date}-${notes}`,
     animal_id: 1,
     event_type: "Vaccine",
+    date,
+    notes,
+    transaction_id: null,
+  };
+}
+
+function deworm(date: string, notes: string): MedicalEvent {
+  return {
+    id: `d-${date}-${notes}`,
+    animal_id: 1,
+    event_type: "Deworming",
     date,
     notes,
     transaction_id: null,
@@ -126,6 +138,69 @@ assert(
 );
 
 assert(DEWORM_INTERVAL_DAYS === 182, "deworm interval is twice yearly");
+assert(EXTERNAL_DEWORM_DELAY_DAYS === 2, "external deworm follows internal by 2 days");
+assert(dewormKindFromNotes("I-DW Deviser Plus") === "internal", "I-DW notes");
+assert(dewormKindFromNotes("E-DW Unimec Plus") === "external", "E-DW notes");
+
+const recentInternal = computeHerdHealth({
+  animals: [animal],
+  medical_events: [deworm("2026-02-01", "I-DW Deviser Plus 5ml")],
+  breeding_events: [],
+  weight_logs: [],
+  today,
+});
+const internalOk = recentInternal.deworming.find((d) => d.dewormKind === "internal");
+assert(internalOk?.status === "ok", `recent internal deworm should be ok, got ${internalOk?.status}`);
+
+const overdueInternal = computeHerdHealth({
+  animals: [animal],
+  medical_events: [deworm("2025-12-01", "I-DW Deviser Plus 5ml")],
+  breeding_events: [],
+  weight_logs: [],
+  today,
+});
+const oldInternal = overdueInternal.deworming.find((d) => d.dewormKind === "internal");
+assert(oldInternal?.status === "overdue", `old internal deworm should be overdue, got ${oldInternal?.status}`);
+
+const internalOnly = computeHerdHealth({
+  animals: [animal],
+  medical_events: [deworm("2026-06-29", "I-DW Deviser Plus 5ml")],
+  breeding_events: [],
+  weight_logs: [],
+  today,
+});
+const externalPending = internalOnly.deworming.find((d) => d.dewormKind === "external");
+assert(
+  externalPending?.status === "due_soon",
+  `external deworm on due date should be due soon, got ${externalPending?.status}`
+);
+assert(externalPending?.dueDate === "2026-07-01", "external due date is internal + 2 days");
+
+const externalDone = computeHerdHealth({
+  animals: [animal],
+  medical_events: [
+    deworm("2026-06-28", "I-DW Deviser Plus 5ml"),
+    deworm("2026-06-30", "E-DW Unimec Plus 1cc"),
+  ],
+  breeding_events: [],
+  weight_logs: [],
+  today,
+});
+const externalOk = externalDone.deworming.find((d) => d.dewormKind === "external");
+assert(externalOk?.status === "ok", `external deworm after internal should be ok, got ${externalOk?.status}`);
+
+const externalOverdue = computeHerdHealth({
+  animals: [animal],
+  medical_events: [deworm("2026-06-20", "I-DW Deviser Plus 5ml")],
+  breeding_events: [],
+  weight_logs: [],
+  today,
+});
+const externalLate = externalOverdue.deworming.find((d) => d.dewormKind === "external");
+assert(
+  externalLate?.status === "overdue",
+  `external deworm 11 days after internal should be overdue, got ${externalLate?.status}`
+);
 
 function breedingEvent(
   overrides: Partial<BreedingEvent> & Pick<BreedingEvent, "id" | "female_animal_id">
@@ -354,5 +429,5 @@ assert(
   "active doe in breeding roster"
 );
 
-console.log("PASS herd health intervals (PPR yearly, ETV & deworm twice yearly)");
+console.log("PASS herd health intervals (PPR yearly, ETV & internal deworm twice yearly, external 2d after internal)");
 console.log("PASS breeding ultrasound window (day 40–75)");

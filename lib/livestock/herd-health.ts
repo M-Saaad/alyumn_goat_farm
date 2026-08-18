@@ -1,4 +1,9 @@
 import { animalLabel } from "@/lib/labels";
+import {
+  dewormKindFromNotes,
+  EXTERNAL_DEWORM_DELAY_DAYS,
+  type DewormType,
+} from "./medical-notes";
 import { isKidAnimal } from "./age";
 import {
   breedingRecordStatusLabel,
@@ -42,6 +47,7 @@ export type AnimalDueItem = {
   daysUntilDue: number | null;
   status: DueStatus;
   vaccineKind?: VaccineKind;
+  dewormKind?: DewormType;
 };
 
 export type BreedingRow = {
@@ -128,15 +134,16 @@ function dueStatus(lastDate: string | null, intervalDays: number, today: string)
   return { dueDate, daysUntilDue, status: "ok" };
 }
 
-function lastEventByAnimal(
+function lastDewormByKind(
   events: MedicalEvent[],
-  eventType: MedicalEvent["event_type"]
+  kind: DewormType
 ): Map<number, MedicalEvent> {
   const map = new Map<number, MedicalEvent>();
   for (const e of events) {
-    if (e.event_type !== eventType || !e.date) continue;
+    if (e.event_type !== "Deworming" || !e.date) continue;
+    if (dewormKindFromNotes(e.notes) !== kind) continue;
     const prev = map.get(e.animal_id);
-    if (!prev || (e.date > (prev.date || ""))) {
+    if (!prev || e.date > (prev.date || "")) {
       map.set(e.animal_id, e);
     }
   }
@@ -164,7 +171,7 @@ function buildDueList(
   lastByAnimal: Map<number, MedicalEvent>,
   intervalDays: number,
   today: string,
-  vaccineKind?: VaccineKind
+  kind?: VaccineKind | DewormType
 ): AnimalDueItem[] {
   return activeAnimals
     .map((a) => {
@@ -177,7 +184,63 @@ function buildDueList(
         dueDate,
         daysUntilDue,
         status,
-        ...(vaccineKind ? { vaccineKind } : {}),
+        ...(kind === "ppr" || kind === "etv" ? { vaccineKind: kind } : {}),
+        ...(kind === "internal" || kind === "external" ? { dewormKind: kind } : {}),
+      };
+    })
+    .sort((a, b) => {
+      const order: Record<DueStatus, number> = { overdue: 0, due_soon: 1, never: 2, ok: 3 };
+      const diff = order[a.status] - order[b.status];
+      if (diff !== 0) return diff;
+      return (a.daysUntilDue ?? 999) - (b.daysUntilDue ?? 999);
+    });
+}
+
+function externalDewormDue(
+  lastInternal: MedicalEvent | null,
+  lastExternal: MedicalEvent | null,
+  today: string
+): { dueDate: string | null; daysUntilDue: number | null; status: DueStatus } {
+  if (!lastInternal?.date) {
+    return { dueDate: null, daysUntilDue: null, status: "never" };
+  }
+  if (lastExternal?.date && lastExternal.date >= lastInternal.date) {
+    return { dueDate: null, daysUntilDue: null, status: "ok" };
+  }
+  const dueDate = addDays(lastInternal.date, EXTERNAL_DEWORM_DELAY_DAYS);
+  const daysUntilDue = daysBetween(today, dueDate);
+  if (daysUntilDue > DUE_SOON_DAYS) {
+    return { dueDate, daysUntilDue, status: "ok" };
+  }
+  if (daysUntilDue < 0) {
+    return { dueDate, daysUntilDue, status: "overdue" };
+  }
+  return { dueDate, daysUntilDue, status: "due_soon" };
+}
+
+function buildExternalDewormList(
+  activeAnimals: Animal[],
+  lastInternalByAnimal: Map<number, MedicalEvent>,
+  lastExternalByAnimal: Map<number, MedicalEvent>,
+  today: string
+): AnimalDueItem[] {
+  return activeAnimals
+    .map((a) => {
+      const lastInternal = lastInternalByAnimal.get(a.id);
+      const lastExternal = lastExternalByAnimal.get(a.id);
+      const { dueDate, daysUntilDue, status } = externalDewormDue(
+        lastInternal ?? null,
+        lastExternal ?? null,
+        today
+      );
+      return {
+        animalId: a.id,
+        label: animalLabel(a),
+        lastDate: lastExternal?.date ?? null,
+        dueDate,
+        daysUntilDue,
+        status,
+        dewormKind: "external" as const,
       };
     })
     .sort((a, b) => {
@@ -276,7 +339,8 @@ export function computeHerdHealth(input: {
 
   const lastPpr = lastVaccineByKind(medicalEvents, "ppr");
   const lastEtv = lastVaccineByKind(medicalEvents, "etv");
-  const lastDeworm = lastEventByAnimal(medicalEvents, "Deworming");
+  const lastInternalDeworm = lastDewormByKind(medicalEvents, "internal");
+  const lastExternalDeworm = lastDewormByKind(medicalEvents, "external");
 
   const pprVaccines = buildDueList(activeAnimals, lastPpr, PPR_INTERVAL_DAYS, today, "ppr");
   const etvVaccines = buildDueList(activeAnimals, lastEtv, ETV_INTERVAL_DAYS, today, "etv");
@@ -286,7 +350,25 @@ export function computeHerdHealth(input: {
     if (diff !== 0) return diff;
     return (a.daysUntilDue ?? 999) - (b.daysUntilDue ?? 999);
   });
-  const deworming = buildDueList(activeAnimals, lastDeworm, DEWORM_INTERVAL_DAYS, today);
+  const internalDeworming = buildDueList(
+    activeAnimals,
+    lastInternalDeworm,
+    DEWORM_INTERVAL_DAYS,
+    today,
+    "internal"
+  );
+  const externalDeworming = buildExternalDewormList(
+    activeAnimals,
+    lastInternalDeworm,
+    lastExternalDeworm,
+    today
+  );
+  const deworming = [...internalDeworming, ...externalDeworming].sort((a, b) => {
+    const order: Record<DueStatus, number> = { overdue: 0, due_soon: 1, never: 2, ok: 3 };
+    const diff = order[a.status] - order[b.status];
+    if (diff !== 0) return diff;
+    return (a.daysUntilDue ?? 999) - (b.daysUntilDue ?? 999);
+  });
 
   const breeding: BreedingRow[] = adultFemales
     .map((female) => buildBreedingRow(female, relevantBreedingEvent(breedingEvents, female.id), today))
@@ -344,11 +426,17 @@ export function computeHerdHealth(input: {
   }
   for (const d of deworming) {
     if (d.status === "overdue" || d.status === "due_soon" || d.status === "never") {
+      const dewormLabel = d.dewormKind === "internal" ? "Internal deworm" : "External deworm";
       actions.push({
         kind: "deworm",
         animalId: d.animalId,
         label: d.label,
-        detail: d.status === "never" ? "Never dewormed" : `Due ${d.dueDate}`,
+        detail:
+          d.status === "never"
+            ? d.dewormKind === "external"
+              ? "No internal deworm on record"
+              : "Never internally dewormed"
+            : `${dewormLabel} due ${d.dueDate}`,
         urgency: d.status === "overdue" ? "overdue" : "due_soon",
       });
     }
@@ -405,7 +493,7 @@ export function computeHerdHealth(input: {
     neverVaccinated: new Set(
       vaccines.filter((v) => v.status === "never").map((v) => v.animalId)
     ).size,
-    neverDewormed: deworming.filter((d) => d.status === "never").length,
+    neverDewormed: internalDeworming.filter((d) => d.status === "never").length,
     neverWeighed: weights.filter((w) => !w.latest).length,
     breedingDelivered,
     breedingFailed,

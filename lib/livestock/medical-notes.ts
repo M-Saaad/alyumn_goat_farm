@@ -8,6 +8,16 @@ export const DEWORM_TYPES = [
 ] as const;
 export type DewormType = (typeof DEWORM_TYPES)[number]["value"];
 
+/** External deworming is due this many days after the latest internal deworming. */
+export const EXTERNAL_DEWORM_DELAY_DAYS = 2;
+
+export function dewormKindFromNotes(notes: string | null | undefined): DewormType | null {
+  const text = (notes ?? "").trim();
+  if (text.startsWith("I-DW") || text.includes("I-DW")) return "internal";
+  if (text.startsWith("E-DW") || text.includes("E-DW")) return "external";
+  return null;
+}
+
 /** Common dewormer product names used on this farm, by type. */
 export const DEWORMER_NAMES_BY_TYPE: Record<DewormType, readonly string[]> = {
   internal: ["Deviser Plus", "Nilzan Plus", "Punch", "Thunder"],
