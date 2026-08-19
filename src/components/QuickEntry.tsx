@@ -157,7 +157,6 @@ export function QuickEntry({
               <PalaiPaymentForm
                 customers={customers}
                 palaiHistory={palaiHistory}
-                onSuccess={close}
               />
             )}
 

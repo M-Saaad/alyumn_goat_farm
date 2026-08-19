@@ -93,12 +93,20 @@ export async function actionLogExpense(formData: FormData) {
 export async function actionRecordPalai(formData: FormData) {
   const serviceMonth = String(formData.get("serviceMonth") || "").trim();
   if (!serviceMonth) throw new Error("Select which month this payment is for");
+  const ratePerGoat = Number(formData.get("ratePerGoat"));
+  const goatCount = Number(formData.get("goatCount"));
+  if (!ratePerGoat || Number.isNaN(ratePerGoat) || ratePerGoat <= 0) {
+    throw new Error("Rate per goat must be a positive number");
+  }
+  if (!goatCount || Number.isNaN(goatCount) || goatCount <= 0) {
+    throw new Error("Goat count must be at least 1");
+  }
   await recordPalai({
     date: String(formData.get("date")),
     serviceMonth,
     customerName: String(formData.get("customerName")),
-    ratePerGoat: Number(formData.get("ratePerGoat")),
-    goatCount: Number(formData.get("goatCount")),
+    ratePerGoat,
+    goatCount,
     paymentMethod: String(formData.get("paymentMethod") || ""),
     notes: String(formData.get("notes") || ""),
     receivedBy: String(formData.get("receivedBy") || "Saad") as "Monis" | "Saad",

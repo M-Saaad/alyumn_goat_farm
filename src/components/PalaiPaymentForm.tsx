@@ -122,11 +122,9 @@ function Field({
 export function PalaiPaymentForm({
   customers,
   palaiHistory,
-  onSuccess,
 }: {
   customers: ContactOption[];
   palaiHistory: PalaiHistoryEntry[];
-  onSuccess?: () => void;
 }) {
   const router = useRouter();
   const defaultCustomer =
@@ -135,6 +133,8 @@ export function PalaiPaymentForm({
   const [editing, setEditing] = useState<PalaiHistoryEntry | null>(null);
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [saved, setSaved] = useState(false);
+  const [formKey, setFormKey] = useState(0);
 
   const customerEntries = useMemo(
     () =>
@@ -170,13 +170,20 @@ export function PalaiPaymentForm({
           {error}
         </p>
       )}
+      {saved && !error && (
+        <p className="rounded-xl bg-emerald-50 px-3 py-2 text-sm text-emerald-800 ring-1 ring-emerald-200">
+          Palai payment recorded. It will also appear under Transactions.
+        </p>
+      )}
 
       {!editing ? (
         <ActionForm
+          key={formKey}
           action={actionRecordPalai}
           onSuccess={() => {
             setError(null);
-            onSuccess?.();
+            setSaved(true);
+            setFormKey((k) => k + 1);
           }}
         >
           <PalaiFields
@@ -205,9 +212,9 @@ export function PalaiPaymentForm({
             action={actionUpdatePalai}
             onSuccess={() => {
               setError(null);
+              setSaved(true);
               setEditing(null);
               router.refresh();
-              onSuccess?.();
             }}
           >
             <input type="hidden" name="transactionId" value={editing.transactionId} />
