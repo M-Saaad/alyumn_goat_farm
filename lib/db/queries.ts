@@ -84,15 +84,19 @@ export const getQuickEntryData = cache(async (): Promise<QuickEntryProps> => {
     return quickEntryPropsFromDb(await getCachedDb());
   }
   const client = createServiceClient();
-  const [animals, contacts, breeding] = await Promise.all([
+  const [animals, contacts, breeding, palai, transactions] = await Promise.all([
     selectAll(client, "animals"),
     selectAll(client, "contacts"),
     selectAll(client, "breeding_events"),
+    selectAll(client, "palai_payments"),
+    selectAll(client, "transactions"),
   ]);
   const db = emptyDb();
   db.animals = await mapAnimalsWithParents(client, animals);
   db.contacts = contacts.map(mapContact);
   db.breeding_events = breeding.map(mapBreeding);
+  db.palai_payments = palai.map(mapPalai);
+  db.transactions = filterLedgerTxs(transactions);
   return quickEntryPropsFromDb(db);
 });
 

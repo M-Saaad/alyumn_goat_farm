@@ -26,7 +26,7 @@ export function ActionForm({
   className,
   children,
 }: {
-  action: (formData: FormData) => Promise<void>;
+  action: (formData: FormData) => Promise<void | { ok?: boolean; error?: string }>;
   onSuccess?: () => void;
   className?: string;
   children: ReactNode;
@@ -42,7 +42,15 @@ export function ActionForm({
     setError(null);
     startTransition(async () => {
       try {
-        await action(fd);
+        const result = await action(fd);
+        if (result && typeof result === "object" && "ok" in result && result.ok === false) {
+          setError(result.error ?? "Something went wrong");
+          return;
+        }
+        if (result && typeof result === "object" && "error" in result && result.error) {
+          setError(result.error);
+          return;
+        }
         router.refresh();
         onSuccess?.();
       } catch (err) {

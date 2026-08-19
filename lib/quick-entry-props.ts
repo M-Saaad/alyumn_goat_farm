@@ -53,12 +53,12 @@ export function quickEntryPropsFromDb(db: FarmDatabase): QuickEntryProps {
     ),
   ].sort((a, b) => a.localeCompare(b));
 
+  const { monisId, saadId } = getPartnerIds(db);
   const palaiHistory = db.palai_payments
     .map((p) => {
       const customer = db.contacts.find((c) => c.id === p.customer_id);
       if (!customer) return null;
       const tx = db.transactions.find((t) => t.id === p.transaction_id);
-      const { monisId, saadId } = getPartnerIds(db);
       const receivedBy =
         tx ? palaiReceivedByFromTx(tx, monisId, saadId) : "Saad";
       return {

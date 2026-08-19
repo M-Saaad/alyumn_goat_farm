@@ -8,7 +8,7 @@ import {
   getPartnerIds,
 } from "./partner-equity/settlement";
 import { recognizePalaiPayment, applyPalaiToDb } from "./palai/recognize-payment";
-import { findPalaiForCustomerMonth, normalizeServiceMonth } from "./palai/service-month";
+import { findPalaiForCustomerMonth, normalizeServiceMonth, formatServiceMonth } from "./palai/service-month";
 import { applyLivestockSaleToDb, applySaleReceiptToDb, beginLivestockSale, buildSaleReceipt, findSaleForAnimal } from "./livestock/record-sale";
 import {
   applyDeleteSaleReceipt,
@@ -148,8 +148,15 @@ export async function recordPalai(input: {
   const serviceMonth = normalizeServiceMonth(input.serviceMonth);
   const duplicate = findPalaiForCustomerMonth(db, customer.id, serviceMonth);
   if (duplicate) {
+    const monthLabel = formatServiceMonth(serviceMonth);
+    const existingDetail =
+      duplicate.goat_count != null && duplicate.rate_per_goat != null
+        ? `${duplicate.goat_count} goats @ ${duplicate.rate_per_goat}`
+        : duplicate.total_amount != null
+          ? `${duplicate.total_amount} total`
+          : "an existing entry";
     throw new Error(
-      `Palai for ${input.customerName} is already recorded for ${serviceMonth}. Edit or delete the existing entry below.`
+      `Palai for ${input.customerName} is already recorded for ${monthLabel} (${existingDetail}). Edit or delete that entry in the list below.`
     );
   }
 
