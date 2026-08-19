@@ -78,21 +78,25 @@ export async function loadPartnerIds(): Promise<{ monisId: string; saadId: strin
   return getPartnerIds({ contacts: contacts.map(mapContact) } as FarmDatabase);
 }
 
-/** Shared QuickEntry props — active animals, contacts, buck names. */
+/** Shared QuickEntry props — active animals, contacts, buck names, palai history. */
 export const getQuickEntryData = cache(async (): Promise<QuickEntryProps> => {
   if (!isSupabaseDb()) {
     return quickEntryPropsFromDb(await getCachedDb());
   }
   const client = createServiceClient();
-  const [animals, contacts, breeding] = await Promise.all([
+  const [animals, contacts, breeding, palai, transactions] = await Promise.all([
     selectAll(client, "animals"),
     selectAll(client, "contacts"),
     selectAll(client, "breeding_events"),
+    selectAll(client, "palai_payments"),
+    selectAll(client, "transactions"),
   ]);
   const db = emptyDb();
   db.animals = await mapAnimalsWithParents(client, animals);
   db.contacts = contacts.map(mapContact);
   db.breeding_events = breeding.map(mapBreeding);
+  db.palai_payments = palai.map(mapPalai);
+  db.transactions = filterLedgerTxs(transactions);
   return quickEntryPropsFromDb(db);
 });
 
@@ -162,16 +166,13 @@ export const loadAnimalsListData = cache(async (): Promise<AnimalsListData> => {
   const mappedAnimals = await mapAnimalsWithParents(client, animals);
   const mappedContacts = contacts.map(mapContact);
   const mappedBreeding = breeding.map(mapBreeding);
-  const db = emptyDb();
-  db.animals = mappedAnimals;
-  db.contacts = mappedContacts;
-  db.breeding_events = mappedBreeding;
+  const quickEntry = await getQuickEntryData();
 
   return {
     animals: mappedAnimals,
     contacts: mappedContacts,
     breeding_events: mappedBreeding,
-    quickEntry: quickEntryPropsFromDb(db),
+    quickEntry,
   };
 });
 
@@ -402,10 +403,7 @@ export const loadTransactionsData = cache(async (): Promise<TransactionsData> =>
 
   const mappedAnimals = await mapAnimalsWithParents(client, animals);
   const mappedContacts = contacts.map(mapContact);
-  const db = emptyDb();
-  db.animals = mappedAnimals;
-  db.contacts = mappedContacts;
-  db.breeding_events = breeding.map(mapBreeding);
+  const quickEntry = await getQuickEntryData();
 
   return {
     transactions: filterLedgerTxs(transactions),
@@ -413,7 +411,7 @@ export const loadTransactionsData = cache(async (): Promise<TransactionsData> =>
     animals: mappedAnimals,
     palai_payments: palai.map(mapPalai),
     livestock_sales: sales.map(mapSale),
-    quickEntry: quickEntryPropsFromDb(db),
+    quickEntry,
   };
 });
 
@@ -446,10 +444,7 @@ export const loadHerdHealthData = cache(async (): Promise<HerdHealthPageData> =>
   ]);
 
   const mappedAnimals = await mapAnimalsWithParents(client, animals);
-  const db = emptyDb();
-  db.animals = mappedAnimals;
-  db.contacts = contacts.map(mapContact);
-  db.breeding_events = breeding.map(mapBreeding);
+  const quickEntry = await getQuickEntryData();
 
   return {
     herd: computeHerdHealth({
@@ -458,7 +453,7 @@ export const loadHerdHealthData = cache(async (): Promise<HerdHealthPageData> =>
       breeding_events: breeding.map(mapBreeding),
       weight_logs: weights.map(mapWeight),
     }),
-    quickEntry: quickEntryPropsFromDb(db),
+    quickEntry,
   };
 });
 
