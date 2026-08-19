@@ -273,8 +273,20 @@ for (const row of vBody) {
   if (goatId == null) continue;
   const etv = parseNotionDate(row[vI["ETV Date"]]);
   const ppr = parseNotionDate(row[vI["PPR Date"]]);
+  const nitroxinil = parseNotionDate(row[vI.Nitroxinil]);
   if (etv) db.medical_events.push({ id: randomUUID(), animal_id: goatId, event_type: "Vaccine", date: etv, notes: `ETV ${row[vI["ETV Dose"]] || ""}`.trim(), transaction_id: null });
   if (ppr) db.medical_events.push({ id: randomUUID(), animal_id: goatId, event_type: "Vaccine", date: ppr, notes: "PPR", transaction_id: null });
+  if (nitroxinil) {
+    const dose = (row[vI["Nitroxinil Dose"]] || "").trim();
+    db.medical_events.push({
+      id: randomUUID(),
+      animal_id: goatId,
+      event_type: "Vaccine",
+      date: nitroxinil,
+      notes: dose ? `Nitroxinil ${dose}` : "Nitroxinil",
+      transaction_id: null,
+    });
+  }
 }
 
 const dewFile = fs.readdirSync(path.join(DATA, "Notion")).find((f) => f.startsWith("De-worming") && f.endsWith("_all.csv"));

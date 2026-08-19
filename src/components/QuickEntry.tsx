@@ -16,10 +16,15 @@ import { LEDGER_CATEGORIES } from "@/lib/constants";
 import {
   DEWORM_TYPES,
   DEWORMER_NAMES_BY_TYPE,
-  VACCINE_NAMES,
   type DewormType,
 } from "@/lib/livestock/medical-notes";
+import {
+  NEW_VACCINE_VALUE,
+  VACCINE_INTERVAL_PRESETS,
+  type VaccineScheduleEntry,
+} from "@/lib/livestock/vaccine-schedule";
 import { todayIso } from "@/lib/format";
+import { NON_NEGATIVE_NUMBER_INPUT_PROPS } from "@/lib/form-numbers";
 import { ActionForm, SubmitButton } from "@/components/ActionForm";
 import { BuckSelect, ContactSelect, type ContactOption } from "@/components/ContactSelect";
 import { PalaiPaymentForm, type PalaiHistoryEntry } from "@/components/PalaiPaymentForm";
@@ -52,6 +57,7 @@ export type QuickEntryProps = {
   maleAnimals: AnimalOption[];
   pastBuckNames: string[];
   palaiHistory?: PalaiHistoryEntry[];
+  vaccineSchedules: VaccineScheduleEntry[];
 };
 
 export function QuickEntry({
@@ -64,6 +70,7 @@ export function QuickEntry({
   maleAnimals,
   pastBuckNames,
   palaiHistory = [],
+  vaccineSchedules,
 }: QuickEntryProps) {
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<Mode>(null);
@@ -176,7 +183,7 @@ export function QuickEntry({
             )}
 
             {mode === "medical" && (
-              <MedicalForm animals={animals} onSuccess={close} />
+              <MedicalForm animals={animals} vaccineSchedules={vaccineSchedules} onSuccess={close} />
             )}
 
             {mode === "weight" && (
@@ -261,12 +268,15 @@ export function QuickEntry({
 
 function MedicalForm({
   animals,
+  vaccineSchedules,
   onSuccess,
 }: {
   animals: AnimalOption[];
+  vaccineSchedules: VaccineScheduleEntry[];
   onSuccess: () => void;
 }) {
   const [eventType, setEventType] = useState("Vaccine");
+  const [vaccineName, setVaccineName] = useState<string>(vaccineSchedules[0]?.name ?? NEW_VACCINE_VALUE);
   const [dewormType, setDewormType] = useState<DewormType>("internal");
   const [dewormerName, setDewormerName] = useState<string>(
     DEWORMER_NAMES_BY_TYPE.internal[0]
@@ -303,14 +313,42 @@ function MedicalForm({
         <>
           <div>
             <label className={label}>Vaccine</label>
-            <select name="vaccineName" className={field} required defaultValue={VACCINE_NAMES[0]}>
-              {VACCINE_NAMES.map((v) => (
-                <option key={v} value={v}>
-                  {v}
+            <select
+              name="vaccineName"
+              className={field}
+              required
+              value={vaccineName}
+              onChange={(e) => setVaccineName(e.target.value)}
+            >
+              {vaccineSchedules.map((v) => (
+                <option key={v.key} value={v.name}>
+                  {v.name}
+                  {v.custom ? ` (${v.scheduleLabel})` : ""}
                 </option>
               ))}
+              <option value={NEW_VACCINE_VALUE}>+ Add new vaccine type…</option>
             </select>
           </div>
+          {vaccineName === NEW_VACCINE_VALUE && (
+            <>
+              <Field label="Vaccine name" name="vaccineNameOther" required />
+              <div>
+                <label className={label}>Schedule</label>
+                <select
+                  name="vaccineIntervalDays"
+                  className={field}
+                  required
+                  defaultValue={String(VACCINE_INTERVAL_PRESETS[0].value)}
+                >
+                  {VACCINE_INTERVAL_PRESETS.map((preset) => (
+                    <option key={preset.value} value={preset.value}>
+                      {preset.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </>
+          )}
           <Field label="Dosage" name="dosage" defaultValue="1ml" required />
         </>
       )}
@@ -649,7 +687,10 @@ function Field(props: {
   type?: string;
   defaultValue?: string;
   required?: boolean;
+  min?: number;
+  step?: number | string;
 }) {
+  const isNumber = props.type === "number";
   return (
     <div>
       <label className={label}>{props.label}</label>
@@ -659,6 +700,10 @@ function Field(props: {
         type={props.type || "text"}
         defaultValue={props.defaultValue}
         required={props.required}
+        min={isNumber ? (props.min ?? NON_NEGATIVE_NUMBER_INPUT_PROPS.min) : undefined}
+        step={
+          isNumber ? (props.step ?? NON_NEGATIVE_NUMBER_INPUT_PROPS.step) : undefined
+        }
       />
     </div>
   );

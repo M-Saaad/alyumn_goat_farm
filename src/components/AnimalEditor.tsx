@@ -5,6 +5,7 @@ import { actionUpdateAnimal } from "@/lib/server-actions";
 import { ActionForm, SubmitButton } from "@/components/ActionForm";
 import { BuckSelect, ContactSelect, type ContactOption } from "@/components/ContactSelect";
 import type { AnimalBreed, AnimalSex, AnimalStatus } from "@/lib/types";
+import { NON_NEGATIVE_NUMBER_INPUT_PROPS } from "@/lib/form-numbers";
 
 const field =
   "mt-1 w-full rounded-xl border border-stone-300 bg-white px-3 py-2 text-base text-stone-900 outline-none focus:border-emerald-600";
@@ -162,6 +163,8 @@ export function AnimalEditor({
                     className={field}
                     name="palaiRate"
                     type="number"
+                    min={NON_NEGATIVE_NUMBER_INPUT_PROPS.min}
+                    step={NON_NEGATIVE_NUMBER_INPUT_PROPS.step}
                     defaultValue={animal.palai_rate ?? ""}
                   />
                 </div>
@@ -239,6 +242,8 @@ export function AnimalEditor({
                   className={field}
                   name="purchasePrice"
                   type="number"
+                  min={NON_NEGATIVE_NUMBER_INPUT_PROPS.min}
+                  step={NON_NEGATIVE_NUMBER_INPUT_PROPS.step}
                   defaultValue={animal.price || ""}
                 />
               </div>
@@ -248,6 +253,8 @@ export function AnimalEditor({
                   className={field}
                   name="purchasePaid"
                   type="number"
+                  min={NON_NEGATIVE_NUMBER_INPUT_PROPS.min}
+                  step={NON_NEGATIVE_NUMBER_INPUT_PROPS.step}
                   defaultValue={animal.purchase_paid || ""}
                 />
               </div>
@@ -328,6 +335,8 @@ export function AnimalEditor({
                     className={field}
                     name="soldPrice"
                     type="number"
+                    min={NON_NEGATIVE_NUMBER_INPUT_PROPS.min}
+                    step={NON_NEGATIVE_NUMBER_INPUT_PROPS.step}
                     defaultValue={
                       animal.sale?.gross_sale_price ?? animal.sold_price ?? ""
                     }
@@ -341,6 +350,8 @@ export function AnimalEditor({
                         className={field}
                         name="deliveryCost"
                         type="number"
+                    min={NON_NEGATIVE_NUMBER_INPUT_PROPS.min}
+                    step={NON_NEGATIVE_NUMBER_INPUT_PROPS.step}
                         defaultValue={animal.sale.delivery_cost || ""}
                       />
                     </div>
@@ -350,6 +361,8 @@ export function AnimalEditor({
                         className={field}
                         name="amountReceived"
                         type="number"
+                    min={NON_NEGATIVE_NUMBER_INPUT_PROPS.min}
+                    step={NON_NEGATIVE_NUMBER_INPUT_PROPS.step}
                         defaultValue={animal.sale.amount_received || ""}
                       />
                     </div>

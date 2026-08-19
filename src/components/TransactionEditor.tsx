@@ -9,6 +9,10 @@ import {
 import { LEDGER_CATEGORIES } from "@/lib/constants";
 import { formatPkr, formatDate } from "@/lib/format";
 import type { TransactionEditVariant } from "@/lib/transactions/mutate";
+import {
+  NON_NEGATIVE_NUMBER_INPUT_PROPS,
+  POSITIVE_INTEGER_INPUT_PROPS,
+} from "@/lib/form-numbers";
 import { ActionForm, SubmitButton } from "@/components/ActionForm";
 import { ContactSelect, type ContactOption } from "@/components/ContactSelect";
 
@@ -231,8 +235,10 @@ function Field(props: {
   type?: string;
   defaultValue?: string | number;
   required?: boolean;
-  step?: string;
+  step?: string | number;
+  min?: number;
 }) {
+  const isNumber = props.type === "number";
   return (
     <div>
       <label className={labelCls}>{props.label}</label>
@@ -242,7 +248,8 @@ function Field(props: {
         type={props.type || "text"}
         defaultValue={props.defaultValue}
         required={props.required}
-        step={props.step}
+        step={props.step ?? (isNumber ? NON_NEGATIVE_NUMBER_INPUT_PROPS.step : undefined)}
+        min={props.min ?? (isNumber ? NON_NEGATIVE_NUMBER_INPUT_PROPS.min : undefined)}
       />
     </div>
   );
@@ -434,6 +441,8 @@ function PalaiForm({
         type="number"
         defaultValue={count}
         required
+        min={POSITIVE_INTEGER_INPUT_PROPS.min}
+        step={POSITIVE_INTEGER_INPUT_PROPS.step}
       />
       <div>
         <label className={labelCls}>Received by</label>

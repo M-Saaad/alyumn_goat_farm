@@ -11,6 +11,7 @@ import type {
   PartnerLedgerEntry,
   Transaction,
   WeightLog,
+  CustomVaccine,
 } from "../types";
 import { emptyDb } from "../db-empty";
 import { mapAnimalsWithParents, animalsWithEncodedParentComments } from "../livestock/animal-parents-store";
@@ -174,6 +175,14 @@ export function mapWeight(r: Record<string, unknown>): WeightLog {
   };
 }
 
+export function mapCustomVaccine(r: Record<string, unknown>): CustomVaccine {
+  return {
+    id: String(r.id),
+    name: String(r.name),
+    interval_days: num(r.interval_days),
+  };
+}
+
 export function mapMedia(r: Record<string, unknown>): AnimalMedia {
   return {
     id: String(r.id),
@@ -186,9 +195,21 @@ export function mapMedia(r: Record<string, unknown>): AnimalMedia {
 }
 
 export async function selectAll(client: SupabaseClient, table: string) {
-  const { data, error } = await client.from(table).select("*");
-  if (error) throw new Error(`${table}: ${error.message}`);
-  return (data ?? []) as Record<string, unknown>[];
+  const pageSize = 1000;
+  const rows: Record<string, unknown>[] = [];
+  let from = 0;
+  while (true) {
+    const { data, error } = await client
+      .from(table)
+      .select("*")
+      .range(from, from + pageSize - 1);
+    if (error) throw new Error(`${table}: ${error.message}`);
+    const page = (data ?? []) as Record<string, unknown>[];
+    rows.push(...page);
+    if (page.length < pageSize) break;
+    from += pageSize;
+  }
+  return rows;
 }
 
 /** Like selectAll but returns [] when a table is missing (e.g. migration not applied). */
@@ -231,6 +252,7 @@ export async function loadFromSupabase(client: SupabaseClient): Promise<FarmData
     breeding,
     weights,
     media,
+    customVaccines,
     metaRows,
   ] = await Promise.all([
     selectAll(client, "contacts"),
@@ -244,6 +266,7 @@ export async function loadFromSupabase(client: SupabaseClient): Promise<FarmData
     selectAll(client, "breeding_events"),
     selectAll(client, "weight_logs"),
     selectAll(client, "animal_media"),
+    selectAllOptional(client, "custom_vaccines"),
     selectAll(client, "app_meta"),
   ]);
 
@@ -262,6 +285,7 @@ export async function loadFromSupabase(client: SupabaseClient): Promise<FarmData
   db.breeding_events = breeding.map(mapBreeding);
   db.weight_logs = weights.map(mapWeight);
   db.animal_media = media.map(mapMedia);
+  db.custom_vaccines = customVaccines.map(mapCustomVaccine);
   db.meta = mapMeta(meta);
   return db;
 }
@@ -431,6 +455,16 @@ export async function saveToSupabase(client: SupabaseClient, db: FarmDatabase): 
       media_type: m.media_type,
       caption: m.caption,
       created_at: m.created_at,
+    }))
+  );
+
+  await syncTable(
+    client,
+    "custom_vaccines",
+    (db.custom_vaccines ?? []).map((v) => ({
+      id: v.id,
+      name: v.name,
+      interval_days: v.interval_days,
     }))
   );
 

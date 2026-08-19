@@ -3,6 +3,8 @@ import { Suspense } from "react";
 import { loadHerdHealthData } from "@/lib/db/queries";
 import { formatDate } from "@/lib/format";
 import { parseHealthTab, type DueStatus, type HerdHealthData, type HerdHealthSummary } from "@/lib/livestock/herd-health";
+import type { VaccineScheduleEntry } from "@/lib/livestock/vaccine-schedule";
+import type { CustomVaccine } from "@/lib/types";
 import { animalLinkFromHealth, healthTabForActionKind } from "@/lib/livestock/health-nav";
 import type { HealthTab } from "@/lib/livestock/health-tabs";
 import { AppHeader } from "@/components/AppHeader";
@@ -11,6 +13,7 @@ import { QuickEntryLoader } from "@/components/QuickEntryLoader";
 import { HealthFilters } from "@/components/HealthFilters";
 import { HealthBreedingList } from "@/components/HealthBreedingList";
 import { BackfillBreedingBirthsButton } from "@/components/BackfillBreedingBirthsButton";
+import { VaccineScheduleManager } from "@/components/VaccineScheduleManager";
 import { isSupabaseDb } from "@/lib/db";
 import type { QuickEntryProps } from "@/components/QuickEntry";
 
@@ -95,7 +98,14 @@ async function HealthPageContent({
   const { summary } = herd;
 
   return (
-    <HealthPageView tab={tab} herd={herd} summary={summary} quickEntry={data.quickEntry} />
+    <HealthPageView
+      tab={tab}
+      herd={herd}
+      summary={summary}
+      quickEntry={data.quickEntry}
+      vaccineSchedules={data.vaccineSchedules}
+      customVaccines={data.customVaccines}
+    />
   );
 }
 
@@ -104,11 +114,15 @@ function HealthPageView({
   herd,
   summary,
   quickEntry,
+  vaccineSchedules,
+  customVaccines,
 }: {
   tab: ReturnType<typeof parseHealthTab>;
   herd: HerdHealthData;
   summary: HerdHealthSummary;
   quickEntry: QuickEntryProps;
+  vaccineSchedules: VaccineScheduleEntry[];
+  customVaccines: CustomVaccine[];
 }) {
   const supabaseEnabled = isSupabaseDb();
 
@@ -213,18 +227,16 @@ function HealthPageView({
 
       {tab === "vaccine" && (
         <>
-          <DueList
-            title="PPR (once a year)"
-            items={herd.vaccines.filter((v) => v.vaccineKind === "ppr")}
-            emptyMessage="No active goats."
-            healthTab="vaccine"
-          />
-          <DueList
-            title="ETV (twice a year)"
-            items={herd.vaccines.filter((v) => v.vaccineKind === "etv")}
-            emptyMessage="No active goats."
-            healthTab="vaccine"
-          />
+          <VaccineScheduleManager customVaccines={customVaccines} />
+          {vaccineSchedules.map((schedule) => (
+            <DueList
+              key={schedule.key}
+              title={`${schedule.name} (${schedule.scheduleLabel})`}
+              items={herd.vaccines.filter((v) => v.vaccineKind === schedule.key)}
+              emptyMessage="No active goats."
+              healthTab="vaccine"
+            />
+          ))}
         </>
       )}
 

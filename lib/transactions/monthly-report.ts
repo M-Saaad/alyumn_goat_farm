@@ -3,6 +3,16 @@ import type { LedgerCategory, PalaiPayment, Transaction } from "../types";
 import { currentMonthIso } from "../format";
 import { computeCategoryBreakdown } from "./category-breakdown";
 
+export type MonthlyLedgerRow = {
+  id: string;
+  date: string;
+  category: LedgerCategory;
+  kind: Transaction["kind"];
+  amount: number;
+  displayAmount: number;
+  notes: string | null;
+};
+
 export type MonthlyCategoryReport = {
   month: string;
   byCategory: Partial<Record<LedgerCategory, number>>;
@@ -14,7 +24,29 @@ export type MonthlyCategoryReport = {
   totalReceived: number;
   totalTransfers: number;
   transactionCount: number;
+  /** Ledger rows dated in this month (excludes Palai Income adjustments — palai uses service month). */
+  ledgerRows: MonthlyLedgerRow[];
+  /** Palai payments counted for this month by service month. */
+  palaiRows: Array<{
+    id: string;
+    date: string;
+    serviceMonth: string;
+    totalAmount: number;
+    goatCount: number | null;
+    notes: string | null;
+  }>;
 };
+
+/** Transactions dated in the given month (YYYY-MM), excluding Palai Income ledger duplicates. */
+export function transactionsDatedInMonth(
+  transactions: Transaction[],
+  month: string
+): Transaction[] {
+  const ym = parseFinanceMonth(month);
+  return transactions.filter(
+    (tx) => tx.date?.startsWith(ym) && tx.category !== "Palai Income"
+  );
+}
 
 function displayAmount(tx: Transaction): number {
   if (tx.kind === "partner_adjustment" && tx.category === "Livestock Sale") {
@@ -61,6 +93,29 @@ export function computeMonthlyCategoryReport(input: {
     transactionCount += palaiInMonth.length;
   }
 
+  const ledgerRows = transactionsDatedInMonth(input.transactions, month)
+    .map((tx) => ({
+      id: tx.id,
+      date: tx.date,
+      category: tx.category,
+      kind: tx.kind,
+      amount: tx.amount,
+      displayAmount: displayAmount(tx),
+      notes: tx.notes,
+    }))
+    .sort((a, b) => b.date.localeCompare(a.date));
+
+  const palaiRows = palaiInMonth
+    .map((p) => ({
+      id: p.id,
+      date: p.date,
+      serviceMonth: palaiServiceMonth(p),
+      totalAmount: p.total_amount,
+      goatCount: p.goat_count,
+      notes: p.notes,
+    }))
+    .sort((a, b) => b.date.localeCompare(a.date));
+
   const total = Object.values(byCategory).reduce((sum, n) => sum + (n || 0), 0);
 
   return {
@@ -74,5 +129,7 @@ export function computeMonthlyCategoryReport(input: {
     totalReceived: breakdown.totalReceived,
     totalTransfers: breakdown.totalTransfers,
     transactionCount,
+    ledgerRows,
+    palaiRows,
   };
 }

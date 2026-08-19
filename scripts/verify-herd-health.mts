@@ -2,10 +2,15 @@ import {
   computeHerdHealth,
   DEWORM_INTERVAL_DAYS,
   ETV_INTERVAL_DAYS,
+  NITROXINIL_INTERVAL_DAYS,
   PPR_INTERVAL_DAYS,
-  vaccineKindFromNotes,
 } from "../lib/livestock/herd-health.ts";
 import { dewormKindFromNotes, EXTERNAL_DEWORM_DELAY_DAYS } from "../lib/livestock/medical-notes.ts";
+import {
+  mergeVaccineSchedules,
+  vaccineKeyFromNotes,
+  vaccineKindFromNotes,
+} from "../lib/livestock/vaccine-schedule.ts";
 import {
   computeUltrasoundStatus,
   needsUltrasound,
@@ -75,6 +80,12 @@ function deworm(date: string, notes: string): MedicalEvent {
 assert(vaccineKindFromNotes("PPR") === "ppr", "PPR notes");
 assert(vaccineKindFromNotes("ETV 1ml") === "etv", "ETV notes");
 assert(vaccineKindFromNotes("PPR + Loxin") === "ppr", "PPR combo notes");
+const builtinSchedules = mergeVaccineSchedules([]);
+assert(vaccineKeyFromNotes("Nitroxinil 2.5ml", builtinSchedules) === "nitroxinil", "Nitroxinil notes");
+assert(
+  vaccineKeyFromNotes("Liver Vaccine (Nitroxynil)", builtinSchedules) === "nitroxinil",
+  "Nitroxynil spelling"
+);
 assert(vaccineKindFromNotes(null) === null, "empty notes");
 
 const today = "2026-07-01";
@@ -127,7 +138,7 @@ const split = computeHerdHealth({
   weight_logs: [],
   today,
 });
-assert(split.vaccines.length === 2, "one PPR + one ETV row per active goat");
+assert(split.vaccines.length === 3, "one PPR + one ETV + one Nitroxinil row per active goat");
 assert(
   split.vaccines.some((v) => v.vaccineKind === "ppr" && v.status === "ok"),
   "split PPR ok"
@@ -135,6 +146,39 @@ assert(
 assert(
   split.vaccines.some((v) => v.vaccineKind === "etv" && v.status === "overdue"),
   "split ETV overdue"
+);
+assert(
+  split.vaccines.some((v) => v.vaccineKind === "nitroxinil" && v.status === "never"),
+  "split Nitroxinil never"
+);
+
+const recentNitroxinil = computeHerdHealth({
+  animals: [animal],
+  medical_events: [med("2026-01-15", "Nitroxinil 2ml")],
+  breeding_events: [],
+  weight_logs: [],
+  today,
+});
+const nitroxinil = recentNitroxinil.vaccines.find((v) => v.vaccineKind === "nitroxinil");
+assert(nitroxinil?.status === "ok", `recent Nitroxinil should be ok, got ${nitroxinil?.status}`);
+assert(NITROXINIL_INTERVAL_DAYS === 365, "Nitroxinil interval is yearly");
+
+const customSchedules = mergeVaccineSchedules([
+  { id: "custom-fmd", name: "FMD", interval_days: 182 },
+]);
+const customHerd = computeHerdHealth({
+  animals: [animal],
+  medical_events: [med("2025-12-01", "FMD 2ml")],
+  breeding_events: [],
+  weight_logs: [],
+  custom_vaccines: [{ id: "custom-fmd", name: "FMD", interval_days: 182 }],
+  today,
+});
+const fmd = customHerd.vaccines.find((v) => v.vaccineKind === "custom-fmd");
+assert(fmd?.status === "overdue", `custom FMD twice-yearly should be overdue, got ${fmd?.status}`);
+assert(
+  vaccineKeyFromNotes("FMD 2ml", customSchedules) === "custom-fmd",
+  "custom vaccine notes match by name prefix"
 );
 
 assert(DEWORM_INTERVAL_DAYS === 182, "deworm interval is twice yearly");
@@ -429,5 +473,7 @@ assert(
   "active doe in breeding roster"
 );
 
-console.log("PASS herd health intervals (PPR yearly, ETV & internal deworm twice yearly, external 2d after internal)");
+console.log(
+  "PASS herd health intervals (built-in & custom vaccines, ETV & internal deworm twice yearly, external 2d after internal)"
+);
 console.log("PASS breeding ultrasound window (day 40–75)");

@@ -37,6 +37,7 @@ import { getPartnerIds } from "../partner-equity/settlement";
 import { quickEntryPropsFromDb } from "../quick-entry-props";
 import { mapAnimalsWithParents } from "../livestock/animal-parents-store";
 import { computeHerdHealth, type HerdHealthData } from "../livestock/herd-health";
+import { mergeVaccineSchedules, type VaccineScheduleEntry } from "../livestock/vaccine-schedule";
 import type { QuickEntryProps } from "@/components/QuickEntry";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
@@ -424,36 +425,52 @@ export const loadTransactionsData = cache(async (): Promise<TransactionsData> =>
 export type HerdHealthPageData = {
   herd: HerdHealthData;
   quickEntry: QuickEntryProps;
+  vaccineSchedules: VaccineScheduleEntry[];
+  customVaccines: import("../types").CustomVaccine[];
 };
 
 export const loadHerdHealthData = cache(async (): Promise<HerdHealthPageData> => {
   if (!isSupabaseDb()) {
     const db = await getCachedDb();
+    const customVaccines = db.custom_vaccines ?? [];
     return {
       herd: computeHerdHealth({
         animals: db.animals,
         medical_events: db.medical_events ?? [],
         breeding_events: db.breeding_events ?? [],
         weight_logs: db.weight_logs ?? [],
+        custom_vaccines: customVaccines,
       }),
       quickEntry: quickEntryPropsFromDb(db),
+      vaccineSchedules: mergeVaccineSchedules(customVaccines),
+      customVaccines,
     };
   }
 
   const client = createServiceClient();
-  const [animals, medical, breeding, weights, contacts] = await Promise.all([
+  const [animals, medical, breeding, weights, contacts, customVaccinesRows] = await Promise.all([
     selectAll(client, "animals"),
     selectAllOptional(client, "medical_events"),
     selectAllOptional(client, "breeding_events"),
     selectAllOptional(client, "weight_logs"),
     selectAll(client, "contacts"),
+    selectAllOptional(client, "custom_vaccines"),
   ]);
 
   const mappedAnimals = await mapAnimalsWithParents(client, animals);
+  const customVaccines = customVaccinesRows.map(
+    (row) =>
+      ({
+        id: String(row.id),
+        name: String(row.name),
+        interval_days: Number(row.interval_days),
+      }) satisfies import("../types").CustomVaccine
+  );
   const db = emptyDb();
   db.animals = mappedAnimals;
   db.contacts = contacts.map(mapContact);
   db.breeding_events = breeding.map(mapBreeding);
+  db.custom_vaccines = customVaccines;
 
   return {
     herd: computeHerdHealth({
@@ -461,8 +478,11 @@ export const loadHerdHealthData = cache(async (): Promise<HerdHealthPageData> =>
       medical_events: medical.map(mapMedical),
       breeding_events: breeding.map(mapBreeding),
       weight_logs: weights.map(mapWeight),
+      custom_vaccines: customVaccines,
     }),
     quickEntry: quickEntryPropsFromDb(db),
+    vaccineSchedules: mergeVaccineSchedules(customVaccines),
+    customVaccines,
   };
 });
 

@@ -9,6 +9,7 @@ import { computeCategoryBreakdown } from "@/lib/transactions/category-breakdown"
 import { AppHeader } from "@/components/AppHeader";
 import { BottomNav } from "@/components/BottomNav";
 import { FinanceCategoryBreakdown } from "@/components/FinanceCategoryBreakdown";
+import { FinanceMonthlyTransactions } from "@/components/FinanceMonthlyTransactions";
 import { FinanceMonthPicker } from "@/components/FinanceMonthPicker";
 import { QuickEntryLoader } from "@/components/QuickEntryLoader";
 import { SignOutButton } from "@/components/SignOutButton";
@@ -134,14 +135,17 @@ async function HomePageContent({
         {monthly.transactionCount === 0 ? (
           <p className="text-sm text-stone-500">No transactions this month.</p>
         ) : (
-          <FinanceCategoryBreakdown
-            investedByCategory={monthly.investedByCategory}
-            receivedByCategory={monthly.receivedByCategory}
-            transfersByCategory={monthly.transfersByCategory}
-            totalInvested={monthly.totalInvested}
-            totalReceived={monthly.totalReceived}
-            totalTransfers={monthly.totalTransfers}
-          />
+          <>
+            <FinanceCategoryBreakdown
+              investedByCategory={monthly.investedByCategory}
+              receivedByCategory={monthly.receivedByCategory}
+              transfersByCategory={monthly.transfersByCategory}
+              totalInvested={monthly.totalInvested}
+              totalReceived={monthly.totalReceived}
+              totalTransfers={monthly.totalTransfers}
+            />
+            <FinanceMonthlyTransactions report={monthly} />
+          </>
         )}
       </section>
 

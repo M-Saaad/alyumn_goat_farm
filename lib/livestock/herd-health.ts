@@ -4,6 +4,16 @@ import {
   EXTERNAL_DEWORM_DELAY_DAYS,
   type DewormType,
 } from "./medical-notes";
+import {
+  BUILTIN_VACCINE_SCHEDULE,
+  mergeVaccineSchedules,
+  vaccineDisplayName,
+  vaccineKeyFromNotes,
+  type VaccineKind,
+  type VaccineScheduleEntry,
+} from "./vaccine-schedule";
+
+export { vaccineKindFromNotes, type VaccineKind } from "./vaccine-schedule";
 import { isKidAnimal } from "./age";
 import {
   breedingRecordStatusLabel,
@@ -20,20 +30,15 @@ import { todayIso } from "@/lib/format";
 
 export { HEALTH_TABS, parseHealthTab } from "./health-tabs";
 export type { HealthTab } from "./health-tabs";
-export const PPR_INTERVAL_DAYS = 365;
-export const ETV_INTERVAL_DAYS = 182;
+export const PPR_INTERVAL_DAYS =
+  BUILTIN_VACCINE_SCHEDULE.find((v) => v.key === "ppr")?.intervalDays ?? 365;
+export const ETV_INTERVAL_DAYS =
+  BUILTIN_VACCINE_SCHEDULE.find((v) => v.key === "etv")?.intervalDays ?? 182;
+export const NITROXINIL_INTERVAL_DAYS =
+  BUILTIN_VACCINE_SCHEDULE.find((v) => v.key === "nitroxinil")?.intervalDays ?? 365;
 /** @deprecated Use PPR_INTERVAL_DAYS / ETV_INTERVAL_DAYS */
 export const VACCINE_INTERVAL_DAYS = PPR_INTERVAL_DAYS;
 export const DEWORM_INTERVAL_DAYS = 182;
-
-export type VaccineKind = "ppr" | "etv";
-
-export function vaccineKindFromNotes(notes: string | null | undefined): VaccineKind | null {
-  const text = (notes ?? "").toUpperCase();
-  if (text.includes("PPR")) return "ppr";
-  if (text.includes("ETV")) return "etv";
-  return null;
-}
 export { GESTATION_DAYS } from "./breeding";
 export const DUE_SOON_DAYS = 14;
 
@@ -46,7 +51,7 @@ export type AnimalDueItem = {
   dueDate: string | null;
   daysUntilDue: number | null;
   status: DueStatus;
-  vaccineKind?: VaccineKind;
+  vaccineKind?: string;
   dewormKind?: DewormType;
 };
 
@@ -150,14 +155,15 @@ function lastDewormByKind(
   return map;
 }
 
-function lastVaccineByKind(
+function lastVaccineByKey(
   events: MedicalEvent[],
-  kind: VaccineKind
+  key: string,
+  schedules: VaccineScheduleEntry[]
 ): Map<number, MedicalEvent> {
   const map = new Map<number, MedicalEvent>();
   for (const e of events) {
     if (e.event_type !== "Vaccine" || !e.date) continue;
-    if (vaccineKindFromNotes(e.notes) !== kind) continue;
+    if (vaccineKeyFromNotes(e.notes, schedules) !== key) continue;
     const prev = map.get(e.animal_id);
     if (!prev || e.date > (prev.date || "")) {
       map.set(e.animal_id, e);
@@ -171,7 +177,8 @@ function buildDueList(
   lastByAnimal: Map<number, MedicalEvent>,
   intervalDays: number,
   today: string,
-  kind?: VaccineKind | DewormType
+  kind?: string | DewormType,
+  mode: "vaccine" | "deworm" = "vaccine"
 ): AnimalDueItem[] {
   return activeAnimals
     .map((a) => {
@@ -184,8 +191,10 @@ function buildDueList(
         dueDate,
         daysUntilDue,
         status,
-        ...(kind === "ppr" || kind === "etv" ? { vaccineKind: kind } : {}),
-        ...(kind === "internal" || kind === "external" ? { dewormKind: kind } : {}),
+        ...(mode === "vaccine" && kind ? { vaccineKind: kind } : {}),
+        ...(mode === "deworm" && (kind === "internal" || kind === "external")
+          ? { dewormKind: kind as DewormType }
+          : {}),
       };
     })
     .sort((a, b) => {
@@ -324,9 +333,11 @@ export function computeHerdHealth(input: {
   medical_events: MedicalEvent[];
   breeding_events: BreedingEvent[];
   weight_logs: WeightLog[];
+  custom_vaccines?: import("@/lib/types").CustomVaccine[];
   today?: string;
 }): HerdHealthData {
   const today = input.today ?? todayIso();
+  const vaccineSchedules = mergeVaccineSchedules(input.custom_vaccines ?? []);
   const weightLogs = input.weight_logs ?? [];
   const medicalEvents = input.medical_events ?? [];
   const breedingEvents = input.breeding_events ?? [];
@@ -337,14 +348,19 @@ export function computeHerdHealth(input: {
     activeAnimalIds.has(e.female_animal_id)
   );
 
-  const lastPpr = lastVaccineByKind(medicalEvents, "ppr");
-  const lastEtv = lastVaccineByKind(medicalEvents, "etv");
   const lastInternalDeworm = lastDewormByKind(medicalEvents, "internal");
   const lastExternalDeworm = lastDewormByKind(medicalEvents, "external");
 
-  const pprVaccines = buildDueList(activeAnimals, lastPpr, PPR_INTERVAL_DAYS, today, "ppr");
-  const etvVaccines = buildDueList(activeAnimals, lastEtv, ETV_INTERVAL_DAYS, today, "etv");
-  const vaccines = [...pprVaccines, ...etvVaccines].sort((a, b) => {
+  const vaccines = vaccineSchedules
+    .flatMap(({ key, intervalDays }) =>
+      buildDueList(
+        activeAnimals,
+        lastVaccineByKey(medicalEvents, key, vaccineSchedules),
+        intervalDays,
+        today,
+        key
+      )
+    ).sort((a, b) => {
     const order: Record<DueStatus, number> = { overdue: 0, due_soon: 1, never: 2, ok: 3 };
     const diff = order[a.status] - order[b.status];
     if (diff !== 0) return diff;
@@ -355,7 +371,8 @@ export function computeHerdHealth(input: {
     lastInternalDeworm,
     DEWORM_INTERVAL_DAYS,
     today,
-    "internal"
+    "internal",
+    "deworm"
   );
   const externalDeworming = buildExternalDewormList(
     activeAnimals,
@@ -411,7 +428,7 @@ export function computeHerdHealth(input: {
   const actions: HerdHealthData["actions"] = [];
   for (const v of vaccines) {
     if (v.status === "overdue" || v.status === "due_soon" || v.status === "never") {
-      const vaccineLabel = v.vaccineKind === "ppr" ? "PPR" : v.vaccineKind === "etv" ? "ETV" : "Vaccine";
+      const vaccineLabel = vaccineDisplayName(v.vaccineKind, vaccineSchedules);
       actions.push({
         kind: "vaccine",
         animalId: v.animalId,

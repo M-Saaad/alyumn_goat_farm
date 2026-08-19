@@ -13,6 +13,7 @@ export function emptyDb(): FarmDatabase {
     breeding_events: [],
     weight_logs: [],
     animal_media: [],
+    custom_vaccines: [],
     meta: {
       importedAt: null,
       settlementVerified: false,

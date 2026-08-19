@@ -1,6 +1,12 @@
-/** Vaccine names tracked on the health schedule. */
-export const VACCINE_NAMES = ["PPR", "ETV"] as const;
-export type VaccineName = (typeof VACCINE_NAMES)[number];
+export {
+  BUILTIN_VACCINE_SCHEDULE,
+  mergeVaccineSchedules,
+  vaccineDisplayName,
+  vaccineKeyFromNotes,
+  vaccineKindFromNotes,
+  type VaccineKind,
+  type VaccineScheduleEntry,
+} from "./vaccine-schedule";
 
 export const DEWORM_TYPES = [
   { value: "internal", label: "Internal", prefix: "I-DW" },
@@ -32,7 +38,7 @@ export const DEWORMER_NAMES = [
 export function formatVaccineNotes(name: string, dosage: string): string {
   const n = name.trim();
   const d = dosage.trim();
-  if (!n) throw new Error("Select a vaccine");
+  if (!n) throw new Error("Enter a vaccine name");
   if (!d) throw new Error("Enter vaccine dosage");
   return `${n} ${d}`;
 }

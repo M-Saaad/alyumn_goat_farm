@@ -8,7 +8,7 @@ import {
   getPartnerIds,
 } from "./partner-equity/settlement";
 import { recognizePalaiPayment, applyPalaiToDb } from "./palai/recognize-payment";
-import { findPalaiForCustomerMonth, normalizeServiceMonth, formatServiceMonth } from "./palai/service-month";
+import { findPalaiForCustomerMonth, normalizeServiceMonth } from "./palai/service-month";
 import { applyLivestockSaleToDb, applySaleReceiptToDb, beginLivestockSale, buildSaleReceipt, findSaleForAnimal } from "./livestock/record-sale";
 import {
   applyDeleteSaleReceipt,
@@ -48,9 +48,14 @@ import type {
   BreedingOutcome,
   BreedingStatus,
   BreedingEvent,
+  CustomVaccine,
 } from "./types";
 import { animalLabel } from "./labels";
 import { uploadAnimalMedia } from "./media/upload";
+import {
+  builtinVaccineByName,
+  findCustomVaccineByName,
+} from "./livestock/vaccine-schedule";
 
 export { animalLabel };
 
@@ -126,6 +131,8 @@ export async function recordPalai(input: {
   paymentMethod?: string;
   notes?: string;
   receivedBy?: "Monis" | "Saad";
+  /** When false (default), add goats to an existing entry for this customer + month. */
+  separatePayment?: boolean;
 }) {
   const before = await fetchDb();
   let db = before;
@@ -146,18 +153,24 @@ export async function recordPalai(input: {
   }
 
   const serviceMonth = normalizeServiceMonth(input.serviceMonth);
-  const duplicate = findPalaiForCustomerMonth(db, customer.id, serviceMonth);
-  if (duplicate) {
-    const monthLabel = formatServiceMonth(serviceMonth);
-    const existingDetail =
-      duplicate.goat_count != null && duplicate.rate_per_goat != null
-        ? `${duplicate.goat_count} goats @ ${duplicate.rate_per_goat}`
-        : duplicate.total_amount != null
-          ? `${duplicate.total_amount} total`
-          : "an existing entry";
-    throw new Error(
-      `Palai for ${input.customerName} is already recorded for ${monthLabel} (${existingDetail}). Edit or delete that entry in the list below.`
-    );
+  const existing = findPalaiForCustomerMonth(db, customer.id, serviceMonth);
+  if (
+    existing?.transaction_id &&
+    !input.separatePayment &&
+    existing.goat_count != null &&
+    existing.rate_per_goat != null
+  ) {
+    return updatePalai({
+      transactionId: existing.transaction_id,
+      date: input.date,
+      serviceMonth,
+      customerName: input.customerName,
+      ratePerGoat: existing.rate_per_goat,
+      goatCount: existing.goat_count + input.goatCount,
+      paymentMethod: input.paymentMethod ?? existing.payment_method,
+      notes: input.notes?.trim() || existing.notes,
+      receivedBy: input.receivedBy ?? "Saad",
+    });
   }
 
   const total = input.ratePerGoat * input.goatCount;
@@ -561,6 +574,70 @@ export async function updateAnimal(input: UpdateAnimalInput) {
   return persistMutation(before, after);
 }
 
+export async function ensureCustomVaccine(name: string, intervalDays: number): Promise<CustomVaccine | null> {
+  const trimmed = name.trim();
+  if (!trimmed) throw new Error("Enter a vaccine name");
+  if (builtinVaccineByName(trimmed)) return null;
+
+  const before = await fetchDb();
+  const existing = findCustomVaccineByName(before.custom_vaccines ?? [], trimmed);
+  if (existing) return existing;
+
+  const vaccine: CustomVaccine = {
+    id: crypto.randomUUID(),
+    name: trimmed,
+    interval_days: intervalDays,
+  };
+  const after = {
+    ...before,
+    custom_vaccines: [...(before.custom_vaccines ?? []), vaccine],
+  };
+  if (isSupabaseDb()) {
+    await applyWritePlan({ upsertCustomVaccines: [vaccine] });
+    return vaccine;
+  }
+  await persistMutation(before, after);
+  return vaccine;
+}
+
+export async function addCustomVaccine(input: { name: string; intervalDays: number }) {
+  const trimmed = input.name.trim();
+  if (!trimmed) throw new Error("Enter a vaccine name");
+  if (builtinVaccineByName(trimmed)) {
+    throw new Error(`"${trimmed}" is already a standard vaccine`);
+  }
+
+  const before = await fetchDb();
+  const custom = before.custom_vaccines ?? [];
+  if (findCustomVaccineByName(custom, trimmed)) {
+    throw new Error(`"${trimmed}" already exists`);
+  }
+
+  const vaccine: CustomVaccine = {
+    id: crypto.randomUUID(),
+    name: trimmed,
+    interval_days: input.intervalDays,
+  };
+  const after = { ...before, custom_vaccines: [...custom, vaccine] };
+  if (isSupabaseDb()) {
+    await applyWritePlan({ upsertCustomVaccines: [vaccine] });
+    return after;
+  }
+  return persistMutation(before, after);
+}
+
+export async function deleteCustomVaccine(id: string) {
+  const before = await fetchDb();
+  const custom = before.custom_vaccines ?? [];
+  if (!custom.some((v) => v.id === id)) throw new Error("Vaccine type not found");
+  const after = { ...before, custom_vaccines: custom.filter((v) => v.id !== id) };
+  if (isSupabaseDb()) {
+    await applyWritePlan({ deleteCustomVaccineIds: [id] });
+    return after;
+  }
+  return persistMutation(before, after);
+}
+
 export async function logMedical(input: {
   animalIds: number[];
   eventType: MedicalEventType;
@@ -837,12 +914,6 @@ export async function updatePalai(input: {
   if (!customer) throw new Error("Customer not found");
 
   const serviceMonth = normalizeServiceMonth(input.serviceMonth);
-  const duplicate = findPalaiForCustomerMonth(before, customer.id, serviceMonth, payment.id);
-  if (duplicate) {
-    throw new Error(
-      `Another palai entry already exists for ${input.customerName} in ${serviceMonth}.`
-    );
-  }
 
   return updateTransaction({
     id: input.transactionId,

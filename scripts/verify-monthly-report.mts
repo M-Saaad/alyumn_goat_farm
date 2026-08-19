@@ -60,6 +60,53 @@ assert(report.total === 45000, `total expected 45000 got ${report.total}`);
 assert(report.totalInvested === 7000, `invested expected 7000 got ${report.totalInvested}`);
 assert(report.totalReceived === 38000, `received expected 38000 got ${report.totalReceived}`);
 assert(report.transactionCount === 4, "four items in July");
+assert(report.ledgerRows.length === 3, "three ledger rows dated in July");
+assert(report.palaiRows.length === 1, "one palai row for July service month");
+
+const august = computeMonthlyCategoryReport({
+  month: "2026-08",
+  transactions: [
+    tx({ id: "f1", category: "Feed", amount: 30000, date: "2026-08-05" }),
+    tx({ id: "d1", category: "Delivery", amount: 3000, date: "2026-08-06" }),
+    tx({ id: "v1", category: "Vet/Medicine", amount: 22000, date: "2026-08-07" }),
+    tx({ id: "o1", category: "Other", amount: 1000, date: "2026-08-08" }),
+    tx({
+      id: "s1",
+      category: "Livestock Sale",
+      kind: "partner_adjustment",
+      amount: -59500,
+      date: "2026-08-10",
+    }),
+    tx({
+      id: "p1",
+      category: "Palai Income",
+      kind: "partner_adjustment",
+      amount: 3500,
+      date: "2026-08-19",
+    }),
+  ],
+  palaiPayments: [
+    {
+      id: "palai-aug",
+      date: "2026-08-19",
+      service_month: "2026-08",
+      customer_id: "c1",
+      rate_per_goat: 7000,
+      goat_count: 7,
+      total_amount: 50000,
+      payment_method: null,
+      transaction_id: "p1",
+      notes: "Awais palai",
+    },
+  ] satisfies PalaiPayment[],
+});
+
+assert(august.totalInvested === 56000, `August invested expected 56000 got ${august.totalInvested}`);
+assert(august.totalReceived === 169000, `August received expected 169000 got ${august.totalReceived}`);
+assert(august.receivedByCategory["Livestock Sale"] === 119000, "August livestock sale");
+assert(august.receivedByCategory["Palai Income"] === 50000, "August palai by service month");
+assert(august.ledgerRows.length === 5, "five dated ledger rows, palai adjustment excluded");
+assert(august.palaiRows.length === 1, "one palai payment row");
 
 const empty = computeMonthlyCategoryReport({
   month: "2026-01",

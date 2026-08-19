@@ -5,6 +5,7 @@ import { getPartnerIds } from "@/lib/partner-equity/settlement";
 import type { FarmDatabase } from "@/lib/types";
 import type { QuickEntryProps } from "@/components/QuickEntry";
 import type { ContactOption } from "@/components/ContactSelect";
+import { mergeVaccineSchedules } from "@/lib/livestock/vaccine-schedule";
 
 /** Build QuickEntry contact/animal props from the loaded database. */
 export function quickEntryPropsFromDb(db: FarmDatabase): QuickEntryProps {
@@ -88,5 +89,6 @@ export function quickEntryPropsFromDb(db: FarmDatabase): QuickEntryProps {
     maleAnimals,
     pastBuckNames,
     palaiHistory,
+    vaccineSchedules: mergeVaccineSchedules(db.custom_vaccines ?? []),
   };
 }

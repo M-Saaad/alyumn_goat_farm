@@ -11,6 +11,10 @@ import { ActionForm, SubmitButton } from "@/components/ActionForm";
 import { ContactSelect, type ContactOption } from "@/components/ContactSelect";
 import { formatPkr, formatDate, currentMonthIso, todayIso } from "@/lib/format";
 import { formatServiceMonth } from "@/lib/palai/service-month";
+import {
+  NON_NEGATIVE_NUMBER_INPUT_PROPS,
+  POSITIVE_INTEGER_INPUT_PROPS,
+} from "@/lib/form-numbers";
 
 const field =
   "mt-1 w-full rounded-xl border border-stone-300 bg-white px-3 py-2 text-base text-stone-900 outline-none focus:border-emerald-600";
@@ -36,11 +40,21 @@ function PalaiFields({
   customers,
   customerName,
   onCustomerChange,
+  serviceMonth,
+  onServiceMonthChange,
+  existingForMonth,
+  separatePayment,
+  onSeparatePaymentChange,
 }: {
   defaults?: Partial<PalaiHistoryEntry>;
   customers: ContactOption[];
   customerName: string;
   onCustomerChange: (name: string) => void;
+  serviceMonth: string;
+  onServiceMonthChange: (month: string) => void;
+  existingForMonth: PalaiHistoryEntry | null;
+  separatePayment: boolean;
+  onSeparatePaymentChange: (value: boolean) => void;
 }) {
   return (
     <>
@@ -59,10 +73,36 @@ function PalaiFields({
           className={field}
           name="serviceMonth"
           type="month"
-          defaultValue={defaults?.serviceMonth ?? currentMonthIso()}
+          value={serviceMonth}
+          onChange={(e) => onServiceMonthChange(e.target.value)}
           required
         />
       </div>
+      {existingForMonth && !defaults && (
+        <div className="rounded-xl bg-amber-50 px-3 py-2 text-sm text-amber-950 ring-1 ring-amber-200">
+          <p>
+            <span className="font-semibold">{formatServiceMonth(existingForMonth.serviceMonth)}</span>{" "}
+            already has{" "}
+            <span className="font-semibold">
+              {existingForMonth.goatCount} goats ({formatPkr(existingForMonth.totalAmount)})
+            </span>
+            .
+          </p>
+          <label className="mt-2 flex items-start gap-2">
+            <input
+              type="checkbox"
+              name="separatePayment"
+              checked={separatePayment}
+              onChange={(e) => onSeparatePaymentChange(e.target.checked)}
+              className="mt-1"
+            />
+            <span>
+              Record as a <span className="font-semibold">separate</span> payment (leave unchecked to add
+              goats to the existing entry)
+            </span>
+          </label>
+        </div>
+      )}
       <div>
         <label className={labelCls}>Payment date</label>
         <input
@@ -73,8 +113,24 @@ function PalaiFields({
           required
         />
       </div>
-      <Field label="Rate / goat" name="ratePerGoat" type="number" defaultValue={String(defaults?.ratePerGoat ?? 7000)} required />
-      <Field label="Goat count" name="goatCount" type="number" defaultValue={String(defaults?.goatCount ?? 2)} required />
+      <Field
+        label="Rate / goat"
+        name="ratePerGoat"
+        type="number"
+        defaultValue={String(defaults?.ratePerGoat ?? 7000)}
+        required
+        min={NON_NEGATIVE_NUMBER_INPUT_PROPS.min}
+        step={NON_NEGATIVE_NUMBER_INPUT_PROPS.step}
+      />
+      <Field
+        label="Goat count"
+        name="goatCount"
+        type="number"
+        defaultValue={String(defaults?.goatCount ?? 2)}
+        required
+        min={POSITIVE_INTEGER_INPUT_PROPS.min}
+        step={POSITIVE_INTEGER_INPUT_PROPS.step}
+      />
       <div>
         <label className={labelCls}>Received by</label>
         <select name="receivedBy" className={field} defaultValue={defaults?.receivedBy ?? "Saad"}>
@@ -98,12 +154,16 @@ function Field({
   type = "text",
   defaultValue,
   required,
+  min,
+  step,
 }: {
   label: string;
   name: string;
   type?: string;
   defaultValue?: string;
   required?: boolean;
+  min?: number;
+  step?: number | string;
 }) {
   return (
     <div>
@@ -114,6 +174,8 @@ function Field({
         type={type}
         defaultValue={defaultValue}
         required={required}
+        min={type === "number" ? (min ?? NON_NEGATIVE_NUMBER_INPUT_PROPS.min) : undefined}
+        step={type === "number" ? (step ?? NON_NEGATIVE_NUMBER_INPUT_PROPS.step) : undefined}
       />
     </div>
   );
@@ -132,6 +194,8 @@ export function PalaiPaymentForm({
   const defaultCustomer =
     customers.find((c) => c.name === "Awais")?.name ?? customers[0]?.name ?? "";
   const [customerName, setCustomerName] = useState(defaultCustomer);
+  const [serviceMonth, setServiceMonth] = useState(currentMonthIso());
+  const [separatePayment, setSeparatePayment] = useState(false);
   const [editing, setEditing] = useState<PalaiHistoryEntry | null>(null);
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -142,6 +206,11 @@ export function PalaiPaymentForm({
         .filter((e) => e.customerName.toLowerCase() === customerName.toLowerCase())
         .sort((a, b) => b.serviceMonth.localeCompare(a.serviceMonth)),
     [palaiHistory, customerName]
+  );
+
+  const existingForMonth = useMemo(
+    () => customerEntries.find((e) => e.serviceMonth === serviceMonth) ?? null,
+    [customerEntries, serviceMonth]
   );
 
   function onDelete(entry: PalaiHistoryEntry) {
@@ -183,9 +252,16 @@ export function PalaiPaymentForm({
             customers={customers}
             customerName={customerName}
             onCustomerChange={setCustomerName}
+            serviceMonth={serviceMonth}
+            onServiceMonthChange={setServiceMonth}
+            existingForMonth={existingForMonth}
+            separatePayment={separatePayment}
+            onSeparatePaymentChange={setSeparatePayment}
           />
           <p className="text-xs text-stone-500">
-            Pick which month the fee is for. Splits 50/50 to Monis and Saad based on who received the cash.
+            Pick which month the fee is for. Adding goats for a month that is already recorded updates
+            that entry unless you check &quot;separate payment&quot;. Splits 50/50 based on who received
+            the cash.
           </p>
           <SubmitButton label="Record palai payment" />
         </ActionForm>
@@ -216,6 +292,11 @@ export function PalaiPaymentForm({
               customers={customers}
               customerName={customerName}
               onCustomerChange={setCustomerName}
+              serviceMonth={editing.serviceMonth}
+              onServiceMonthChange={() => {}}
+              existingForMonth={null}
+              separatePayment={false}
+              onSeparatePaymentChange={() => {}}
             />
             <SubmitButton label="Save changes" pendingLabel="Saving…" />
           </ActionForm>

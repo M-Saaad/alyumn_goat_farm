@@ -284,19 +284,26 @@ async function main() {
     if (!junePalai || junePalai.service_month !== "2024-03") {
       throw new Error("palai service month not saved");
     }
-    let duplicateFailed = false;
+    let secondSameMonthOk = false;
     try {
       await recordPalai({
         date: "2026-07-16",
         serviceMonth: "2024-03",
         customerName: "Awais",
-        ratePerGoat: 7000,
+        ratePerGoat: 5000,
         goatCount: 1,
+        notes: "second palai same month test",
       });
+      secondSameMonthOk = true;
     } catch {
-      duplicateFailed = true;
+      secondSameMonthOk = false;
     }
-    if (!duplicateFailed) throw new Error("duplicate palai month should be blocked");
+    if (!secondSameMonthOk) throw new Error("second palai for same month should be allowed");
+    const afterSecondPalai = loadDb();
+    const sameMonthCount = afterSecondPalai.palai_payments.filter(
+      (p) => p.customer_id === junePalai!.customer_id && p.service_month === "2024-03"
+    ).length;
+    if (sameMonthCount < 2) throw new Error("expected two palai entries for same month");
     await updatePalai({
       transactionId: junePalai.transaction_id!,
       date: "2026-07-15",
@@ -312,7 +319,7 @@ async function main() {
     if (!updatedPalai || updatedPalai.service_month !== "2024-02" || updatedPalai.goat_count !== 2) {
       throw new Error("palai month update failed");
     }
-    console.log("PASS palai service month record, duplicate block, and update");
+    console.log("PASS palai service month record, multiple same-month entries, and update");
 
     console.log("\nAll live engine tests passed.");
   } finally {

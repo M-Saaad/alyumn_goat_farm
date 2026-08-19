@@ -11,6 +11,7 @@ import {
 import { formatDate, formatPkr, todayIso } from "@/lib/format";
 import { ActionForm, SubmitButton } from "@/components/ActionForm";
 import type { AgreementStatus, LivestockSale, PurchaseAgreement } from "@/lib/types";
+import { NON_NEGATIVE_NUMBER_INPUT_PROPS } from "@/lib/form-numbers";
 
 const field =
   "mt-1 w-full rounded-xl border border-stone-300 bg-white px-3 py-2 text-base text-stone-900 outline-none focus:border-emerald-600";
@@ -94,7 +95,14 @@ export function PurchaseInstallmentCard({
                 </div>
                 <div>
                   <label className={labelCls}>Amount (PKR)</label>
-                  <input className={field} name="amount" type="number" required />
+                  <input
+                    className={field}
+                    name="amount"
+                    type="number"
+                    required
+                    min={NON_NEGATIVE_NUMBER_INPUT_PROPS.min}
+                    step={NON_NEGATIVE_NUMBER_INPUT_PROPS.step}
+                  />
                 </div>
                 <div>
                   <label className={labelCls}>Who paid</label>
@@ -303,7 +311,14 @@ export function SaleInstallmentCard({
                 </div>
                 <div>
                   <label className={labelCls}>Amount received (PKR)</label>
-                  <input className={field} name="amount" type="number" required />
+                  <input
+                    className={field}
+                    name="amount"
+                    type="number"
+                    required
+                    min={NON_NEGATIVE_NUMBER_INPUT_PROPS.min}
+                    step={NON_NEGATIVE_NUMBER_INPUT_PROPS.step}
+                  />
                 </div>
                 <div>
                   <label className={labelCls}>Cash received by</label>

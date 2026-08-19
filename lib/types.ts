@@ -157,6 +157,13 @@ export interface WeightLog {
   notes: string | null;
 }
 
+/** User-defined vaccine type with a recurring due schedule. */
+export interface CustomVaccine {
+  id: string;
+  name: string;
+  interval_days: number;
+}
+
 export type MediaType = "image" | "video";
 
 export interface AnimalMedia {
@@ -180,6 +187,7 @@ export interface FarmDatabase {
   breeding_events: BreedingEvent[];
   weight_logs: WeightLog[];
   animal_media: AnimalMedia[];
+  custom_vaccines: CustomVaccine[];
   meta: {
     importedAt: string | null;
     settlementVerified: boolean;
