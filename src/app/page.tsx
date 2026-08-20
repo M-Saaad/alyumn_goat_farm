@@ -1,12 +1,14 @@
-import Link from "next/link";
 import { Suspense } from "react";
-import { loadHomeData, contactNameFrom } from "@/lib/db/queries";
+import { loadHomeData } from "@/lib/db/queries";
 import { computeSettlement } from "@/lib/partner-equity/settlement";
 import { computePeriodHeadcount } from "@/lib/livestock/period-headcount";
-import { formatPkr, formatDate, currentMonthIso } from "@/lib/format";
+import { formatPkr, currentMonthIso, todayIso } from "@/lib/format";
 import { palaiServiceMonth } from "@/lib/palai/service-month";
-import { computeMonthlyCategoryReport, parseFinanceReport } from "@/lib/transactions/monthly-report";
-import { computeCategoryBreakdown } from "@/lib/transactions/category-breakdown";
+import {
+  computeMonthlyCategoryReport,
+  earliestFarmDate,
+  parseFinanceReport,
+} from "@/lib/transactions/monthly-report";
 import { AppHeader } from "@/components/AppHeader";
 import { BottomNav } from "@/components/BottomNav";
 import { FinanceCategoryBreakdown } from "@/components/FinanceCategoryBreakdown";
@@ -55,25 +57,30 @@ async function HomePageContent({
     transactions: data.transactions,
   } as FarmDatabase;
   const s = computeSettlement(settlementDb);
-  const monthly = computeMonthlyCategoryReport({
+
+  const headcountStart =
+    reportRange.mode === "alltime"
+      ? earliestFarmDate(data.animals, data.transactions)
+      : reportRange.periodStart;
+  const headcountEnd =
+    reportRange.mode === "alltime" ? todayIso() : reportRange.periodEnd;
+
+  const periodReport = computeMonthlyCategoryReport({
     transactions: data.transactions,
     palaiPayments: data.palai_payments,
-    month: reportRange.month,
-    from: reportRange.from,
-    to: reportRange.to,
     mode: reportRange.mode,
     periodLabel: reportRange.periodLabel,
+    month: reportRange.mode === "month" ? reportRange.month : undefined,
+    from: reportRange.mode === "custom" ? reportRange.from : undefined,
+    to: reportRange.mode === "custom" ? reportRange.to : undefined,
   });
-  const headcount = computePeriodHeadcount(
-    data.animals,
-    reportRange.periodStart,
-    reportRange.periodEnd
-  );
-  const allTime = computeCategoryBreakdown({
-    transactions: data.transactions,
-    palaiPayments: data.palai_payments,
-  });
-  const recent = [...data.transactions].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 12);
+
+  const headcount = computePeriodHeadcount(data.animals, headcountStart, headcountEnd);
+
+  const viewAllHref =
+    reportRange.mode === "alltime"
+      ? "/transactions"
+      : `/transactions?from=${headcountStart}&to=${headcountEnd}`;
 
   const palaiThisMonth = data.palai_payments
     .filter((p) => palaiServiceMonth(p) === currentMonthIso())
@@ -138,8 +145,8 @@ async function HomePageContent({
 
       <section className="mb-4 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-stone-200">
         <div className="mb-3">
-          <h2 className="mb-1 text-sm font-bold text-stone-800">Period report</h2>
-          <p className="mb-2 text-xs text-stone-500">{monthly.periodLabel}</p>
+          <h2 className="mb-1 text-sm font-bold text-stone-800">Finance report</h2>
+          <p className="mb-2 text-xs text-stone-500">{periodReport.periodLabel}</p>
           <Suspense fallback={<div className="h-8 animate-pulse rounded-lg bg-stone-100" />}>
             <FinanceReportPicker
               mode={reportRange.mode}
@@ -150,59 +157,21 @@ async function HomePageContent({
           </Suspense>
         </div>
         <FinancePeriodHeadcount headcount={headcount} />
-        {monthly.transactionCount === 0 ? (
+        {periodReport.transactionCount === 0 ? (
           <p className="text-sm text-stone-500">No transactions in this period.</p>
         ) : (
           <>
             <FinanceCategoryBreakdown
-              investedByCategory={monthly.investedByCategory}
-              receivedByCategory={monthly.receivedByCategory}
-              transfersByCategory={monthly.transfersByCategory}
-              totalInvested={monthly.totalInvested}
-              totalReceived={monthly.totalReceived}
-              totalTransfers={monthly.totalTransfers}
+              investedByCategory={periodReport.investedByCategory}
+              receivedByCategory={periodReport.receivedByCategory}
+              transfersByCategory={periodReport.transfersByCategory}
+              totalInvested={periodReport.totalInvested}
+              totalReceived={periodReport.totalReceived}
+              totalTransfers={periodReport.totalTransfers}
             />
-            <FinanceMonthlyTransactions report={monthly} />
+            <FinanceMonthlyTransactions report={periodReport} viewAllHref={viewAllHref} />
           </>
         )}
-      </section>
-
-      <section className="mb-4 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-stone-200">
-        <h2 className="mb-3 text-sm font-bold text-stone-800">All time by category</h2>
-        <FinanceCategoryBreakdown
-          investedByCategory={allTime.investedByCategory}
-          receivedByCategory={allTime.receivedByCategory}
-          transfersByCategory={allTime.transfersByCategory}
-          totalInvested={allTime.totalInvested}
-          totalReceived={allTime.totalReceived}
-          totalTransfers={allTime.totalTransfers}
-        />
-      </section>
-
-      <section className="mb-4 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-stone-200">
-        <div className="mb-2 flex items-center justify-between gap-2">
-          <h2 className="text-sm font-bold text-stone-800">Recent transactions</h2>
-          <Link href="/transactions" className="text-sm font-semibold text-emerald-700">
-            View all →
-          </Link>
-        </div>
-        <ul className="divide-y divide-stone-100">
-          {recent.map((tx) => (
-            <li key={tx.id} className="flex items-start justify-between gap-2 py-2 text-sm">
-              <div>
-                <p className="font-medium text-stone-800">{tx.category}</p>
-                <p className="text-xs text-stone-500">
-                  {formatDate(tx.date)} ·{" "}
-                  {tx.kind === "cost"
-                    ? `paid by ${contactNameFrom(data.contacts, tx.paid_by_partner_id)}`
-                    : "adjustment"}
-                </p>
-                {tx.notes && <p className="text-xs text-stone-500 line-clamp-1">{tx.notes}</p>}
-              </div>
-              <p className="shrink-0 font-semibold">{formatPkr(tx.amount)}</p>
-            </li>
-          ))}
-        </ul>
       </section>
 
       <QuickEntryLoader {...data.quickEntry} />

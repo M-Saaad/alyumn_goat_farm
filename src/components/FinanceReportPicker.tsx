@@ -27,13 +27,18 @@ export function FinanceReportPicker({ mode, month, from, to }: FinanceReportPick
       params.delete("from");
       params.delete("to");
       if (!params.get("month")) params.set("month", month);
-    } else {
+    } else if (nextMode === "custom") {
       params.set("range", "custom");
       params.delete("month");
       const start = from ?? `${month}-01`;
       const end = to ?? todayIso();
       params.set("from", start);
       params.set("to", end);
+    } else {
+      params.set("range", "alltime");
+      params.delete("month");
+      params.delete("from");
+      params.delete("to");
     }
     navigate(params);
   }
@@ -59,30 +64,22 @@ export function FinanceReportPicker({ mode, month, from, to }: FinanceReportPick
     navigate(params);
   }
 
+  const tabClass = (active: boolean) =>
+    `rounded-lg px-3 py-1.5 text-sm font-semibold ${
+      active ? "bg-stone-800 text-white" : "bg-stone-100 text-stone-700 ring-1 ring-stone-200"
+    }`;
+
   return (
     <div className="space-y-3">
-      <div className="flex gap-2">
-        <button
-          type="button"
-          onClick={() => switchMode("month")}
-          className={`rounded-lg px-3 py-1.5 text-sm font-semibold ${
-            mode === "month"
-              ? "bg-stone-800 text-white"
-              : "bg-stone-100 text-stone-700 ring-1 ring-stone-200"
-          }`}
-        >
+      <div className="flex flex-wrap gap-2">
+        <button type="button" onClick={() => switchMode("month")} className={tabClass(mode === "month")}>
           Monthly
         </button>
-        <button
-          type="button"
-          onClick={() => switchMode("custom")}
-          className={`rounded-lg px-3 py-1.5 text-sm font-semibold ${
-            mode === "custom"
-              ? "bg-stone-800 text-white"
-              : "bg-stone-100 text-stone-700 ring-1 ring-stone-200"
-          }`}
-        >
+        <button type="button" onClick={() => switchMode("custom")} className={tabClass(mode === "custom")}>
           Custom range
+        </button>
+        <button type="button" onClick={() => switchMode("alltime")} className={tabClass(mode === "alltime")}>
+          All time
         </button>
       </div>
 
@@ -99,7 +96,7 @@ export function FinanceReportPicker({ mode, month, from, to }: FinanceReportPick
             className="rounded-lg border border-stone-300 bg-white px-2 py-1 text-sm text-stone-800"
           />
         </div>
-      ) : (
+      ) : mode === "custom" ? (
         <div className="grid grid-cols-2 gap-2">
           <label className="block text-sm">
             <span className="mb-1 block font-semibold text-stone-800">Start date</span>
@@ -120,6 +117,8 @@ export function FinanceReportPicker({ mode, month, from, to }: FinanceReportPick
             />
           </label>
         </div>
+      ) : (
+        <p className="text-sm text-stone-600">Full ledger history with category totals.</p>
       )}
     </div>
   );

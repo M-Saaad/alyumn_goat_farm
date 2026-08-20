@@ -22,12 +22,14 @@ export const dynamic = "force-dynamic";
 export default async function TransactionsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; filter?: string }>;
+  searchParams: Promise<{ q?: string; filter?: string; from?: string; to?: string }>;
 }) {
   const sp = await searchParams;
   const data = await loadTransactionsData();
   const q = (sp.q || "").toLowerCase().trim();
   const filter = sp.filter || "all";
+  const fromDate = sp.from?.trim().slice(0, 10);
+  const toDate = sp.to?.trim().slice(0, 10);
   const { monisId, saadId } = getPartnerIds({ contacts: data.contacts } as FarmDatabase);
 
   let txs = [...data.transactions].sort((a, b) => {
@@ -35,6 +37,13 @@ export default async function TransactionsPage({
     if (byDate !== 0) return byDate;
     return (b.source_row ?? 0) - (a.source_row ?? 0);
   });
+
+  if (fromDate) {
+    txs = txs.filter((t) => t.date.slice(0, 10) >= fromDate);
+  }
+  if (toDate) {
+    txs = txs.filter((t) => t.date.slice(0, 10) <= toDate);
+  }
 
   if (filter === "cost") {
     txs = txs.filter((t) => t.kind === "cost");
@@ -169,7 +178,19 @@ export default async function TransactionsPage({
 
   return (
     <main className="px-4 pt-6">
-      <AppHeader eyebrow="Finance" title={`Transactions (${txs.length})`} />
+      <AppHeader
+        eyebrow="Finance"
+        title={`Transactions (${txs.length})`}
+        subtitle={
+          fromDate && toDate
+            ? `${formatDate(fromDate)} – ${formatDate(toDate)}`
+            : fromDate
+              ? `From ${formatDate(fromDate)}`
+              : toDate
+                ? `Through ${formatDate(toDate)}`
+                : undefined
+        }
+      />
 
       <Suspense fallback={<div className="mb-4 h-16 animate-pulse rounded-xl bg-stone-200" />}>
         <TransactionsFilters />
