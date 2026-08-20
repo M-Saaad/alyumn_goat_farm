@@ -1,10 +1,17 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { currentMonthIso, startDateForMonthSpan, todayIso } from "@/lib/format";
+import {
+  currentMonthIso,
+  monthSpanForRange,
+  startDateForMonthSpan,
+  todayIso,
+} from "@/lib/format";
 import type { FinanceReportMode } from "@/lib/transactions/monthly-report";
 
 const MONTH_PRESETS = [2, 3, 4, 5, 6, 7, 8];
+const MAX_CUSTOM_MONTHS = 120;
 
 type FinanceReportPickerProps = {
   mode: FinanceReportMode;
@@ -16,6 +23,16 @@ type FinanceReportPickerProps = {
 export function FinanceReportPicker({ mode, month, from, to }: FinanceReportPickerProps) {
   const router = useRouter();
   const sp = useSearchParams();
+  const [customMonths, setCustomMonths] = useState("");
+
+  useEffect(() => {
+    if (mode !== "custom" || !from || !to) {
+      setCustomMonths("");
+      return;
+    }
+    const span = monthSpanForRange(from, to);
+    setCustomMonths(span != null ? String(span) : "");
+  }, [mode, from, to]);
 
   function navigate(params: URLSearchParams) {
     const qs = params.toString();
@@ -76,6 +93,12 @@ export function FinanceReportPicker({ mode, month, from, to }: FinanceReportPick
     navigate(params);
   }
 
+  function applyCustomMonths() {
+    const monthCount = Number.parseInt(customMonths.trim(), 10);
+    if (!Number.isFinite(monthCount) || monthCount < 1 || monthCount > MAX_CUSTOM_MONTHS) return;
+    setMonthPreset(monthCount);
+  }
+
   function isMonthPresetActive(monthCount: number): boolean {
     if (mode !== "custom" || !from || !to) return false;
     return from === startDateForMonthSpan(to, monthCount);
@@ -90,6 +113,10 @@ export function FinanceReportPicker({ mode, month, from, to }: FinanceReportPick
     `shrink-0 rounded-full px-3 py-1 text-xs font-semibold ${
       active ? "bg-emerald-700 text-white" : "bg-white text-stone-600 ring-1 ring-stone-200"
     }`;
+
+  const customSpan = mode === "custom" && from && to ? monthSpanForRange(from, to) : null;
+  const customActive =
+    customSpan != null && !MONTH_PRESETS.includes(customSpan) && customSpan > 0;
 
   return (
     <div className="space-y-3">
@@ -135,6 +162,35 @@ export function FinanceReportPicker({ mode, month, from, to }: FinanceReportPick
               ))}
             </div>
           </div>
+          <form
+            className="flex items-end gap-2"
+            onSubmit={(e) => {
+              e.preventDefault();
+              applyCustomMonths();
+            }}
+          >
+            <label className="block text-sm min-w-0 flex-1">
+              <span className="mb-1 block font-semibold text-stone-800">Custom months</span>
+              <input
+                type="number"
+                min={1}
+                max={MAX_CUSTOM_MONTHS}
+                step={1}
+                value={customMonths}
+                onChange={(e) => setCustomMonths(e.target.value)}
+                placeholder="e.g. 12"
+                className={`w-full rounded-lg border bg-white px-2 py-1 text-sm text-stone-800 ${
+                  customActive ? "border-emerald-600 ring-1 ring-emerald-200" : "border-stone-300"
+                }`}
+              />
+            </label>
+            <button
+              type="submit"
+              className="shrink-0 rounded-lg bg-stone-800 px-3 py-1.5 text-sm font-semibold text-white"
+            >
+              Apply
+            </button>
+          </form>
           <div className="grid grid-cols-2 gap-2">
             <label className="block text-sm">
               <span className="mb-1 block font-semibold text-stone-800">Start date</span>

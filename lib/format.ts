@@ -42,3 +42,14 @@ export function startDateForMonthSpan(endIso: string, monthCount: number): strin
   const m = String(date.getMonth() + 1).padStart(2, "0");
   return `${y}-${m}-01`;
 }
+
+/** If `from`/`end` match a calendar month span, return the span length (1–120). */
+export function monthSpanForRange(fromIso: string, endIso: string): number | null {
+  const from = fromIso.trim().slice(0, 10);
+  const end = endIso.trim().slice(0, 10);
+  if (!from || !end) return null;
+  for (let monthCount = 1; monthCount <= 120; monthCount++) {
+    if (from === startDateForMonthSpan(end, monthCount)) return monthCount;
+  }
+  return null;
+}
