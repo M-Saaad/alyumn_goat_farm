@@ -92,6 +92,14 @@ assert(july.end.kids === 2, `end kids expected 2 got ${july.end.kids}`);
 assert(july.end.others === 1, `end others expected 1 got ${july.end.others}`);
 assert(july.end.total === 4, `end total expected 4 got ${july.end.total}`);
 
+assert(july.average.dayCount === 31, "July has 31 days in average window");
+assert(july.average.total === 3.8, `July average total expected 3.8 got ${july.average.total}`);
+assert(july.average.breedingFemales === 1.5, `July avg females expected 1.5 got ${july.average.breedingFemales}`);
+
+const stable = computePeriodHeadcount([adultFemale, adultMale], "2026-07-01", "2026-07-10");
+assert(stable.average.total === 2, "stable herd average equals daily count");
+assert(stable.average.dayCount === 10, "ten day window");
+
 assert(lastDayOfMonth("2026-07") === "2026-07-31", "July last day");
 assert(lastDayOfMonth("2026-02") === "2026-02-28", "Feb last day");
 
