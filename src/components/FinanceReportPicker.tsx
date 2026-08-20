@@ -1,8 +1,10 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
-import { currentMonthIso, todayIso } from "@/lib/format";
+import { currentMonthIso, startDateForMonthSpan, todayIso } from "@/lib/format";
 import type { FinanceReportMode } from "@/lib/transactions/monthly-report";
+
+const MONTH_PRESETS = [2, 3, 4, 5, 6, 7, 8];
 
 type FinanceReportPickerProps = {
   mode: FinanceReportMode;
@@ -64,9 +66,29 @@ export function FinanceReportPicker({ mode, month, from, to }: FinanceReportPick
     navigate(params);
   }
 
+  function setMonthPreset(monthCount: number) {
+    const params = new URLSearchParams(sp.toString());
+    params.set("range", "custom");
+    params.delete("month");
+    const end = todayIso();
+    params.set("from", startDateForMonthSpan(end, monthCount));
+    params.set("to", end);
+    navigate(params);
+  }
+
+  function isMonthPresetActive(monthCount: number): boolean {
+    if (mode !== "custom" || !from || !to) return false;
+    return from === startDateForMonthSpan(to, monthCount);
+  }
+
   const tabClass = (active: boolean) =>
     `rounded-lg px-3 py-1.5 text-sm font-semibold ${
       active ? "bg-stone-800 text-white" : "bg-stone-100 text-stone-700 ring-1 ring-stone-200"
+    }`;
+
+  const presetClass = (active: boolean) =>
+    `shrink-0 rounded-full px-3 py-1 text-xs font-semibold ${
+      active ? "bg-emerald-700 text-white" : "bg-white text-stone-600 ring-1 ring-stone-200"
     }`;
 
   return (
@@ -97,25 +119,42 @@ export function FinanceReportPicker({ mode, month, from, to }: FinanceReportPick
           />
         </div>
       ) : mode === "custom" ? (
-        <div className="grid grid-cols-2 gap-2">
-          <label className="block text-sm">
-            <span className="mb-1 block font-semibold text-stone-800">Start date</span>
-            <input
-              type="date"
-              value={from ?? ""}
-              onChange={(e) => onDateChange("from", e.target.value)}
-              className="w-full rounded-lg border border-stone-300 bg-white px-2 py-1 text-sm text-stone-800"
-            />
-          </label>
-          <label className="block text-sm">
-            <span className="mb-1 block font-semibold text-stone-800">End date</span>
-            <input
-              type="date"
-              value={to ?? ""}
-              onChange={(e) => onDateChange("to", e.target.value)}
-              className="w-full rounded-lg border border-stone-300 bg-white px-2 py-1 text-sm text-stone-800"
-            />
-          </label>
+        <div className="space-y-2">
+          <div>
+            <p className="mb-1 text-xs font-semibold text-stone-600">Quick span</p>
+            <div className="flex gap-2 overflow-x-auto pb-1">
+              {MONTH_PRESETS.map((count) => (
+                <button
+                  key={count}
+                  type="button"
+                  onClick={() => setMonthPreset(count)}
+                  className={presetClass(isMonthPresetActive(count))}
+                >
+                  {count} months
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <label className="block text-sm">
+              <span className="mb-1 block font-semibold text-stone-800">Start date</span>
+              <input
+                type="date"
+                value={from ?? ""}
+                onChange={(e) => onDateChange("from", e.target.value)}
+                className="w-full rounded-lg border border-stone-300 bg-white px-2 py-1 text-sm text-stone-800"
+              />
+            </label>
+            <label className="block text-sm">
+              <span className="mb-1 block font-semibold text-stone-800">End date</span>
+              <input
+                type="date"
+                value={to ?? ""}
+                onChange={(e) => onDateChange("to", e.target.value)}
+                className="w-full rounded-lg border border-stone-300 bg-white px-2 py-1 text-sm text-stone-800"
+              />
+            </label>
+          </div>
         </div>
       ) : (
         <p className="text-sm text-stone-600">Full ledger history with category totals.</p>

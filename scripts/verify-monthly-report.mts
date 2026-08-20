@@ -3,6 +3,7 @@ import {
   parseFinanceMonth,
   parseFinanceReport,
 } from "../lib/transactions/monthly-report.ts";
+import { startDateForMonthSpan } from "../lib/format.ts";
 import type { PalaiPayment, Transaction } from "../lib/types";
 
 function assert(cond: boolean, msg: string) {
@@ -236,5 +237,8 @@ const allTime = computeMonthlyCategoryReport({
 });
 assert(allTime.totalInvested === 8000, `all time invested expected 8000 got ${allTime.totalInvested}`);
 assert(allTime.ledgerRows.length === 2, "all time includes every ledger row");
+
+assert(startDateForMonthSpan("2026-08-20", 2) === "2026-07-01", "2-month span from August");
+assert(startDateForMonthSpan("2026-08-20", 8) === "2026-01-01", "8-month span from August");
 
 console.log("PASS monthly category report");
