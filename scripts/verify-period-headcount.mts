@@ -65,6 +65,15 @@ const animals = [adultFemale, adultMale, kid, soldDoe, newKid];
 assert(isActiveOnDate(adultFemale, "2026-07-31"), "adult active end of July");
 assert(!isActiveOnDate(soldDoe, "2026-07-15"), "sold on out date not active that day");
 assert(isActiveOnDate(soldDoe, "2026-07-14"), "sold doe active day before out");
+
+const diedNoOut = baseAnimal({
+  id: 99,
+  sex: "Female",
+  name: "Old",
+  status: "Died",
+  out_date: null,
+});
+assert(!isActiveOnDate(diedNoOut, "2026-08-20"), "terminal without out date never active");
 assert(!isActiveOnDate(newKid, "2026-07-01"), "born mid-month not active at start");
 assert(isActiveOnDate(newKid, "2026-07-20"), "born mid-month active from birth date");
 
