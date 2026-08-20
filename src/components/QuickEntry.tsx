@@ -15,7 +15,6 @@ import {
 import { LEDGER_CATEGORIES } from "@/lib/constants";
 import {
   DEWORM_TYPES,
-  DEWORMER_NAMES_BY_TYPE,
   type DewormType,
 } from "@/lib/livestock/medical-notes";
 import {
@@ -58,6 +57,7 @@ export type QuickEntryProps = {
   pastBuckNames: string[];
   palaiHistory?: PalaiHistoryEntry[];
   vaccineSchedules: VaccineScheduleEntry[];
+  dewormerNamesByType: Record<DewormType, string[]>;
 };
 
 export function QuickEntry({
@@ -71,6 +71,7 @@ export function QuickEntry({
   pastBuckNames,
   palaiHistory = [],
   vaccineSchedules,
+  dewormerNamesByType,
 }: QuickEntryProps) {
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<Mode>(null);
@@ -183,7 +184,12 @@ export function QuickEntry({
             )}
 
             {mode === "medical" && (
-              <MedicalForm animals={animals} vaccineSchedules={vaccineSchedules} onSuccess={close} />
+              <MedicalForm
+                animals={animals}
+                vaccineSchedules={vaccineSchedules}
+                dewormerNamesByType={dewormerNamesByType}
+                onSuccess={close}
+              />
             )}
 
             {mode === "weight" && (
@@ -269,25 +275,27 @@ export function QuickEntry({
 function MedicalForm({
   animals,
   vaccineSchedules,
+  dewormerNamesByType,
   onSuccess,
 }: {
   animals: AnimalOption[];
   vaccineSchedules: VaccineScheduleEntry[];
+  dewormerNamesByType: Record<DewormType, string[]>;
   onSuccess: () => void;
 }) {
   const [eventType, setEventType] = useState("Vaccine");
   const [vaccineName, setVaccineName] = useState<string>(vaccineSchedules[0]?.name ?? NEW_VACCINE_VALUE);
   const [dewormType, setDewormType] = useState<DewormType>("internal");
   const [dewormerName, setDewormerName] = useState<string>(
-    DEWORMER_NAMES_BY_TYPE.internal[0]
+    dewormerNamesByType.internal[0] ?? "Other"
   );
 
-  const dewormerOptions = DEWORMER_NAMES_BY_TYPE[dewormType];
+  const dewormerOptions = dewormerNamesByType[dewormType];
 
   function onDewormTypeChange(next: DewormType) {
     setDewormType(next);
-    const options = DEWORMER_NAMES_BY_TYPE[next];
-    setDewormerName((prev) => (prev === "Other" || options.includes(prev) ? prev : options[0]));
+    const options = dewormerNamesByType[next];
+    setDewormerName((prev) => (prev === "Other" || options.includes(prev) ? prev : options[0] ?? "Other"));
   }
 
   return (

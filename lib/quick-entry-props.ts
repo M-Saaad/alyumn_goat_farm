@@ -6,6 +6,7 @@ import type { FarmDatabase } from "@/lib/types";
 import type { QuickEntryProps } from "@/components/QuickEntry";
 import type { ContactOption } from "@/components/ContactSelect";
 import { mergeVaccineSchedules } from "@/lib/livestock/vaccine-schedule";
+import { mergeDewormerNames } from "@/lib/livestock/medical-notes";
 
 /** Build QuickEntry contact/animal props from the loaded database. */
 export function quickEntryPropsFromDb(db: FarmDatabase): QuickEntryProps {
@@ -90,5 +91,9 @@ export function quickEntryPropsFromDb(db: FarmDatabase): QuickEntryProps {
     pastBuckNames,
     palaiHistory,
     vaccineSchedules: mergeVaccineSchedules(db.custom_vaccines ?? []),
+    dewormerNamesByType: {
+      internal: mergeDewormerNames(db.custom_dewormers ?? [], "internal"),
+      external: mergeDewormerNames(db.custom_dewormers ?? [], "external"),
+    },
   };
 }

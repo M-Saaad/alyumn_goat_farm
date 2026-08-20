@@ -26,6 +26,7 @@ function loadJsonDb(): FarmDatabase {
   if (!db.medical_events) db.medical_events = [];
   if (!db.breeding_events) db.breeding_events = [];
   if (!db.custom_vaccines) db.custom_vaccines = [];
+  if (!db.custom_dewormers) db.custom_dewormers = [];
   for (const event of db.breeding_events) {
     if (event.fetus_count === undefined) event.fetus_count = null;
   }

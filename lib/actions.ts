@@ -49,6 +49,7 @@ import type {
   BreedingStatus,
   BreedingEvent,
   CustomVaccine,
+  CustomDewormer,
 } from "./types";
 import { animalLabel } from "./labels";
 import { uploadAnimalMedia } from "./media/upload";
@@ -56,6 +57,11 @@ import {
   builtinVaccineByName,
   findCustomVaccineByName,
 } from "./livestock/vaccine-schedule";
+import {
+  builtinDewormerByName,
+  findCustomDewormerByName,
+  type DewormType,
+} from "./livestock/medical-notes";
 
 export { animalLabel };
 
@@ -636,6 +642,35 @@ export async function deleteCustomVaccine(id: string) {
     return after;
   }
   return persistMutation(before, after);
+}
+
+export async function ensureCustomDewormer(
+  name: string,
+  dewormType: DewormType
+): Promise<CustomDewormer | null> {
+  const trimmed = name.trim();
+  if (!trimmed) throw new Error("Enter a dewormer name");
+  if (builtinDewormerByName(trimmed, dewormType)) return null;
+
+  const before = await fetchDb();
+  const existing = findCustomDewormerByName(before.custom_dewormers ?? [], trimmed, dewormType);
+  if (existing) return existing as CustomDewormer;
+
+  const dewormer: CustomDewormer = {
+    id: crypto.randomUUID(),
+    name: trimmed,
+    deworm_type: dewormType,
+  };
+  const after = {
+    ...before,
+    custom_dewormers: [...(before.custom_dewormers ?? []), dewormer],
+  };
+  if (isSupabaseDb()) {
+    await applyWritePlan({ upsertCustomDewormers: [dewormer] });
+    return dewormer;
+  }
+  await persistMutation(before, after);
+  return dewormer;
 }
 
 export async function logMedical(input: {
