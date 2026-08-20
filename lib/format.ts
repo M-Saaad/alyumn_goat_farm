@@ -31,19 +31,21 @@ export function currentMonthIso(): string {
   return new Date().toISOString().slice(0, 7);
 }
 
-/** First day of the month spanning `monthCount` calendar months ending on `endIso`. */
+/** Start date `monthCount` calendar months before `endIso` (same day of month). */
 export function startDateForMonthSpan(endIso: string, monthCount: number): string {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(endIso.trim().slice(0, 10));
   if (!match || monthCount < 1) return endIso.slice(0, 10);
   const year = Number(match[1]);
   const month = Number(match[2]);
-  const date = new Date(year, month - monthCount, 1);
+  const day = Number(match[3]);
+  const date = new Date(year, month - 1 - monthCount, day);
   const y = date.getFullYear();
   const m = String(date.getMonth() + 1).padStart(2, "0");
-  return `${y}-${m}-01`;
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
 }
 
-/** If `from`/`end` match a calendar month span, return the span length (1–120). */
+/** If `from`/`end` match a rolling month span, return the span length (1–120). */
 export function monthSpanForRange(fromIso: string, endIso: string): number | null {
   const from = fromIso.trim().slice(0, 10);
   const end = endIso.trim().slice(0, 10);
