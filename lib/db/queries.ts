@@ -28,6 +28,7 @@ import {
   mapPalai,
   mapPurchaseAgreement,
   mapSale,
+  mapAnimal,
   mapTx,
   mapWeight,
   selectAll,
@@ -105,6 +106,7 @@ export type HomeData = {
   contacts: Contact[];
   transactions: Transaction[];
   palai_payments: PalaiPayment[];
+  animals: Animal[];
   meta: FarmDatabase["meta"];
   quickEntry: QuickEntryProps;
 };
@@ -116,17 +118,19 @@ export const loadHomeData = cache(async (): Promise<HomeData> => {
       contacts: db.contacts,
       transactions: db.transactions,
       palai_payments: db.palai_payments,
+      animals: db.animals,
       meta: db.meta,
       quickEntry: quickEntryPropsFromDb(db),
     };
   }
 
   const client = createServiceClient();
-  const [contacts, transactions, palai, metaRows, quickEntry] = await Promise.all([
+  const [contacts, transactions, palai, metaRows, animalRows, quickEntry] = await Promise.all([
     selectAll(client, "contacts"),
     selectAll(client, "transactions"),
     selectAll(client, "palai_payments"),
     selectAll(client, "app_meta"),
+    selectAll(client, "animals"),
     getQuickEntryData(),
   ]);
 
@@ -134,6 +138,7 @@ export const loadHomeData = cache(async (): Promise<HomeData> => {
     contacts: contacts.map(mapContact),
     transactions: filterLedgerTxs(transactions),
     palai_payments: palai.map(mapPalai),
+    animals: animalRows.map(mapAnimal),
     meta: mapMeta(metaRows[0]),
     quickEntry,
   };
