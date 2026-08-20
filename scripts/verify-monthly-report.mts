@@ -238,9 +238,11 @@ const allTime = computeMonthlyCategoryReport({
 assert(allTime.totalInvested === 8000, `all time invested expected 8000 got ${allTime.totalInvested}`);
 assert(allTime.ledgerRows.length === 2, "all time includes every ledger row");
 
-assert(startDateForMonthSpan("2026-08-20", 2) === "2026-07-01", "2-month span from August");
-assert(startDateForMonthSpan("2026-08-20", 8) === "2026-01-01", "8-month span from August");
-assert(monthSpanForRange("2026-07-01", "2026-08-20") === 2, "detect 2-month span");
+assert(startDateForMonthSpan("2026-08-20", 2) === "2026-06-20", "2-month rolling span from August");
+assert(startDateForMonthSpan("2026-08-20", 3) === "2026-05-20", "3-month rolling span from August");
+assert(startDateForMonthSpan("2026-08-20", 8) === "2025-12-20", "8-month rolling span from August");
+assert(monthSpanForRange("2026-06-20", "2026-08-20") === 2, "detect 2-month span");
+assert(monthSpanForRange("2026-05-20", "2026-08-20") === 3, "detect 3-month span");
 assert(monthSpanForRange("2026-06-15", "2026-08-20") === null, "non-month-span returns null");
 
 console.log("PASS monthly category report");

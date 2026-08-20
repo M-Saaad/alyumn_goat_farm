@@ -152,7 +152,7 @@ export function FinanceReportPicker({ mode, month, from, to }: FinanceReportPick
                 Number of months
               </label>
               <p className="text-xs text-stone-500">
-                From the 1st of the starting month through today
+                Same day of month, counting back from today
               </p>
             </div>
             <div className="flex items-center gap-2">
