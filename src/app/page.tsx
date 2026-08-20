@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { loadHomeData, contactNameFrom } from "@/lib/db/queries";
 import { computeSettlement } from "@/lib/partner-equity/settlement";
+import { computePeriodHeadcount } from "@/lib/livestock/period-headcount";
 import { formatPkr, formatDate, currentMonthIso } from "@/lib/format";
 import { palaiServiceMonth } from "@/lib/palai/service-month";
 import { computeMonthlyCategoryReport, parseFinanceReport } from "@/lib/transactions/monthly-report";
@@ -11,6 +12,7 @@ import { BottomNav } from "@/components/BottomNav";
 import { FinanceCategoryBreakdown } from "@/components/FinanceCategoryBreakdown";
 import { FinanceMonthlyTransactions } from "@/components/FinanceMonthlyTransactions";
 import { FinanceReportPicker } from "@/components/FinanceReportPicker";
+import { FinancePeriodHeadcount } from "@/components/FinancePeriodHeadcount";
 import { QuickEntryLoader } from "@/components/QuickEntryLoader";
 import { SignOutButton } from "@/components/SignOutButton";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
@@ -62,6 +64,11 @@ async function HomePageContent({
     mode: reportRange.mode,
     periodLabel: reportRange.periodLabel,
   });
+  const headcount = computePeriodHeadcount(
+    data.animals,
+    reportRange.periodStart,
+    reportRange.periodEnd
+  );
   const allTime = computeCategoryBreakdown({
     transactions: data.transactions,
     palaiPayments: data.palai_payments,
@@ -142,6 +149,7 @@ async function HomePageContent({
             />
           </Suspense>
         </div>
+        <FinancePeriodHeadcount headcount={headcount} />
         {monthly.transactionCount === 0 ? (
           <p className="text-sm text-stone-500">No transactions in this period.</p>
         ) : (

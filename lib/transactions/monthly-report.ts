@@ -1,6 +1,7 @@
 import { normalizeServiceMonth, palaiServiceMonth, formatServiceMonth } from "../palai/service-month";
 import type { LedgerCategory, PalaiPayment, Transaction } from "../types";
 import { currentMonthIso, formatDate, todayIso } from "../format";
+import { lastDayOfMonth } from "../livestock/period-headcount";
 import {
   computeCategoryBreakdown,
   palaiInFilter,
@@ -106,6 +107,8 @@ export function parseFinanceReport(searchParams: {
   month: string;
   from?: string;
   to?: string;
+  periodStart: string;
+  periodEnd: string;
   periodLabel: string;
   filter: DateRangeFilter;
 } {
@@ -121,15 +124,23 @@ export function parseFinanceReport(searchParams: {
       month: from.slice(0, 7),
       from,
       to,
+      periodStart: from,
+      periodEnd: to,
       periodLabel: `${formatDate(from)} – ${formatDate(to)}`,
       filter: { from, to },
     };
   }
 
   const month = parseFinanceMonth(searchParams.month);
+  const periodStart = firstDayOfMonth(month);
+  const periodEnd = lastDayOfMonth(month);
   return {
     mode: "month",
     month,
+    from: periodStart,
+    to: periodEnd,
+    periodStart,
+    periodEnd,
     periodLabel: formatServiceMonth(month),
     filter: { month },
   };
