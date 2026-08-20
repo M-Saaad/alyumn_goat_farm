@@ -1,6 +1,36 @@
 import { palaiServiceMonth } from "../palai/service-month";
 import type { LedgerCategory, PalaiPayment, Transaction } from "../types";
 
+export type DateRangeFilter = {
+  month?: string;
+  from?: string;
+  to?: string;
+};
+
+export function transactionInFilter(
+  date: string | null | undefined,
+  filter?: DateRangeFilter
+): boolean {
+  if (!filter) return true;
+  if (!date?.trim()) return false;
+  const iso = date.trim().slice(0, 10);
+  if (filter.month) return iso.startsWith(filter.month);
+  if (filter.from && filter.to) return iso >= filter.from && iso <= filter.to;
+  return true;
+}
+
+export function palaiInFilter(payment: PalaiPayment, filter?: DateRangeFilter): boolean {
+  if (!filter) return true;
+  const serviceMonth = palaiServiceMonth(payment);
+  if (filter.month) return serviceMonth === filter.month;
+  if (filter.from && filter.to) {
+    const startMonth = filter.from.slice(0, 7);
+    const endMonth = filter.to.slice(0, 7);
+    return serviceMonth >= startMonth && serviceMonth <= endMonth;
+  }
+  return true;
+}
+
 export const INVESTED_CATEGORY_ORDER: LedgerCategory[] = [
   "Feed",
   "Delivery",
@@ -27,7 +57,14 @@ export function computeCategoryBreakdown(input: {
   transactions: Transaction[];
   palaiPayments?: PalaiPayment[];
   month?: string;
+  from?: string;
+  to?: string;
 }): CategoryBreakdown {
+  const filter: DateRangeFilter | undefined = input.from && input.to
+    ? { from: input.from, to: input.to }
+    : input.month
+      ? { month: input.month }
+      : undefined;
   const investedByCategory: Partial<Record<LedgerCategory, number>> = {};
   const receivedByCategory: Partial<Record<LedgerCategory, number>> = {};
   const transfersByCategory: Partial<Record<LedgerCategory, number>> = {};
@@ -36,7 +73,7 @@ export function computeCategoryBreakdown(input: {
   let totalTransfers = 0;
 
   for (const tx of input.transactions) {
-    if (input.month && !tx.date?.startsWith(input.month)) continue;
+    if (!transactionInFilter(tx.date, filter)) continue;
     if (tx.category === "Palai Income") continue;
 
     if (tx.kind === "cost") {
@@ -57,8 +94,8 @@ export function computeCategoryBreakdown(input: {
   }
 
   const palaiPayments = input.palaiPayments ?? [];
-  const palaiInScope = input.month
-    ? palaiPayments.filter((p) => palaiServiceMonth(p) === input.month)
+  const palaiInScope = filter
+    ? palaiPayments.filter((p) => palaiInFilter(p, filter))
     : palaiPayments;
 
   if (palaiInScope.length > 0) {

@@ -1,6 +1,7 @@
 import {
   computeMonthlyCategoryReport,
   parseFinanceMonth,
+  parseFinanceReport,
 } from "../lib/transactions/monthly-report.ts";
 import type { PalaiPayment, Transaction } from "../lib/types";
 
@@ -121,5 +122,105 @@ assert(empty.totalReceived === 0, "empty month received is zero");
 assert(parseFinanceMonth(undefined) === new Date().toISOString().slice(0, 7), "default current month");
 assert(parseFinanceMonth("2026-03") === "2026-03", "valid month");
 assert(parseFinanceMonth("bad") === new Date().toISOString().slice(0, 7), "invalid falls back");
+
+const custom = computeMonthlyCategoryReport({
+  from: "2026-07-10",
+  to: "2026-07-25",
+  mode: "custom",
+  transactions: [
+    tx({ id: "1", category: "Feed", amount: 5000, date: "2026-07-10" }),
+    tx({ id: "2", category: "Feed", amount: 3000, date: "2026-06-30" }),
+    tx({ id: "3", category: "Vet/Medicine", amount: 2000, date: "2026-07-20" }),
+    tx({
+      id: "4",
+      category: "Livestock Sale",
+      kind: "partner_adjustment",
+      amount: -12000,
+      date: "2026-07-25",
+    }),
+    tx({ id: "5", category: "Feed", amount: 9000, date: "2026-07-28" }),
+  ],
+  palaiPayments: [
+    {
+      id: "palai-1",
+      date: "2026-07-28",
+      service_month: "2026-07",
+      customer_id: "c1",
+      rate_per_goat: 7000,
+      goat_count: 2,
+      total_amount: 14000,
+      payment_method: null,
+      transaction_id: "tx-palai",
+      notes: null,
+    },
+    {
+      id: "palai-aug",
+      date: "2026-08-05",
+      service_month: "2026-08",
+      customer_id: "c1",
+      rate_per_goat: 7000,
+      goat_count: 1,
+      total_amount: 7000,
+      payment_method: null,
+      transaction_id: "tx-palai-aug",
+      notes: null,
+    },
+  ] satisfies PalaiPayment[],
+});
+
+assert(custom.mode === "custom", "custom mode");
+assert(custom.totalInvested === 7000, `custom invested expected 7000 got ${custom.totalInvested}`);
+assert(custom.totalReceived === 38000, `custom received expected 38000 got ${custom.totalReceived}`);
+assert(custom.ledgerRows.length === 3, "three ledger rows in custom date window");
+assert(custom.palaiRows.length === 1, "July palai only for July custom window");
+assert(custom.transactionCount === 4, "four items in custom July window");
+
+const crossMonth = computeMonthlyCategoryReport({
+  from: "2026-07-15",
+  to: "2026-08-10",
+  mode: "custom",
+  transactions: [
+    tx({ id: "j1", category: "Feed", amount: 1000, date: "2026-07-20" }),
+    tx({ id: "j2", category: "Feed", amount: 2000, date: "2026-08-05" }),
+    tx({ id: "j3", category: "Feed", amount: 3000, date: "2026-06-01" }),
+  ],
+  palaiPayments: [
+    {
+      id: "palai-july",
+      date: "2026-07-28",
+      service_month: "2026-07",
+      customer_id: "c1",
+      rate_per_goat: 7000,
+      goat_count: 2,
+      total_amount: 14000,
+      payment_method: null,
+      transaction_id: "tx1",
+      notes: null,
+    },
+    {
+      id: "palai-aug",
+      date: "2026-08-05",
+      service_month: "2026-08",
+      customer_id: "c1",
+      rate_per_goat: 7000,
+      goat_count: 1,
+      total_amount: 7000,
+      payment_method: null,
+      transaction_id: "tx2",
+      notes: null,
+    },
+  ] satisfies PalaiPayment[],
+});
+
+assert(crossMonth.totalInvested === 3000, `cross-month invested expected 3000 got ${crossMonth.totalInvested}`);
+assert(crossMonth.totalReceived === 21000, `cross-month received expected 21000 got ${crossMonth.totalReceived}`);
+assert(crossMonth.palaiRows.length === 2, "both palai months in cross-month window");
+
+const parsedCustom = parseFinanceReport({ range: "custom", from: "2026-07-01", to: "2026-07-31" });
+assert(parsedCustom.mode === "custom", "parse custom mode");
+assert(parsedCustom.from === "2026-07-01" && parsedCustom.to === "2026-07-31", "parse custom dates");
+
+const parsedMonth = parseFinanceReport({ month: "2026-05" });
+assert(parsedMonth.mode === "month" && parsedMonth.month === "2026-05", "parse month mode");
 
 console.log("PASS monthly category report");

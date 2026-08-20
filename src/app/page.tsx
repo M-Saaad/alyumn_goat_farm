@@ -4,13 +4,13 @@ import { loadHomeData, contactNameFrom } from "@/lib/db/queries";
 import { computeSettlement } from "@/lib/partner-equity/settlement";
 import { formatPkr, formatDate, currentMonthIso } from "@/lib/format";
 import { palaiServiceMonth } from "@/lib/palai/service-month";
-import { computeMonthlyCategoryReport, parseFinanceMonth } from "@/lib/transactions/monthly-report";
+import { computeMonthlyCategoryReport, parseFinanceReport } from "@/lib/transactions/monthly-report";
 import { computeCategoryBreakdown } from "@/lib/transactions/category-breakdown";
 import { AppHeader } from "@/components/AppHeader";
 import { BottomNav } from "@/components/BottomNav";
 import { FinanceCategoryBreakdown } from "@/components/FinanceCategoryBreakdown";
 import { FinanceMonthlyTransactions } from "@/components/FinanceMonthlyTransactions";
-import { FinanceMonthPicker } from "@/components/FinanceMonthPicker";
+import { FinanceReportPicker } from "@/components/FinanceReportPicker";
 import { QuickEntryLoader } from "@/components/QuickEntryLoader";
 import { SignOutButton } from "@/components/SignOutButton";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
@@ -21,7 +21,7 @@ export const dynamic = "force-dynamic";
 export default function HomePage({
   searchParams,
 }: {
-  searchParams: Promise<{ month?: string }>;
+  searchParams: Promise<{ month?: string; from?: string; to?: string; range?: string }>;
 }) {
   return (
     <Suspense fallback={<HomePageFallback />}>
@@ -43,10 +43,10 @@ function HomePageFallback() {
 async function HomePageContent({
   searchParams,
 }: {
-  searchParams: Promise<{ month?: string }>;
+  searchParams: Promise<{ month?: string; from?: string; to?: string; range?: string }>;
 }) {
   const sp = await searchParams;
-  const month = parseFinanceMonth(sp.month);
+  const reportRange = parseFinanceReport(sp);
   const data = await loadHomeData();
   const settlementDb = {
     contacts: data.contacts,
@@ -56,7 +56,11 @@ async function HomePageContent({
   const monthly = computeMonthlyCategoryReport({
     transactions: data.transactions,
     palaiPayments: data.palai_payments,
-    month,
+    month: reportRange.month,
+    from: reportRange.from,
+    to: reportRange.to,
+    mode: reportRange.mode,
+    periodLabel: reportRange.periodLabel,
   });
   const allTime = computeCategoryBreakdown({
     transactions: data.transactions,
@@ -127,13 +131,19 @@ async function HomePageContent({
 
       <section className="mb-4 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-stone-200">
         <div className="mb-3">
-          <h2 className="mb-2 text-sm font-bold text-stone-800">Monthly report</h2>
+          <h2 className="mb-1 text-sm font-bold text-stone-800">Period report</h2>
+          <p className="mb-2 text-xs text-stone-500">{monthly.periodLabel}</p>
           <Suspense fallback={<div className="h-8 animate-pulse rounded-lg bg-stone-100" />}>
-            <FinanceMonthPicker month={month} />
+            <FinanceReportPicker
+              mode={reportRange.mode}
+              month={reportRange.month}
+              from={reportRange.from}
+              to={reportRange.to}
+            />
           </Suspense>
         </div>
         {monthly.transactionCount === 0 ? (
-          <p className="text-sm text-stone-500">No transactions this month.</p>
+          <p className="text-sm text-stone-500">No transactions in this period.</p>
         ) : (
           <>
             <FinanceCategoryBreakdown
