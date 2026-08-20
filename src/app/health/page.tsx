@@ -12,7 +12,6 @@ import { BottomNav } from "@/components/BottomNav";
 import { QuickEntryLoader } from "@/components/QuickEntryLoader";
 import { HealthFilters } from "@/components/HealthFilters";
 import { HealthBreedingList } from "@/components/HealthBreedingList";
-import { BackfillBreedingBirthsButton } from "@/components/BackfillBreedingBirthsButton";
 import { VaccineScheduleManager } from "@/components/VaccineScheduleManager";
 import { isSupabaseDb } from "@/lib/db";
 import type { QuickEntryProps } from "@/components/QuickEntry";
@@ -219,7 +218,6 @@ function HealthPageView({
 
       {tab === "breeding" && (
         <section className="mb-4 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-stone-200">
-          {supabaseEnabled && <BackfillBreedingBirthsButton />}
           <h2 className="mb-2 text-sm font-bold">Females (excluding kids)</h2>
           <HealthBreedingList rows={herd.breeding} supabaseEnabled={supabaseEnabled} />
         </section>
