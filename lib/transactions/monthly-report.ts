@@ -2,6 +2,7 @@ import { normalizeServiceMonth, palaiServiceMonth, formatServiceMonth } from "..
 import type { LedgerCategory, PalaiPayment, Transaction } from "../types";
 import { currentMonthIso, formatDate, todayIso } from "../format";
 import { lastDayOfMonth } from "../livestock/period-headcount";
+import type { Animal } from "../types";
 import {
   computeCategoryBreakdown,
   palaiInFilter,
@@ -9,7 +10,7 @@ import {
   type DateRangeFilter,
 } from "./category-breakdown";
 
-export type FinanceReportMode = "month" | "custom";
+export type FinanceReportMode = "month" | "custom" | "alltime";
 
 export type MonthlyLedgerRow = {
   id: string;
@@ -97,6 +98,19 @@ export function parseFinanceMonth(value: string | undefined): string {
   }
 }
 
+export function earliestFarmDate(animals: Animal[], transactions: Transaction[]): string {
+  let earliest = todayIso();
+  for (const animal of animals) {
+    const date = animal.date_of_purchase?.trim().slice(0, 10);
+    if (date && date < earliest) earliest = date;
+  }
+  for (const tx of transactions) {
+    const date = tx.date?.trim().slice(0, 10);
+    if (date && date < earliest) earliest = date;
+  }
+  return earliest;
+}
+
 export function parseFinanceReport(searchParams: {
   month?: string;
   from?: string;
@@ -110,8 +124,20 @@ export function parseFinanceReport(searchParams: {
   periodStart: string;
   periodEnd: string;
   periodLabel: string;
-  filter: DateRangeFilter;
+  filter?: DateRangeFilter;
 } {
+  if (searchParams.range === "alltime") {
+    const today = todayIso();
+    return {
+      mode: "alltime",
+      month: parseFinanceMonth(searchParams.month),
+      periodStart: today,
+      periodEnd: today,
+      periodLabel: "All time",
+      filter: undefined,
+    };
+  }
+
   if (searchParams.range === "custom") {
     const month = parseFinanceMonth(searchParams.month);
     const defaultFrom = firstDayOfMonth(month);
@@ -155,27 +181,33 @@ export function computeMonthlyCategoryReport(input: {
   mode?: FinanceReportMode;
   periodLabel?: string;
 }): MonthlyCategoryReport {
-  const filter: DateRangeFilter =
-    input.from && input.to
-      ? { from: input.from, to: input.to }
-      : { month: parseFinanceMonth(input.month) };
+  const filter: DateRangeFilter | undefined =
+    input.mode === "alltime"
+      ? undefined
+      : input.from && input.to
+        ? { from: input.from, to: input.to }
+        : { month: parseFinanceMonth(input.month) };
 
-  const mode: FinanceReportMode = input.mode ?? (input.from && input.to ? "custom" : "month");
-  const month = filter.month ?? (input.from ? input.from.slice(0, 7) : parseFinanceMonth(input.month));
-  const from = filter.from;
-  const to = filter.to;
+  const mode: FinanceReportMode =
+    input.mode ?? (input.from && input.to ? "custom" : "month");
+  const month =
+    filter?.month ?? (input.from ? input.from.slice(0, 7) : parseFinanceMonth(input.month));
+  const from = filter?.from ?? input.from;
+  const to = filter?.to ?? input.to;
   const periodLabel =
     input.periodLabel ??
-    (mode === "custom" && from && to
-      ? `${formatDate(from)} – ${formatDate(to)}`
-      : formatServiceMonth(month));
+    (mode === "alltime"
+      ? "All time"
+      : mode === "custom" && from && to
+        ? `${formatDate(from)} – ${formatDate(to)}`
+        : formatServiceMonth(month));
 
   const breakdown = computeCategoryBreakdown({
     transactions: input.transactions,
     palaiPayments: input.palaiPayments,
-    month: filter.month,
-    from: filter.from,
-    to: filter.to,
+    month: filter?.month,
+    from: filter?.from,
+    to: filter?.to,
   });
 
   const byCategory: Partial<Record<LedgerCategory, number>> = {};
@@ -183,20 +215,25 @@ export function computeMonthlyCategoryReport(input: {
 
   for (const tx of input.transactions) {
     if (tx.category === "Palai Income") continue;
-    if (!transactionInFilter(tx.date, filter)) continue;
+    if (filter && !transactionInFilter(tx.date, filter)) continue;
     const amount = displayAmount(tx);
     byCategory[tx.category] = (byCategory[tx.category] || 0) + amount;
     transactionCount++;
   }
 
-  const palaiInPeriod = input.palaiPayments.filter((p) => palaiInFilter(p, filter));
+  const palaiInPeriod = filter
+    ? input.palaiPayments.filter((p) => palaiInFilter(p, filter))
+    : input.palaiPayments;
   if (palaiInPeriod.length > 0) {
     byCategory["Palai Income"] = palaiInPeriod.reduce((sum, p) => sum + p.total_amount, 0);
     transactionCount += palaiInPeriod.length;
   }
 
   const ledgerRows = input.transactions
-    .filter((tx) => tx.category !== "Palai Income" && transactionInFilter(tx.date, filter))
+    .filter(
+      (tx) =>
+        tx.category !== "Palai Income" && (!filter || transactionInFilter(tx.date, filter))
+    )
     .map((tx) => ({
       id: tx.id,
       date: tx.date,

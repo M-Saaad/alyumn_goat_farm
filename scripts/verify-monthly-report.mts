@@ -223,4 +223,18 @@ assert(parsedCustom.from === "2026-07-01" && parsedCustom.to === "2026-07-31", "
 const parsedMonth = parseFinanceReport({ month: "2026-05" });
 assert(parsedMonth.mode === "month" && parsedMonth.month === "2026-05", "parse month mode");
 
+const parsedAlltime = parseFinanceReport({ range: "alltime" });
+assert(parsedAlltime.mode === "alltime" && parsedAlltime.periodLabel === "All time", "parse alltime mode");
+
+const allTime = computeMonthlyCategoryReport({
+  mode: "alltime",
+  transactions: [
+    tx({ id: "1", category: "Feed", amount: 5000, date: "2026-07-10" }),
+    tx({ id: "2", category: "Feed", amount: 3000, date: "2026-06-30" }),
+  ],
+  palaiPayments: [],
+});
+assert(allTime.totalInvested === 8000, `all time invested expected 8000 got ${allTime.totalInvested}`);
+assert(allTime.ledgerRows.length === 2, "all time includes every ledger row");
+
 console.log("PASS monthly category report");
