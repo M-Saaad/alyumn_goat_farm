@@ -20,6 +20,7 @@ import {
   addCustomVaccine,
   deleteCustomVaccine,
   ensureCustomVaccine,
+  ensureCustomDewormer,
   recordLivestockSale,
   registerBornGoat,
   recordPalai,
@@ -31,7 +32,7 @@ import {
 import { revalidatePath } from "next/cache";
 import type { AnimalBreed, AnimalSex, AnimalStatus, LedgerCategory, MedicalEventType } from "@/lib/types";
 import { LEDGER_CATEGORIES } from "@/lib/types";
-import { formatDewormNotes, formatVaccineNotes } from "@/lib/livestock/medical-notes";
+import { formatDewormNotes, formatVaccineNotes, type DewormType } from "@/lib/livestock/medical-notes";
 import { NEW_VACCINE_VALUE, parseVaccineIntervalDays } from "@/lib/livestock/vaccine-schedule";
 import { uploadAnimalMedia } from "@/lib/media/upload";
 import type { TransactionEditVariant } from "@/lib/transactions/mutate";
@@ -220,11 +221,16 @@ export async function actionLogMedical(formData: FormData) {
     }
     notes = formatVaccineNotes(name, String(formData.get("dosage") || ""));
   } else if (eventType === "Deworming") {
+    const dewormType = String(formData.get("dewormType") || "") as DewormType;
     const dewormerName = String(formData.get("dewormerName") || "").trim();
     const customName = String(formData.get("dewormerNameOther") || "").trim();
+    const resolvedName = dewormerName === "Other" ? customName : dewormerName;
+    if (dewormerName === "Other") {
+      await ensureCustomDewormer(resolvedName, dewormType);
+    }
     notes = formatDewormNotes({
-      type: String(formData.get("dewormType") || ""),
-      name: dewormerName === "Other" ? customName : dewormerName,
+      type: dewormType,
+      name: resolvedName,
       dosage: String(formData.get("dosage") || ""),
     });
   }

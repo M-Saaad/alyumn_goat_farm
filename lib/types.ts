@@ -164,6 +164,13 @@ export interface CustomVaccine {
   interval_days: number;
 }
 
+/** User-defined dewormer product name, scoped to internal or external type. */
+export interface CustomDewormer {
+  id: string;
+  name: string;
+  deworm_type: "internal" | "external";
+}
+
 export type MediaType = "image" | "video";
 
 export interface AnimalMedia {
@@ -188,6 +195,7 @@ export interface FarmDatabase {
   weight_logs: WeightLog[];
   animal_media: AnimalMedia[];
   custom_vaccines: CustomVaccine[];
+  custom_dewormers: CustomDewormer[];
   meta: {
     importedAt: string | null;
     settlementVerified: boolean;

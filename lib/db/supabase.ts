@@ -12,6 +12,7 @@ import type {
   Transaction,
   WeightLog,
   CustomVaccine,
+  CustomDewormer,
 } from "../types";
 import { emptyDb } from "../db-empty";
 import { mapAnimalsWithParents, animalsWithEncodedParentComments } from "../livestock/animal-parents-store";
@@ -183,6 +184,18 @@ export function mapCustomVaccine(r: Record<string, unknown>): CustomVaccine {
   };
 }
 
+export function mapCustomDewormer(r: Record<string, unknown>): CustomDewormer {
+  const dewormType = String(r.deworm_type);
+  if (dewormType !== "internal" && dewormType !== "external") {
+    throw new Error(`Invalid deworm_type: ${dewormType}`);
+  }
+  return {
+    id: String(r.id),
+    name: String(r.name),
+    deworm_type: dewormType,
+  };
+}
+
 export function mapMedia(r: Record<string, unknown>): AnimalMedia {
   return {
     id: String(r.id),
@@ -253,6 +266,7 @@ export async function loadFromSupabase(client: SupabaseClient): Promise<FarmData
     weights,
     media,
     customVaccines,
+    customDewormers,
     metaRows,
   ] = await Promise.all([
     selectAll(client, "contacts"),
@@ -267,6 +281,7 @@ export async function loadFromSupabase(client: SupabaseClient): Promise<FarmData
     selectAll(client, "weight_logs"),
     selectAll(client, "animal_media"),
     selectAllOptional(client, "custom_vaccines"),
+    selectAllOptional(client, "custom_dewormers"),
     selectAll(client, "app_meta"),
   ]);
 
@@ -286,6 +301,7 @@ export async function loadFromSupabase(client: SupabaseClient): Promise<FarmData
   db.weight_logs = weights.map(mapWeight);
   db.animal_media = media.map(mapMedia);
   db.custom_vaccines = customVaccines.map(mapCustomVaccine);
+  db.custom_dewormers = customDewormers.map(mapCustomDewormer);
   db.meta = mapMeta(meta);
   return db;
 }
@@ -465,6 +481,16 @@ export async function saveToSupabase(client: SupabaseClient, db: FarmDatabase): 
       id: v.id,
       name: v.name,
       interval_days: v.interval_days,
+    }))
+  );
+
+  await syncTable(
+    client,
+    "custom_dewormers",
+    (db.custom_dewormers ?? []).map((d) => ({
+      id: d.id,
+      name: d.name,
+      deworm_type: d.deworm_type,
     }))
   );
 

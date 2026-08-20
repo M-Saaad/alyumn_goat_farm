@@ -35,6 +35,39 @@ export const DEWORMER_NAMES = [
   ...DEWORMER_NAMES_BY_TYPE.external,
 ] as const;
 
+export type CustomDewormerLike = {
+  name: string;
+  deworm_type: DewormType;
+};
+
+export function builtinDewormerByName(name: string, type: DewormType): string | null {
+  const upper = name.trim().toUpperCase();
+  const match = DEWORMER_NAMES_BY_TYPE[type].find((n) => n.toUpperCase() === upper);
+  return match ?? null;
+}
+
+export function findCustomDewormerByName(
+  custom: CustomDewormerLike[],
+  name: string,
+  type: DewormType
+): CustomDewormerLike | null {
+  const upper = name.trim().toUpperCase();
+  return custom.find((d) => d.deworm_type === type && d.name.toUpperCase() === upper) ?? null;
+}
+
+export function mergeDewormerNames(
+  custom: CustomDewormerLike[],
+  type: DewormType
+): string[] {
+  const builtins = [...DEWORMER_NAMES_BY_TYPE[type]];
+  const builtinUpper = new Set(builtins.map((n) => n.toUpperCase()));
+  const customs = custom
+    .filter((d) => d.deworm_type === type)
+    .map((d) => d.name.trim())
+    .filter((name) => name && !builtinUpper.has(name.toUpperCase()));
+  return [...builtins, ...customs];
+}
+
 export function formatVaccineNotes(name: string, dosage: string): string {
   const n = name.trim();
   const d = dosage.trim();
