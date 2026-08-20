@@ -72,14 +72,14 @@ export function FinanceReportPicker({ mode, month, from, to }: FinanceReportPick
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap gap-2">
+        <button type="button" onClick={() => switchMode("alltime")} className={tabClass(mode === "alltime")}>
+          All time
+        </button>
         <button type="button" onClick={() => switchMode("month")} className={tabClass(mode === "month")}>
           Monthly
         </button>
         <button type="button" onClick={() => switchMode("custom")} className={tabClass(mode === "custom")}>
           Custom range
-        </button>
-        <button type="button" onClick={() => switchMode("alltime")} className={tabClass(mode === "alltime")}>
-          All time
         </button>
       </div>
 
