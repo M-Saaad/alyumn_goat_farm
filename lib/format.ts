@@ -30,3 +30,15 @@ export function todayIso(): string {
 export function currentMonthIso(): string {
   return new Date().toISOString().slice(0, 7);
 }
+
+/** First day of the month spanning `monthCount` calendar months ending on `endIso`. */
+export function startDateForMonthSpan(endIso: string, monthCount: number): string {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(endIso.trim().slice(0, 10));
+  if (!match || monthCount < 1) return endIso.slice(0, 10);
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const date = new Date(year, month - monthCount, 1);
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  return `${y}-${m}-01`;
+}
