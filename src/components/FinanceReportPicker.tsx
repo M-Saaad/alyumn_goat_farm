@@ -4,13 +4,13 @@ import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   currentMonthIso,
+  formatDate,
   monthSpanForRange,
   startDateForMonthSpan,
   todayIso,
 } from "@/lib/format";
 import type { FinanceReportMode } from "@/lib/transactions/monthly-report";
 
-const MONTH_PRESETS = [2, 3, 4, 5, 6, 7, 8];
 const MAX_CUSTOM_MONTHS = 120;
 
 type FinanceReportPickerProps = {
@@ -49,8 +49,8 @@ export function FinanceReportPicker({ mode, month, from, to }: FinanceReportPick
     } else if (nextMode === "custom") {
       params.set("range", "custom");
       params.delete("month");
-      const start = from ?? `${month}-01`;
-      const end = to ?? todayIso();
+      const end = todayIso();
+      const start = from ?? startDateForMonthSpan(end, 3);
       params.set("from", start);
       params.set("to", end);
     } else {
@@ -83,7 +83,7 @@ export function FinanceReportPicker({ mode, month, from, to }: FinanceReportPick
     navigate(params);
   }
 
-  function setMonthPreset(monthCount: number) {
+  function applyMonthSpan(monthCount: number) {
     const params = new URLSearchParams(sp.toString());
     params.set("range", "custom");
     params.delete("month");
@@ -96,12 +96,7 @@ export function FinanceReportPicker({ mode, month, from, to }: FinanceReportPick
   function applyCustomMonths() {
     const monthCount = Number.parseInt(customMonths.trim(), 10);
     if (!Number.isFinite(monthCount) || monthCount < 1 || monthCount > MAX_CUSTOM_MONTHS) return;
-    setMonthPreset(monthCount);
-  }
-
-  function isMonthPresetActive(monthCount: number): boolean {
-    if (mode !== "custom" || !from || !to) return false;
-    return from === startDateForMonthSpan(to, monthCount);
+    applyMonthSpan(monthCount);
   }
 
   const tabClass = (active: boolean) =>
@@ -109,14 +104,12 @@ export function FinanceReportPicker({ mode, month, from, to }: FinanceReportPick
       active ? "bg-stone-800 text-white" : "bg-stone-100 text-stone-700 ring-1 ring-stone-200"
     }`;
 
-  const presetClass = (active: boolean) =>
-    `shrink-0 rounded-full px-3 py-1 text-xs font-semibold ${
-      active ? "bg-emerald-700 text-white" : "bg-white text-stone-600 ring-1 ring-stone-200"
-    }`;
-
-  const customSpan = mode === "custom" && from && to ? monthSpanForRange(from, to) : null;
-  const customActive =
-    customSpan != null && !MONTH_PRESETS.includes(customSpan) && customSpan > 0;
+  const parsedMonths = Number.parseInt(customMonths.trim(), 10);
+  const previewValid =
+    Number.isFinite(parsedMonths) && parsedMonths >= 1 && parsedMonths <= MAX_CUSTOM_MONTHS;
+  const previewEnd = todayIso();
+  const previewStart = previewValid ? startDateForMonthSpan(previewEnd, parsedMonths) : null;
+  const activeSpan = mode === "custom" && from && to ? monthSpanForRange(from, to) : null;
 
   return (
     <div className="space-y-3">
@@ -146,70 +139,81 @@ export function FinanceReportPicker({ mode, month, from, to }: FinanceReportPick
           />
         </div>
       ) : mode === "custom" ? (
-        <div className="space-y-2">
-          <div>
-            <p className="mb-1 text-xs font-semibold text-stone-600">Quick span</p>
-            <div className="flex gap-2 overflow-x-auto pb-1">
-              {MONTH_PRESETS.map((count) => (
-                <button
-                  key={count}
-                  type="button"
-                  onClick={() => setMonthPreset(count)}
-                  className={presetClass(isMonthPresetActive(count))}
-                >
-                  {count} months
-                </button>
-              ))}
-            </div>
-          </div>
+        <div className="space-y-3 rounded-xl bg-stone-50 p-3 ring-1 ring-stone-200">
           <form
-            className="flex items-end gap-2"
+            className="space-y-2"
             onSubmit={(e) => {
               e.preventDefault();
               applyCustomMonths();
             }}
           >
-            <label className="block text-sm min-w-0 flex-1">
-              <span className="mb-1 block font-semibold text-stone-800">Custom months</span>
+            <div>
+              <label htmlFor="finance-month-span" className="text-sm font-semibold text-stone-800">
+                Number of months
+              </label>
+              <p className="text-xs text-stone-500">
+                From the 1st of the starting month through today
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
               <input
+                id="finance-month-span"
                 type="number"
                 min={1}
                 max={MAX_CUSTOM_MONTHS}
                 step={1}
                 value={customMonths}
                 onChange={(e) => setCustomMonths(e.target.value)}
-                placeholder="e.g. 12"
-                className={`w-full rounded-lg border bg-white px-2 py-1 text-sm text-stone-800 ${
-                  customActive ? "border-emerald-600 ring-1 ring-emerald-200" : "border-stone-300"
-                }`}
+                onBlur={applyCustomMonths}
+                placeholder="3"
+                className="w-20 rounded-lg border border-stone-300 bg-white px-3 py-2 text-center text-base font-semibold text-stone-900"
               />
-            </label>
-            <button
-              type="submit"
-              className="shrink-0 rounded-lg bg-stone-800 px-3 py-1.5 text-sm font-semibold text-white"
-            >
-              Apply
-            </button>
+              <span className="text-sm font-medium text-stone-700">months</span>
+              <button
+                type="submit"
+                className="ml-auto rounded-lg bg-stone-800 px-4 py-2 text-sm font-semibold text-white"
+              >
+                Apply
+              </button>
+            </div>
+            {previewStart && (
+              <p className="text-xs text-stone-600">
+                {activeSpan === parsedMonths && from && to
+                  ? `Showing ${formatDate(from)} – ${formatDate(to)}`
+                  : `Will show ${formatDate(previewStart)} – ${formatDate(previewEnd)}`}
+              </p>
+            )}
+            {!previewStart && from && to && (
+              <p className="text-xs text-stone-600">
+                Showing {formatDate(from)} – {formatDate(to)}
+              </p>
+            )}
           </form>
-          <div className="grid grid-cols-2 gap-2">
-            <label className="block text-sm">
-              <span className="mb-1 block font-semibold text-stone-800">Start date</span>
-              <input
-                type="date"
-                value={from ?? ""}
-                onChange={(e) => onDateChange("from", e.target.value)}
-                className="w-full rounded-lg border border-stone-300 bg-white px-2 py-1 text-sm text-stone-800"
-              />
-            </label>
-            <label className="block text-sm">
-              <span className="mb-1 block font-semibold text-stone-800">End date</span>
-              <input
-                type="date"
-                value={to ?? ""}
-                onChange={(e) => onDateChange("to", e.target.value)}
-                className="w-full rounded-lg border border-stone-300 bg-white px-2 py-1 text-sm text-stone-800"
-              />
-            </label>
+
+          <div className="border-t border-stone-200 pt-3">
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-stone-500">
+              Or pick exact dates
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              <label className="block text-sm">
+                <span className="mb-1 block font-medium text-stone-700">Start</span>
+                <input
+                  type="date"
+                  value={from ?? ""}
+                  onChange={(e) => onDateChange("from", e.target.value)}
+                  className="w-full rounded-lg border border-stone-300 bg-white px-2 py-1.5 text-sm text-stone-800"
+                />
+              </label>
+              <label className="block text-sm">
+                <span className="mb-1 block font-medium text-stone-700">End</span>
+                <input
+                  type="date"
+                  value={to ?? ""}
+                  onChange={(e) => onDateChange("to", e.target.value)}
+                  className="w-full rounded-lg border border-stone-300 bg-white px-2 py-1.5 text-sm text-stone-800"
+                />
+              </label>
+            </div>
           </div>
         </div>
       ) : (
