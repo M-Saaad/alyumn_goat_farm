@@ -4,10 +4,11 @@ import type { MonthlyCategoryReport } from "@/lib/transactions/monthly-report";
 
 export function FinanceMonthlyTransactions({ report }: { report: MonthlyCategoryReport }) {
   const { ledgerRows, palaiRows } = report;
+  const periodLabel = report.periodLabel;
   if (ledgerRows.length === 0 && palaiRows.length === 0) {
     return (
       <p className="mt-3 text-sm text-stone-500">
-        No transactions dated in {formatServiceMonth(report.month)}.
+        No transactions in {periodLabel}.
       </p>
     );
   }
@@ -15,7 +16,7 @@ export function FinanceMonthlyTransactions({ report }: { report: MonthlyCategory
   return (
     <div className="mt-4 border-t border-stone-100 pt-3">
       <h3 className="mb-2 text-xs font-bold uppercase tracking-wide text-stone-500">
-        Included this month ({ledgerRows.length + palaiRows.length})
+        Included in period ({ledgerRows.length + palaiRows.length})
       </h3>
       <ul className="divide-y divide-stone-100 text-sm">
         {ledgerRows.map((row) => (

@@ -1,7 +1,14 @@
-import { normalizeServiceMonth, palaiServiceMonth } from "../palai/service-month";
+import { normalizeServiceMonth, palaiServiceMonth, formatServiceMonth } from "../palai/service-month";
 import type { LedgerCategory, PalaiPayment, Transaction } from "../types";
-import { currentMonthIso } from "../format";
-import { computeCategoryBreakdown } from "./category-breakdown";
+import { currentMonthIso, formatDate, todayIso } from "../format";
+import {
+  computeCategoryBreakdown,
+  palaiInFilter,
+  transactionInFilter,
+  type DateRangeFilter,
+} from "./category-breakdown";
+
+export type FinanceReportMode = "month" | "custom";
 
 export type MonthlyLedgerRow = {
   id: string;
@@ -14,7 +21,11 @@ export type MonthlyLedgerRow = {
 };
 
 export type MonthlyCategoryReport = {
+  mode: FinanceReportMode;
   month: string;
+  from?: string;
+  to?: string;
+  periodLabel: string;
   byCategory: Partial<Record<LedgerCategory, number>>;
   investedByCategory: Partial<Record<LedgerCategory, number>>;
   receivedByCategory: Partial<Record<LedgerCategory, number>>;
@@ -24,9 +35,9 @@ export type MonthlyCategoryReport = {
   totalReceived: number;
   totalTransfers: number;
   transactionCount: number;
-  /** Ledger rows dated in this month (excludes Palai Income adjustments — palai uses service month). */
+  /** Ledger rows in this period (excludes Palai Income adjustments — palai uses service month). */
   ledgerRows: MonthlyLedgerRow[];
-  /** Palai payments counted for this month by service month. */
+  /** Palai payments counted for this period by service month. */
   palaiRows: Array<{
     id: string;
     date: string;
@@ -36,6 +47,27 @@ export type MonthlyCategoryReport = {
     notes: string | null;
   }>;
 };
+
+function parseIsoDate(value: string | undefined): string | null {
+  if (!value?.trim()) return null;
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value.trim().slice(0, 10));
+  if (!match) return null;
+  const [, year, month, day] = match;
+  const monthNum = Number(month);
+  const dayNum = Number(day);
+  if (monthNum < 1 || monthNum > 12 || dayNum < 1 || dayNum > 31) return null;
+  const parsed = new Date(Number(year), monthNum - 1, dayNum);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return `${year}-${month}-${day}`;
+}
+
+function firstDayOfMonth(month: string): string {
+  return `${month}-01`;
+}
+
+function orderedRange(from: string, to: string): { from: string; to: string } {
+  return from <= to ? { from, to } : { from: to, to: from };
+}
 
 /** Transactions dated in the given month (YYYY-MM), excluding Palai Income ledger duplicates. */
 export function transactionsDatedInMonth(
@@ -64,16 +96,75 @@ export function parseFinanceMonth(value: string | undefined): string {
   }
 }
 
+export function parseFinanceReport(searchParams: {
+  month?: string;
+  from?: string;
+  to?: string;
+  range?: string;
+}): {
+  mode: FinanceReportMode;
+  month: string;
+  from?: string;
+  to?: string;
+  periodLabel: string;
+  filter: DateRangeFilter;
+} {
+  if (searchParams.range === "custom") {
+    const month = parseFinanceMonth(searchParams.month);
+    const defaultFrom = firstDayOfMonth(month);
+    const defaultTo = todayIso();
+    const fromRaw = parseIsoDate(searchParams.from) ?? defaultFrom;
+    const toRaw = parseIsoDate(searchParams.to) ?? defaultTo;
+    const { from, to } = orderedRange(fromRaw, toRaw);
+    return {
+      mode: "custom",
+      month: from.slice(0, 7),
+      from,
+      to,
+      periodLabel: `${formatDate(from)} – ${formatDate(to)}`,
+      filter: { from, to },
+    };
+  }
+
+  const month = parseFinanceMonth(searchParams.month);
+  return {
+    mode: "month",
+    month,
+    periodLabel: formatServiceMonth(month),
+    filter: { month },
+  };
+}
+
 export function computeMonthlyCategoryReport(input: {
   transactions: Transaction[];
   palaiPayments: PalaiPayment[];
-  month: string;
+  month?: string;
+  from?: string;
+  to?: string;
+  mode?: FinanceReportMode;
+  periodLabel?: string;
 }): MonthlyCategoryReport {
-  const month = parseFinanceMonth(input.month);
+  const filter: DateRangeFilter =
+    input.from && input.to
+      ? { from: input.from, to: input.to }
+      : { month: parseFinanceMonth(input.month) };
+
+  const mode: FinanceReportMode = input.mode ?? (input.from && input.to ? "custom" : "month");
+  const month = filter.month ?? (input.from ? input.from.slice(0, 7) : parseFinanceMonth(input.month));
+  const from = filter.from;
+  const to = filter.to;
+  const periodLabel =
+    input.periodLabel ??
+    (mode === "custom" && from && to
+      ? `${formatDate(from)} – ${formatDate(to)}`
+      : formatServiceMonth(month));
+
   const breakdown = computeCategoryBreakdown({
     transactions: input.transactions,
     palaiPayments: input.palaiPayments,
-    month,
+    month: filter.month,
+    from: filter.from,
+    to: filter.to,
   });
 
   const byCategory: Partial<Record<LedgerCategory, number>> = {};
@@ -81,19 +172,20 @@ export function computeMonthlyCategoryReport(input: {
 
   for (const tx of input.transactions) {
     if (tx.category === "Palai Income") continue;
-    if (!tx.date?.startsWith(month)) continue;
+    if (!transactionInFilter(tx.date, filter)) continue;
     const amount = displayAmount(tx);
     byCategory[tx.category] = (byCategory[tx.category] || 0) + amount;
     transactionCount++;
   }
 
-  const palaiInMonth = input.palaiPayments.filter((p) => palaiServiceMonth(p) === month);
-  if (palaiInMonth.length > 0) {
-    byCategory["Palai Income"] = palaiInMonth.reduce((sum, p) => sum + p.total_amount, 0);
-    transactionCount += palaiInMonth.length;
+  const palaiInPeriod = input.palaiPayments.filter((p) => palaiInFilter(p, filter));
+  if (palaiInPeriod.length > 0) {
+    byCategory["Palai Income"] = palaiInPeriod.reduce((sum, p) => sum + p.total_amount, 0);
+    transactionCount += palaiInPeriod.length;
   }
 
-  const ledgerRows = transactionsDatedInMonth(input.transactions, month)
+  const ledgerRows = input.transactions
+    .filter((tx) => tx.category !== "Palai Income" && transactionInFilter(tx.date, filter))
     .map((tx) => ({
       id: tx.id,
       date: tx.date,
@@ -105,7 +197,7 @@ export function computeMonthlyCategoryReport(input: {
     }))
     .sort((a, b) => b.date.localeCompare(a.date));
 
-  const palaiRows = palaiInMonth
+  const palaiRows = palaiInPeriod
     .map((p) => ({
       id: p.id,
       date: p.date,
@@ -119,7 +211,11 @@ export function computeMonthlyCategoryReport(input: {
   const total = Object.values(byCategory).reduce((sum, n) => sum + (n || 0), 0);
 
   return {
+    mode,
     month,
+    from,
+    to,
+    periodLabel,
     byCategory,
     investedByCategory: breakdown.investedByCategory,
     receivedByCategory: breakdown.receivedByCategory,
