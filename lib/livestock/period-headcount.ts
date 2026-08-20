@@ -1,4 +1,5 @@
 import { animalLabel } from "../labels";
+import { todayIso } from "../format";
 import type { Animal, AnimalStatus } from "../types";
 import { isKidAnimal } from "./age";
 
@@ -23,7 +24,7 @@ export type PeriodHeadcount = {
   end: HeadcountBucket;
 };
 
-/** Active on date: entered on or before date and not yet out by that date. */
+/** Active on date: entered on or before date and still on farm that day. */
 export function isActiveOnDate(
   animal: Pick<Animal, "date_of_purchase" | "status" | "out_date">,
   date: string
@@ -31,11 +32,11 @@ export function isActiveOnDate(
   const iso = date.trim().slice(0, 10);
   const entry = animal.date_of_purchase?.trim().slice(0, 10);
   if (!entry || entry > iso) return false;
-  if (TERMINAL_STATUSES.includes(animal.status)) {
-    const out = animal.out_date?.trim().slice(0, 10);
-    if (out && out <= iso) return false;
-  }
-  return true;
+  if (animal.status === "Active") return true;
+  if (!TERMINAL_STATUSES.includes(animal.status)) return false;
+  const out = animal.out_date?.trim().slice(0, 10);
+  if (!out) return false;
+  return out > iso;
 }
 
 export function classifyActiveAnimal(
@@ -95,7 +96,9 @@ export function computePeriodHeadcount(
   endDate: string
 ): PeriodHeadcount {
   const start = startDate.trim().slice(0, 10);
-  const end = endDate.trim().slice(0, 10);
+  const today = todayIso();
+  const endRaw = endDate.trim().slice(0, 10);
+  const end = endRaw > today ? today : endRaw;
   return {
     startDate: start,
     endDate: end,
