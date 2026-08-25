@@ -12,7 +12,7 @@ import {
   actionRecordLivestockSale,
   actionRegisterBornGoat,
 } from "@/lib/server-actions";
-import { LEDGER_CATEGORIES } from "@/lib/constants";
+import { EXPENSE_CATEGORIES } from "@/lib/constants";
 import {
   DEWORM_TYPES,
   type DewormType,
@@ -145,9 +145,7 @@ export function QuickEntry({
                 <div>
                   <label className={label}>Category</label>
                   <select name="category" className={field} required>
-                    {LEDGER_CATEGORIES.filter((c) =>
-                      ["Feed", "Delivery", "Vet/Medicine", "Labor", "Infrastructure", "Other"].includes(c)
-                    ).map((c) => (
+                    {EXPENSE_CATEGORIES.map((c) => (
                       <option key={c} value={c}>
                         {c}
                       </option>

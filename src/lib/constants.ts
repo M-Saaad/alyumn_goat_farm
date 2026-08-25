@@ -15,6 +15,17 @@ export const LEDGER_CATEGORIES = [
 
 export type LedgerCategory = (typeof LEDGER_CATEGORIES)[number];
 
+/** Categories available in Log Expense quick entry and expense transaction edits. */
+export const EXPENSE_CATEGORIES = [
+  "Feed",
+  "Delivery",
+  "Vet/Medicine",
+  "Labor",
+  "Infrastructure",
+  "Palai Expense",
+  "Other",
+] as const satisfies readonly LedgerCategory[];
+
 export const CATEGORY_DISPLAY_ORDER: LedgerCategory[] = [
   "Feed",
   "Delivery",
