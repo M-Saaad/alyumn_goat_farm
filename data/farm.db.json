@@ -8412,6 +8412,24 @@
       "adjustment_partner_id": null,
       "notes": "Electricity Bill",
       "source_row": 499
+    },
+    {
+      "id": "e0d142bc-a583-4db1-bd08-852c6b4aab88",
+      "date": "2026-08-11",
+      "amount": 20000,
+      "kind": "cost",
+      "category": "Palai Expense",
+      "farm_model": null,
+      "animal_id": 1,
+      "customer_id": null,
+      "vendor_id": null,
+      "paid_by_partner_id": "f2881370-db8d-4cab-9c18-a035ae97b860",
+      "received_by_partner_id": null,
+      "adjustment_partner_id": null,
+      "notes": "Gulabo 1 month palai (Chatni)",
+      "source_row": null,
+      "purchase_agreement_id": null,
+      "livestock_sale_id": null
     }
   ],
   "partner_ledger_entries": [
@@ -12062,6 +12080,14 @@
       "amount": 2333,
       "category": "Infrastructure",
       "created_at": "2026-08-10T07:29:28.058Z"
+    },
+    {
+      "transaction_id": "e0d142bc-a583-4db1-bd08-852c6b4aab88",
+      "partner_id": "f2881370-db8d-4cab-9c18-a035ae97b860",
+      "amount": 20000,
+      "category": "Palai Expense",
+      "id": "e9fa9111-88f3-495c-92d0-8c2dc6e581ae",
+      "created_at": "2026-08-25T08:56:22.425Z"
     }
   ],
   "palai_payments": [
@@ -12927,7 +12953,8 @@
       "ultrasound_date": null,
       "outcome": "Pending",
       "status": "Ready",
-      "notes": "Delivered on February 21, 2026"
+      "notes": "Delivered on February 21, 2026",
+      "fetus_count": null
     },
     {
       "id": "aecdcd3f-8d0b-4b38-925a-7c3f852b1dea",
@@ -12940,7 +12967,8 @@
       "ultrasound_date": "2026-05-21",
       "outcome": "Doubt",
       "status": "Doubt",
-      "notes": "Stillbirth on 13th January, Maybe crossed on 14 Apr"
+      "notes": "Stillbirth on 13th January, Maybe crossed on 14 Apr",
+      "fetus_count": null
     },
     {
       "id": "be7b7821-cdff-406a-a656-a16c47aba556",
@@ -12953,7 +12981,8 @@
       "ultrasound_date": "2026-08-03",
       "outcome": "Doubt",
       "status": "Doubt",
-      "notes": "Purchased on October 7, 2025 (fresh crossed)"
+      "notes": "Purchased on October 7, 2025 (fresh crossed)",
+      "fetus_count": null
     },
     {
       "id": "681aa93b-fd87-4ecc-9af8-3bbec3c51942",
@@ -12966,7 +12995,8 @@
       "ultrasound_date": null,
       "outcome": "Delivered",
       "status": "Delivered",
-      "notes": "Delivered on May 11, 2026"
+      "notes": "Delivered on May 11, 2026",
+      "fetus_count": null
     },
     {
       "id": "81b307af-23bc-4f38-886b-0d3d5eb91d6e",
@@ -12979,7 +13009,8 @@
       "ultrasound_date": "2026-08-06",
       "outcome": "Doubt",
       "status": "Doubt",
-      "notes": "Delivered on September 19, 2025"
+      "notes": "Delivered on September 19, 2025",
+      "fetus_count": null
     },
     {
       "id": "0f1486ae-e1f8-423e-8468-863e4bc5aeea",
@@ -12992,7 +13023,8 @@
       "ultrasound_date": "2026-08-04",
       "outcome": "Doubt",
       "status": "Doubt",
-      "notes": "Purchased on August 27, 2025 (age: 3 months)."
+      "notes": "Purchased on August 27, 2025 (age: 3 months).",
+      "fetus_count": null
     },
     {
       "id": "01e6810d-0ca0-4241-898b-99f9bfd0117e",
@@ -13005,7 +13037,8 @@
       "ultrasound_date": "2026-05-21",
       "outcome": "Doubt",
       "status": "Doubt",
-      "notes": "Delivered on February 9, 2026"
+      "notes": "Delivered on February 9, 2026",
+      "fetus_count": null
     },
     {
       "id": "d30a069b-51cd-4d2b-9cd1-9769993c32b6",
@@ -13018,7 +13051,8 @@
       "ultrasound_date": "2026-08-07",
       "outcome": "Doubt",
       "status": "Doubt",
-      "notes": "Stillbirth on 10th November, Shouldn’t breed for at least 3 months."
+      "notes": "Stillbirth on 10th November, Shouldn’t breed for at least 3 months.",
+      "fetus_count": null
     },
     {
       "id": "2f592535-708c-4616-8f87-ebedaa7913af",
@@ -13031,7 +13065,8 @@
       "ultrasound_date": "2026-08-08",
       "outcome": "Doubt",
       "status": "Doubt",
-      "notes": "Delivered on January 1, 2026"
+      "notes": "Delivered on January 1, 2026",
+      "fetus_count": null
     },
     {
       "id": "e33e0e14-acad-4daf-9af2-32ab0b56263a",
@@ -13044,7 +13079,8 @@
       "ultrasound_date": "2026-08-07",
       "outcome": "Doubt",
       "status": "Doubt",
-      "notes": "Delivered on 12 March, 2026, Maybe crossed on 14 Apr"
+      "notes": "Delivered on 12 March, 2026, Maybe crossed on 14 Apr",
+      "fetus_count": null
     },
     {
       "id": "687308f3-3ed2-4bb6-866b-9d81d8e7a52b",
@@ -13057,7 +13093,8 @@
       "ultrasound_date": null,
       "outcome": "Pending",
       "status": "Kid",
-      "notes": "Born on September 22, 2025"
+      "notes": "Born on September 22, 2025",
+      "fetus_count": null
     },
     {
       "id": "16f3e6cc-1ee2-4ec6-8445-97499b89391a",
@@ -13070,7 +13107,8 @@
       "ultrasound_date": "2026-09-02",
       "outcome": "Pending",
       "status": "Ready",
-      "notes": "Purchased on October 19, 2025 (age: 4 months)."
+      "notes": "Purchased on October 19, 2025 (age: 4 months).",
+      "fetus_count": null
     },
     {
       "id": "ed7fd21e-cadd-40fa-8639-68bc587b0359",
@@ -13083,7 +13121,8 @@
       "ultrasound_date": null,
       "outcome": "Delivered",
       "status": "Delivered",
-      "notes": "Purchased from fazeel"
+      "notes": "Purchased from fazeel",
+      "fetus_count": null
     },
     {
       "id": "c6048c2b-2220-4e68-a033-34c300f6b821",
@@ -13096,7 +13135,8 @@
       "ultrasound_date": null,
       "outcome": "Pending",
       "status": "Ready",
-      "notes": "Purchased from fazeel"
+      "notes": "Purchased from fazeel",
+      "fetus_count": null
     },
     {
       "id": "a8bfa8c4-1723-426b-8429-f548f4b6ad76",
@@ -13109,7 +13149,8 @@
       "ultrasound_date": null,
       "outcome": "Pending",
       "status": "Kid",
-      "notes": null
+      "notes": null,
+      "fetus_count": null
     },
     {
       "id": "2b6bd721-362a-4fd3-a91f-e75437143782",
@@ -13122,7 +13163,8 @@
       "ultrasound_date": null,
       "outcome": "Pending",
       "status": "Ready",
-      "notes": null
+      "notes": null,
+      "fetus_count": null
     },
     {
       "id": "0bf2035a-357c-4025-a95a-f3e29b3803f6",
@@ -13135,7 +13177,8 @@
       "ultrasound_date": "2026-05-27",
       "outcome": "Doubt",
       "status": "Doubt",
-      "notes": "Purchased from shahzaib"
+      "notes": "Purchased from shahzaib",
+      "fetus_count": null
     }
   ],
   "weight_logs": [],
@@ -13453,5 +13496,7 @@
       "status": "settled",
       "notes": "Paid in full on purchase date"
     }
-  ]
+  ],
+  "custom_vaccines": [],
+  "custom_dewormers": []
 }

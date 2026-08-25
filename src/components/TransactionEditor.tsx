@@ -6,7 +6,7 @@ import {
   actionDeleteTransaction,
   actionUpdateTransaction,
 } from "@/lib/server-actions";
-import { LEDGER_CATEGORIES } from "@/lib/constants";
+import { EXPENSE_CATEGORIES, LEDGER_CATEGORIES } from "@/lib/constants";
 import { formatPkr, formatDate } from "@/lib/format";
 import type { TransactionEditVariant } from "@/lib/transactions/mutate";
 import {
@@ -53,16 +53,6 @@ export type EditableTransaction = {
 const field =
   "mt-1 w-full rounded-xl border border-stone-300 bg-white px-3 py-2 text-base text-stone-900 outline-none focus:border-emerald-600";
 const labelCls = "block text-sm font-medium text-stone-700";
-
-const EXPENSE_CATEGORIES = [
-  "Feed",
-  "Delivery",
-  "Vet/Medicine",
-  "Labor",
-  "Infrastructure",
-  "Palai Expense",
-  "Other",
-] as const;
 
 export function TransactionEditor({
   transactions,
