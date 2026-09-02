@@ -4,6 +4,7 @@ import { computeSettlement } from "@/lib/partner-equity/settlement";
 import { computePeriodHeadcount } from "@/lib/livestock/period-headcount";
 import { formatPkr, currentMonthIso, todayIso } from "@/lib/format";
 import { palaiServiceMonth } from "@/lib/palai/service-month";
+import { investedCategoryOrder } from "@/lib/transactions/expense-categories";
 import {
   computeMonthlyCategoryReport,
   earliestFarmDate,
@@ -168,6 +169,7 @@ async function HomePageContent({
               totalInvested={periodReport.totalInvested}
               totalReceived={periodReport.totalReceived}
               totalTransfers={periodReport.totalTransfers}
+              investedOrder={investedCategoryOrder(data.custom_categories)}
             />
             <FinanceMonthlyTransactions report={periodReport} viewAllHref={viewAllHref} />
           </>

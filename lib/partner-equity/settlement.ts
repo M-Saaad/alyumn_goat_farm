@@ -125,7 +125,7 @@ export function ledgerForAdjustment(
 export function createCostTransaction(input: {
   date: string;
   amount: number;
-  category: LedgerCategory;
+  category: string;
   paidByPartnerId: string;
   animalId?: number | null;
   vendorId?: string | null;

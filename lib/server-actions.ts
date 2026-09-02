@@ -21,6 +21,9 @@ import {
   deleteCustomVaccine,
   ensureCustomVaccine,
   ensureCustomDewormer,
+  addCustomCategory,
+  deleteCustomCategory,
+  ensureCustomCategory,
   recordLivestockSale,
   registerBornGoat,
   recordPalai,
@@ -31,9 +34,12 @@ import {
 } from "@/lib/actions";
 import { revalidatePath } from "next/cache";
 import type { AnimalBreed, AnimalSex, AnimalStatus, LedgerCategory, MedicalEventType } from "@/lib/types";
-import { LEDGER_CATEGORIES } from "@/lib/types";
 import { formatDewormNotes, formatVaccineNotes, type DewormType } from "@/lib/livestock/medical-notes";
 import { NEW_VACCINE_VALUE, parseVaccineIntervalDays } from "@/lib/livestock/vaccine-schedule";
+import {
+  NEW_EXPENSE_CATEGORY_VALUE,
+  isValidExpenseCategory,
+} from "@/lib/transactions/expense-categories";
 import { uploadAnimalMedia } from "@/lib/media/upload";
 import type { TransactionEditVariant } from "@/lib/transactions/mutate";
 import {
@@ -50,6 +56,20 @@ function revalidateTxnPaths() {
   revalidatePath("/transactions");
   revalidatePath("/animals");
   revalidatePath("/health");
+}
+
+async function resolveExpenseCategory(formData: FormData): Promise<string> {
+  let category = String(formData.get("category") || "").trim();
+  if (category === NEW_EXPENSE_CATEGORY_VALUE) {
+    category = String(formData.get("categoryOther") || "").trim();
+    if (!category) throw new Error("Enter a category name");
+    await ensureCustomCategory(category);
+  }
+  const db = await import("@/lib/db").then((m) => m.fetchDb());
+  if (!isValidExpenseCategory(category, db.custom_categories ?? [])) {
+    throw new Error("Invalid category");
+  }
+  return category;
 }
 
 export type UltrasoundActionResult = { ok: true } | { ok: false; error: string };
@@ -76,16 +96,13 @@ function friendlyUltrasoundError(err: unknown): string {
 export async function actionLogExpense(formData: FormData) {
   const date = String(formData.get("date") || "").trim();
   const amountRaw = String(formData.get("amount") || "").trim();
-  const category = String(formData.get("category") || "").trim();
   const paidBy = String(formData.get("paidBy") || "").trim();
   const animalRaw = String(formData.get("animalId") || "").trim();
   const notes = String(formData.get("notes") || "");
 
   if (!date) throw new Error("Date is required");
   const amount = parsePositiveAmount(amountRaw);
-  if (!(LEDGER_CATEGORIES as readonly string[]).includes(category)) {
-    throw new Error("Invalid category");
-  }
+  const category = await resolveExpenseCategory(formData);
   if (paidBy !== "Monis" && paidBy !== "Saad") {
     throw new Error("Select who paid (Monis or Saad)");
   }
@@ -93,7 +110,7 @@ export async function actionLogExpense(formData: FormData) {
   await logExpense({
     date,
     amount,
-    category: category as LedgerCategory,
+    category,
     paidBy,
     animalId: animalRaw ? Number(animalRaw) : null,
     notes,
@@ -256,6 +273,18 @@ export async function actionDeleteCustomVaccine(formData: FormData) {
   const id = String(formData.get("id") || "").trim();
   if (!id) throw new Error("Vaccine type not found");
   await deleteCustomVaccine(id);
+  revalidateTxnPaths();
+}
+
+export async function actionAddCustomCategory(formData: FormData) {
+  await addCustomCategory({ name: String(formData.get("name") || "") });
+  revalidateTxnPaths();
+}
+
+export async function actionDeleteCustomCategory(formData: FormData) {
+  const id = String(formData.get("id") || "").trim();
+  if (!id) throw new Error("Category not found");
+  await deleteCustomCategory(id);
   revalidateTxnPaths();
 }
 
@@ -482,12 +511,13 @@ export async function actionUpdateTransaction(formData: FormData) {
 
   if (variant === "expense") {
     const animalRaw = String(formData.get("animalId") || "").trim();
+    const category = await resolveExpenseCategory(formData);
     await updateTransaction({
       id,
       variant: "expense",
       date: String(formData.get("date")),
       amount: parsePositiveAmount(String(formData.get("amount") ?? "")),
-      category: String(formData.get("category")) as LedgerCategory,
+      category: category as LedgerCategory,
       paidBy: String(formData.get("paidBy")) as "Monis" | "Saad",
       animalId: animalRaw ? Number(animalRaw) : null,
       notes: String(formData.get("notes") || "") || null,

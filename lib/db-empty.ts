@@ -15,6 +15,7 @@ export function emptyDb(): FarmDatabase {
     animal_media: [],
     custom_vaccines: [],
     custom_dewormers: [],
+    custom_categories: [],
     meta: {
       importedAt: null,
       settlementVerified: false,

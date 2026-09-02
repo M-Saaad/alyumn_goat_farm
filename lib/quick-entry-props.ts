@@ -7,6 +7,7 @@ import type { QuickEntryProps } from "@/components/QuickEntry";
 import type { ContactOption } from "@/components/ContactSelect";
 import { mergeVaccineSchedules } from "@/lib/livestock/vaccine-schedule";
 import { mergeDewormerNames } from "@/lib/livestock/medical-notes";
+import { mergeExpenseCategories } from "@/lib/transactions/expense-categories";
 
 /** Build QuickEntry contact/animal props from the loaded database. */
 export function quickEntryPropsFromDb(db: FarmDatabase): QuickEntryProps {
@@ -95,5 +96,6 @@ export function quickEntryPropsFromDb(db: FarmDatabase): QuickEntryProps {
       internal: mergeDewormerNames(db.custom_dewormers ?? [], "internal"),
       external: mergeDewormerNames(db.custom_dewormers ?? [], "external"),
     },
+    expenseCategories: mergeExpenseCategories(db.custom_categories ?? []),
   };
 }

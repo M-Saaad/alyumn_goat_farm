@@ -18,6 +18,7 @@ import type {
   WeightLog,
   CustomVaccine,
   CustomDewormer,
+  CustomCategory,
 } from "../types";
 import { createServiceClient } from "../supabase/admin";
 import { isSupabaseDb, persistDb } from "../db";
@@ -49,6 +50,8 @@ export type WritePlan = {
   deleteCustomVaccineIds?: string[];
   upsertCustomDewormers?: CustomDewormer[];
   deleteCustomDewormerIds?: string[];
+  upsertCustomCategories?: CustomCategory[];
+  deleteCustomCategoryIds?: string[];
 };
 
 function txRow(t: Transaction): Record<string, unknown> {
@@ -219,6 +222,13 @@ function customDewormerRow(d: CustomDewormer): Record<string, unknown> {
   };
 }
 
+function customCategoryRow(c: CustomCategory): Record<string, unknown> {
+  return {
+    id: c.id,
+    name: c.name,
+  };
+}
+
 async function upsertRows(
   client: SupabaseClient,
   table: string,
@@ -275,6 +285,9 @@ export async function applyWritePlan(plan: WritePlan): Promise<void> {
   }
   if (plan.deleteCustomDewormerIds?.length) {
     await deleteByIds(client, "custom_dewormers", plan.deleteCustomDewormerIds);
+  }
+  if (plan.deleteCustomCategoryIds?.length) {
+    await deleteByIds(client, "custom_categories", plan.deleteCustomCategoryIds);
   }
 
   if (plan.deleteTransactionIds?.length) {
@@ -342,6 +355,9 @@ export async function applyWritePlan(plan: WritePlan): Promise<void> {
   if (plan.upsertCustomDewormers?.length) {
     await upsertRows(client, "custom_dewormers", plan.upsertCustomDewormers.map(customDewormerRow));
   }
+  if (plan.upsertCustomCategories?.length) {
+    await upsertRows(client, "custom_categories", plan.upsertCustomCategories.map(customCategoryRow));
+  }
 }
 
 function byId<T extends { id: string | number }>(rows: T[]): Map<string, T> {
@@ -398,6 +414,11 @@ export function diffDb(before: FarmDatabase, after: FarmDatabase): WritePlan {
     after.custom_dewormers ?? [],
     jsonEq
   );
+  const customCategories = changed(
+    before.custom_categories ?? [],
+    after.custom_categories ?? [],
+    jsonEq
+  );
 
   // When ledger rows for a tx were replaced (delete+insert with new UUIDs),
   // also clear by transaction_id so orphans are gone even if we miss an id.
@@ -443,6 +464,8 @@ export function diffDb(before: FarmDatabase, after: FarmDatabase): WritePlan {
     deleteCustomVaccineIds: customVaccines.deleteIds,
     upsertCustomDewormers: customDewormers.upsert,
     deleteCustomDewormerIds: customDewormers.deleteIds,
+    upsertCustomCategories: customCategories.upsert,
+    deleteCustomCategoryIds: customCategories.deleteIds,
   };
 }
 

@@ -1,5 +1,5 @@
 import { normalizeServiceMonth, palaiServiceMonth, formatServiceMonth } from "../palai/service-month";
-import type { LedgerCategory, PalaiPayment, Transaction } from "../types";
+import type { PalaiPayment, Transaction } from "../types";
 import { currentMonthIso, formatDate, todayIso } from "../format";
 import { lastDayOfMonth } from "../livestock/period-headcount";
 import type { Animal } from "../types";
@@ -15,7 +15,7 @@ export type FinanceReportMode = "month" | "custom" | "alltime";
 export type MonthlyLedgerRow = {
   id: string;
   date: string;
-  category: LedgerCategory;
+  category: string;
   kind: Transaction["kind"];
   amount: number;
   displayAmount: number;
@@ -28,10 +28,10 @@ export type MonthlyCategoryReport = {
   from?: string;
   to?: string;
   periodLabel: string;
-  byCategory: Partial<Record<LedgerCategory, number>>;
-  investedByCategory: Partial<Record<LedgerCategory, number>>;
-  receivedByCategory: Partial<Record<LedgerCategory, number>>;
-  transfersByCategory: Partial<Record<LedgerCategory, number>>;
+  byCategory: Record<string, number>;
+  investedByCategory: Record<string, number>;
+  receivedByCategory: Record<string, number>;
+  transfersByCategory: Record<string, number>;
   total: number;
   totalInvested: number;
   totalReceived: number;
@@ -210,7 +210,7 @@ export function computeMonthlyCategoryReport(input: {
     to: filter?.to,
   });
 
-  const byCategory: Partial<Record<LedgerCategory, number>> = {};
+  const byCategory: Record<string, number> = {};
   let transactionCount = 0;
 
   for (const tx of input.transactions) {

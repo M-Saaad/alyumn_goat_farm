@@ -12,7 +12,7 @@ import {
   actionRecordLivestockSale,
   actionRegisterBornGoat,
 } from "@/lib/server-actions";
-import { EXPENSE_CATEGORIES } from "@/lib/constants";
+import { NEW_EXPENSE_CATEGORY_VALUE } from "@/lib/transactions/expense-categories";
 import {
   DEWORM_TYPES,
   type DewormType,
@@ -58,6 +58,7 @@ export type QuickEntryProps = {
   palaiHistory?: PalaiHistoryEntry[];
   vaccineSchedules: VaccineScheduleEntry[];
   dewormerNamesByType: Record<DewormType, string[]>;
+  expenseCategories: string[];
 };
 
 export function QuickEntry({
@@ -72,6 +73,7 @@ export function QuickEntry({
   palaiHistory = [],
   vaccineSchedules,
   dewormerNamesByType,
+  expenseCategories,
 }: QuickEntryProps) {
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<Mode>(null);
@@ -139,24 +141,11 @@ export function QuickEntry({
             )}
 
             {mode === "expense" && (
-              <ActionForm action={actionLogExpense} onSuccess={close}>
-                <Field label="Date" name="date" type="date" defaultValue={todayIso()} required />
-                <Field label="Amount (PKR)" name="amount" type="number" required />
-                <div>
-                  <label className={label}>Category</label>
-                  <select name="category" className={field} required>
-                    {EXPENSE_CATEGORIES.map((c) => (
-                      <option key={c} value={c}>
-                        {c}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <PartnerSelect />
-                <AnimalSelect animals={animals} optional />
-                <Field label="Notes" name="notes" />
-                <SubmitButton />
-              </ActionForm>
+              <ExpenseForm
+                expenseCategories={expenseCategories}
+                animals={animals}
+                onSuccess={close}
+              />
             )}
 
             {mode === "palai" && (
@@ -267,6 +256,49 @@ export function QuickEntry({
         </div>
       )}
     </>
+  );
+}
+
+function ExpenseForm({
+  expenseCategories,
+  animals,
+  onSuccess,
+}: {
+  expenseCategories: string[];
+  animals: AnimalOption[];
+  onSuccess: () => void;
+}) {
+  const [category, setCategory] = useState(expenseCategories[0] ?? "Other");
+
+  return (
+    <ActionForm action={actionLogExpense} onSuccess={onSuccess}>
+      <Field label="Date" name="date" type="date" defaultValue={todayIso()} required />
+      <Field label="Amount (PKR)" name="amount" type="number" required />
+      <div>
+        <label className={label}>Category</label>
+        <select
+          name="category"
+          className={field}
+          required
+          value={category}
+          onChange={(e) => setCategory(e.target.value)}
+        >
+          {expenseCategories.map((c) => (
+            <option key={c} value={c}>
+              {c}
+            </option>
+          ))}
+          <option value={NEW_EXPENSE_CATEGORY_VALUE}>+ Add new category…</option>
+        </select>
+      </div>
+      {category === NEW_EXPENSE_CATEGORY_VALUE && (
+        <Field label="New category name" name="categoryOther" required />
+      )}
+      <PartnerSelect />
+      <AnimalSelect animals={animals} optional />
+      <Field label="Notes" name="notes" />
+      <SubmitButton />
+    </ActionForm>
   );
 }
 

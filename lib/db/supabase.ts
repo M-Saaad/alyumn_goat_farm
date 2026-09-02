@@ -13,6 +13,7 @@ import type {
   WeightLog,
   CustomVaccine,
   CustomDewormer,
+  CustomCategory,
 } from "../types";
 import { emptyDb } from "../db-empty";
 import { mapAnimalsWithParents, animalsWithEncodedParentComments } from "../livestock/animal-parents-store";
@@ -196,6 +197,13 @@ export function mapCustomDewormer(r: Record<string, unknown>): CustomDewormer {
   };
 }
 
+export function mapCustomCategory(r: Record<string, unknown>): CustomCategory {
+  return {
+    id: String(r.id),
+    name: String(r.name),
+  };
+}
+
 export function mapMedia(r: Record<string, unknown>): AnimalMedia {
   return {
     id: String(r.id),
@@ -267,6 +275,7 @@ export async function loadFromSupabase(client: SupabaseClient): Promise<FarmData
     media,
     customVaccines,
     customDewormers,
+    customCategories,
     metaRows,
   ] = await Promise.all([
     selectAll(client, "contacts"),
@@ -282,6 +291,7 @@ export async function loadFromSupabase(client: SupabaseClient): Promise<FarmData
     selectAll(client, "animal_media"),
     selectAllOptional(client, "custom_vaccines"),
     selectAllOptional(client, "custom_dewormers"),
+    selectAllOptional(client, "custom_categories"),
     selectAll(client, "app_meta"),
   ]);
 
@@ -302,6 +312,7 @@ export async function loadFromSupabase(client: SupabaseClient): Promise<FarmData
   db.animal_media = media.map(mapMedia);
   db.custom_vaccines = customVaccines.map(mapCustomVaccine);
   db.custom_dewormers = customDewormers.map(mapCustomDewormer);
+  db.custom_categories = customCategories.map(mapCustomCategory);
   db.meta = mapMeta(meta);
   return db;
 }
@@ -491,6 +502,15 @@ export async function saveToSupabase(client: SupabaseClient, db: FarmDatabase): 
       id: d.id,
       name: d.name,
       deworm_type: d.deworm_type,
+    }))
+  );
+
+  await syncTable(
+    client,
+    "custom_categories",
+    (db.custom_categories ?? []).map((c) => ({
+      id: c.id,
+      name: c.name,
     }))
   );
 

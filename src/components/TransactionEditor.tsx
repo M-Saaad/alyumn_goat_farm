@@ -6,7 +6,7 @@ import {
   actionDeleteTransaction,
   actionUpdateTransaction,
 } from "@/lib/server-actions";
-import { EXPENSE_CATEGORIES, LEDGER_CATEGORIES } from "@/lib/constants";
+import { NEW_EXPENSE_CATEGORY_VALUE } from "@/lib/transactions/expense-categories";
 import { formatPkr, formatDate } from "@/lib/format";
 import type { TransactionEditVariant } from "@/lib/transactions/mutate";
 import {
@@ -60,6 +60,7 @@ export function TransactionEditor({
   allAnimals,
   vendors,
   customers,
+  expenseCategories,
 }: {
   transactions: EditableTransaction[];
   /** Active animals for expense linking. */
@@ -68,6 +69,7 @@ export function TransactionEditor({
   allAnimals: AnimalOption[];
   vendors: ContactOption[];
   customers: ContactOption[];
+  expenseCategories: string[];
 }) {
   const router = useRouter();
   const [editing, setEditing] = useState<EditableTransaction | null>(null);
@@ -197,7 +199,7 @@ export function TransactionEditor({
               <input type="hidden" name="variant" value={editing.variant} />
 
               {editing.variant === "expense" && (
-                <ExpenseForm tx={editing} animals={animals} />
+                <ExpenseForm tx={editing} animals={animals} expenseCategories={expenseCategories} />
               )}
               {editing.variant === "livestock_purchase" && (
                 <PurchaseForm tx={editing} vendors={vendors} />
@@ -248,17 +250,16 @@ function Field(props: {
 function ExpenseForm({
   tx,
   animals,
+  expenseCategories,
 }: {
   tx: EditableTransaction;
   animals: AnimalOption[];
+  expenseCategories: string[];
 }) {
-  const cats = LEDGER_CATEGORIES.filter((c) =>
-    (EXPENSE_CATEGORIES as readonly string[]).includes(c)
-  );
-  const options =
-    cats.includes(tx.category as (typeof cats)[number])
-      ? cats
-      : [tx.category, ...cats];
+  const baseOptions = expenseCategories.includes(tx.category)
+    ? expenseCategories
+    : [tx.category, ...expenseCategories];
+  const [category, setCategory] = useState(tx.category);
 
   return (
     <>
@@ -273,14 +274,24 @@ function ExpenseForm({
       />
       <div>
         <label className={labelCls}>Category</label>
-        <select name="category" className={field} required defaultValue={tx.category}>
-          {options.map((c) => (
+        <select
+          name="category"
+          className={field}
+          required
+          value={category}
+          onChange={(e) => setCategory(e.target.value)}
+        >
+          {baseOptions.map((c) => (
             <option key={c} value={c}>
               {c}
             </option>
           ))}
+          <option value={NEW_EXPENSE_CATEGORY_VALUE}>+ Add new category…</option>
         </select>
       </div>
+      {category === NEW_EXPENSE_CATEGORY_VALUE && (
+        <Field label="New category name" name="categoryOther" required />
+      )}
       <div>
         <label className={labelCls}>Who paid</label>
         <select name="paidBy" className={field} required defaultValue={tx.paidBy ?? "Saad"}>

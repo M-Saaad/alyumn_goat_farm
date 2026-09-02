@@ -13,7 +13,7 @@
     "db:reset": "node scripts/audit-data.mjs && node scripts/import-all.mjs && npm run verify",
     "seed:supabase": "npx tsx --env-file=.env.local scripts/seed-supabase.mts",
     "pull:supabase": "npx tsx --env-file=.env.local scripts/pull-supabase.mts",
-    "sync:supabase": "npx tsx --env-file=.env.local scripts/pull-supabase.mts && npx tsx scripts/fetch-supabase-status.mts",
+    "sync:supabase": "npx tsx --env-file=.env.local scripts/pull-supabase.mts && npx tsx --env-file=.env.local scripts/fetch-supabase-status.mts",
     "backfill:home-bred": "npx tsx --env-file=.env.local scripts/backfill-home-bred-supabase.mts",
     "backfill:breeding-births": "npx tsx --env-file=.env.local scripts/backfill-breeding-from-births.mts",
     "apply:animal-parents": "npx tsx --env-file=.env.local scripts/apply-animal-parents-supabase.mts",

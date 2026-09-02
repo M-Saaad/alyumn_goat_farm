@@ -13,6 +13,8 @@ export const LEDGER_CATEGORIES = [
 ] as const;
 
 export type LedgerCategory = (typeof LEDGER_CATEGORIES)[number];
+/** Any ledger category name — built-in or user-defined. */
+export type CategoryName = LedgerCategory | (string & {});
 export type AnimalStatus = "Active" | "Died" | "Sold" | "Slaughtered" | "Gone";
 export type AnimalSex = "Male" | "Female";
 export type AnimalBreed = "Gulabi" | "Teddy" | "Bissar" | "Tapra";
@@ -60,7 +62,7 @@ export interface Transaction {
   date: string;
   amount: number;
   kind: TransactionKind;
-  category: LedgerCategory;
+  category: CategoryName;
   farm_model: FarmModel | null;
   animal_id: number | null;
   customer_id: string | null;
@@ -79,7 +81,7 @@ export interface PartnerLedgerEntry {
   transaction_id: string;
   partner_id: string;
   amount: number;
-  category: LedgerCategory;
+  category: CategoryName;
   created_at: string;
 }
 
@@ -171,6 +173,12 @@ export interface CustomDewormer {
   deworm_type: "internal" | "external";
 }
 
+/** User-defined expense category for Log Expense and finance reports. */
+export interface CustomCategory {
+  id: string;
+  name: string;
+}
+
 export type MediaType = "image" | "video";
 
 export interface AnimalMedia {
@@ -196,6 +204,7 @@ export interface FarmDatabase {
   animal_media: AnimalMedia[];
   custom_vaccines: CustomVaccine[];
   custom_dewormers: CustomDewormer[];
+  custom_categories: CustomCategory[];
   meta: {
     importedAt: string | null;
     settlementVerified: boolean;

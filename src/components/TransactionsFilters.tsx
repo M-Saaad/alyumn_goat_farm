@@ -3,15 +3,28 @@
 import { useEffect, useRef, useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { LEDGER_CATEGORIES, categoryToSlug } from "@/lib/constants";
+import type { CustomCategory } from "@/lib/types";
 
-const filters = [
-  { id: "all", label: "All" },
-  { id: "cost", label: "Cost" },
-  { id: "adjustment", label: "Adjustment" },
-  ...LEDGER_CATEGORIES.map((c) => ({ id: categoryToSlug(c), label: c })),
-];
+function buildFilters(customCategories: CustomCategory[]) {
+  const customFilters = customCategories.map((c) => ({
+    id: categoryToSlug(c.name),
+    label: c.name,
+  }));
+  return [
+    { id: "all", label: "All" },
+    { id: "cost", label: "Cost" },
+    { id: "adjustment", label: "Adjustment" },
+    ...LEDGER_CATEGORIES.map((c) => ({ id: categoryToSlug(c), label: c })),
+    ...customFilters.filter((f) => !LEDGER_CATEGORIES.some((c) => categoryToSlug(c) === f.id)),
+  ];
+}
 
-export function TransactionsFilters() {
+export function TransactionsFilters({
+  customCategories,
+}: {
+  customCategories: CustomCategory[];
+}) {
+  const filters = buildFilters(customCategories);
   const router = useRouter();
   const sp = useSearchParams();
   const [pending, startTransition] = useTransition();

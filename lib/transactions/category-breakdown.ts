@@ -45,9 +45,9 @@ export const INVESTED_CATEGORY_ORDER: LedgerCategory[] = [
 export const RECEIVED_CATEGORY_ORDER: LedgerCategory[] = ["Livestock Sale", "Palai Income"];
 
 export type CategoryBreakdown = {
-  investedByCategory: Partial<Record<LedgerCategory, number>>;
-  receivedByCategory: Partial<Record<LedgerCategory, number>>;
-  transfersByCategory: Partial<Record<LedgerCategory, number>>;
+  investedByCategory: Record<string, number>;
+  receivedByCategory: Record<string, number>;
+  transfersByCategory: Record<string, number>;
   totalInvested: number;
   totalReceived: number;
   totalTransfers: number;
@@ -65,9 +65,9 @@ export function computeCategoryBreakdown(input: {
     : input.month
       ? { month: input.month }
       : undefined;
-  const investedByCategory: Partial<Record<LedgerCategory, number>> = {};
-  const receivedByCategory: Partial<Record<LedgerCategory, number>> = {};
-  const transfersByCategory: Partial<Record<LedgerCategory, number>> = {};
+  const investedByCategory: Record<string, number> = {};
+  const receivedByCategory: Record<string, number> = {};
+  const transfersByCategory: Record<string, number> = {};
   let totalInvested = 0;
   let totalReceived = 0;
   let totalTransfers = 0;

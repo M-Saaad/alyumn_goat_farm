@@ -1,11 +1,8 @@
 import { formatPkr } from "@/lib/format";
 import type { LedgerCategory } from "@/lib/constants";
-import {
-  INVESTED_CATEGORY_ORDER,
-  RECEIVED_CATEGORY_ORDER,
-} from "@/lib/transactions/category-breakdown";
+import { RECEIVED_CATEGORY_ORDER } from "@/lib/transactions/category-breakdown";
 
-type CategoryMap = Partial<Record<LedgerCategory, number>>;
+type CategoryMap = Partial<Record<string, number>>;
 
 function CategoryList({
   title,
@@ -19,12 +16,44 @@ function CategoryList({
   hint: string;
   accent: "invested" | "received" | "transfer";
   categories: CategoryMap;
-  order: LedgerCategory[];
+  order: string[];
   total: number;
 }) {
-  const items = order.filter((c) => categories[c]);
+  const items = [
+    ...order.filter((c) => categories[c]),
+    ...Object.keys(categories)
+      .filter((c) => !order.includes(c) && categories[c])
+      .sort((a, b) => a.localeCompare(b)),
+  ];
   if (items.length === 0) return null;
 
+  return (
+    <CategoryListInner
+      title={title}
+      hint={hint}
+      accent={accent}
+      categories={categories}
+      items={items}
+      total={total}
+    />
+  );
+}
+
+function CategoryListInner({
+  title,
+  hint,
+  accent,
+  categories,
+  items,
+  total,
+}: {
+  title: string;
+  hint: string;
+  accent: "invested" | "received" | "transfer";
+  categories: CategoryMap;
+  items: string[];
+  total: number;
+}) {
   const headerClass =
     accent === "invested"
       ? "bg-red-50 text-red-800 ring-red-100"
@@ -68,6 +97,7 @@ export function FinanceCategoryBreakdown({
   totalInvested,
   totalReceived,
   totalTransfers,
+  investedOrder,
 }: {
   investedByCategory: CategoryMap;
   receivedByCategory: CategoryMap;
@@ -75,6 +105,7 @@ export function FinanceCategoryBreakdown({
   totalInvested: number;
   totalReceived: number;
   totalTransfers: number;
+  investedOrder: LedgerCategory[];
 }) {
   const hasTransfers = totalTransfers > 0;
 
@@ -85,7 +116,7 @@ export function FinanceCategoryBreakdown({
         hint="Costs · money out"
         accent="invested"
         categories={investedByCategory}
-        order={INVESTED_CATEGORY_ORDER}
+        order={investedOrder}
         total={totalInvested}
       />
       <CategoryList
