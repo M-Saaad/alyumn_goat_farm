@@ -55,3 +55,29 @@ export function findPalaiForCustomerMonth(
       p.id !== excludePaymentId
   );
 }
+
+/** Same-rate palai row to add goats onto, only when merge is explicitly requested. */
+export function palaiMergeTarget(
+  payments: PalaiPayment[],
+  input: {
+    customerId: string;
+    serviceMonth: string;
+    ratePerGoat: number;
+    mergeWithExisting?: boolean;
+    excludePaymentId?: string;
+  }
+): PalaiPayment | undefined {
+  if (!input.mergeWithExisting) return undefined;
+  const month = normalizeServiceMonth(input.serviceMonth);
+  const rate = Number(input.ratePerGoat);
+  return payments.find(
+    (p) =>
+      p.customer_id === input.customerId &&
+      palaiServiceMonth(p) === month &&
+      p.id !== input.excludePaymentId &&
+      p.transaction_id != null &&
+      p.goat_count != null &&
+      p.rate_per_goat != null &&
+      Number(p.rate_per_goat) === rate
+  );
+}

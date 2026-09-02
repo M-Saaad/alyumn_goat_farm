@@ -149,11 +149,7 @@ export function QuickEntry({
             )}
 
             {mode === "palai" && (
-              <PalaiPaymentForm
-                customers={customers}
-                palaiHistory={palaiHistory}
-                onSuccess={close}
-              />
+              <PalaiPaymentForm customers={customers} palaiHistory={palaiHistory} />
             )}
 
             {mode === "buy" && (

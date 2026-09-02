@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   actionDeleteTransaction,
@@ -43,8 +43,10 @@ function PalaiFields({
   serviceMonth,
   onServiceMonthChange,
   existingForMonth,
-  separatePayment,
-  onSeparatePaymentChange,
+  ratePerGoat,
+  onRatePerGoatChange,
+  mergeWithExisting,
+  onMergeWithExistingChange,
 }: {
   defaults?: Partial<PalaiHistoryEntry>;
   customers: ContactOption[];
@@ -52,10 +54,18 @@ function PalaiFields({
   onCustomerChange: (name: string) => void;
   serviceMonth: string;
   onServiceMonthChange: (month: string) => void;
-  existingForMonth: PalaiHistoryEntry | null;
-  separatePayment: boolean;
-  onSeparatePaymentChange: (value: boolean) => void;
+  existingForMonth: PalaiHistoryEntry[];
+  ratePerGoat: string;
+  onRatePerGoatChange: (value: string) => void;
+  mergeWithExisting: boolean;
+  onMergeWithExistingChange: (value: boolean) => void;
 }) {
+  const rateNum = Number(ratePerGoat);
+  const sameRateLine = existingForMonth.find(
+    (e) => Number(e.ratePerGoat) === rateNum && Number.isFinite(rateNum)
+  );
+  const monthTotal = existingForMonth.reduce((sum, e) => sum + e.totalAmount, 0);
+
   return (
     <>
       <ContactSelect
@@ -78,29 +88,40 @@ function PalaiFields({
           required
         />
       </div>
-      {existingForMonth && !defaults && (
+      {existingForMonth.length > 0 && !defaults && (
         <div className="rounded-xl bg-amber-50 px-3 py-2 text-sm text-amber-950 ring-1 ring-amber-200">
           <p>
-            <span className="font-semibold">{formatServiceMonth(existingForMonth.serviceMonth)}</span>{" "}
-            already has{" "}
-            <span className="font-semibold">
-              {existingForMonth.goatCount} goats ({formatPkr(existingForMonth.totalAmount)})
-            </span>
-            .
+            <span className="font-semibold">{formatServiceMonth(serviceMonth)}</span> already
+            has {existingForMonth.length === 1 ? "a payment" : `${existingForMonth.length} payments`}{" "}
+            totaling <span className="font-semibold">{formatPkr(monthTotal)}</span>:
           </p>
-          <label className="mt-2 flex items-start gap-2">
-            <input
-              type="checkbox"
-              name="separatePayment"
-              checked={separatePayment}
-              onChange={(e) => onSeparatePaymentChange(e.target.checked)}
-              className="mt-1"
-            />
-            <span>
-              Record as a <span className="font-semibold">separate</span> payment (leave unchecked to add
-              goats to the existing entry)
-            </span>
-          </label>
+          <ul className="mt-1 list-disc pl-4">
+            {existingForMonth.map((e) => (
+              <li key={e.id}>
+                {e.goatCount} goats @ {formatPkr(e.ratePerGoat)} ({formatPkr(e.totalAmount)})
+              </li>
+            ))}
+          </ul>
+          {sameRateLine ? (
+            <label className="mt-2 flex items-start gap-2">
+              <input
+                type="checkbox"
+                name="mergeWithExisting"
+                checked={mergeWithExisting}
+                onChange={(e) => onMergeWithExistingChange(e.target.checked)}
+                className="mt-1"
+              />
+              <span>
+                Add these goats onto the existing {sameRateLine.goatCount} @{" "}
+                {formatPkr(sameRateLine.ratePerGoat)} line
+              </span>
+            </label>
+          ) : (
+            <p className="mt-2">
+              A different rate is saved as a <span className="font-semibold">new line</span>. It
+              will not replace the payment above.
+            </p>
+          )}
         </div>
       )}
       <div>
@@ -117,7 +138,9 @@ function PalaiFields({
         label="Rate / goat"
         name="ratePerGoat"
         type="number"
-        defaultValue={String(defaults?.ratePerGoat ?? 7000)}
+        value={defaults ? undefined : ratePerGoat}
+        onValueChange={defaults ? undefined : onRatePerGoatChange}
+        defaultValue={defaults ? String(defaults.ratePerGoat ?? 7000) : undefined}
         required
         min={NON_NEGATIVE_NUMBER_INPUT_PROPS.min}
         step={NON_NEGATIVE_NUMBER_INPUT_PROPS.step}
@@ -153,6 +176,8 @@ function Field({
   name,
   type = "text",
   defaultValue,
+  value,
+  onValueChange,
   required,
   min,
   step,
@@ -161,10 +186,13 @@ function Field({
   name: string;
   type?: string;
   defaultValue?: string;
+  value?: string;
+  onValueChange?: (value: string) => void;
   required?: boolean;
   min?: number;
   step?: number | string;
 }) {
+  const controlled = onValueChange != null;
   return (
     <div>
       <label className={labelCls}>{label}</label>
@@ -172,7 +200,9 @@ function Field({
         className={field}
         name={name}
         type={type}
-        defaultValue={defaultValue}
+        {...(controlled
+          ? { value: value ?? "", onChange: (e) => onValueChange(e.target.value) }
+          : { defaultValue })}
         required={required}
         min={type === "number" ? (min ?? NON_NEGATIVE_NUMBER_INPUT_PROPS.min) : undefined}
         step={type === "number" ? (step ?? NON_NEGATIVE_NUMBER_INPUT_PROPS.step) : undefined}
@@ -195,10 +225,12 @@ export function PalaiPaymentForm({
     customers.find((c) => c.name === "Awais")?.name ?? customers[0]?.name ?? "";
   const [customerName, setCustomerName] = useState(defaultCustomer);
   const [serviceMonth, setServiceMonth] = useState(currentMonthIso());
-  const [separatePayment, setSeparatePayment] = useState(false);
+  const [ratePerGoat, setRatePerGoat] = useState("7000");
+  const [mergeWithExisting, setMergeWithExisting] = useState(false);
   const [editing, setEditing] = useState<PalaiHistoryEntry | null>(null);
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [savedNotice, setSavedNotice] = useState<string | null>(null);
 
   const customerEntries = useMemo(
     () =>
@@ -209,9 +241,17 @@ export function PalaiPaymentForm({
   );
 
   const existingForMonth = useMemo(
-    () => customerEntries.find((e) => e.serviceMonth === serviceMonth) ?? null,
+    () => customerEntries.filter((e) => e.serviceMonth === serviceMonth),
     [customerEntries, serviceMonth]
   );
+
+  const sameRateLine = existingForMonth.find(
+    (e) => Number(e.ratePerGoat) === Number(ratePerGoat) && Number.isFinite(Number(ratePerGoat))
+  );
+
+  useEffect(() => {
+    if (mergeWithExisting && !sameRateLine) setMergeWithExisting(false);
+  }, [mergeWithExisting, sameRateLine]);
 
   function onDelete(entry: PalaiHistoryEntry) {
     const ok = window.confirm(
@@ -219,6 +259,7 @@ export function PalaiPaymentForm({
     );
     if (!ok) return;
     setError(null);
+    setSavedNotice(null);
     startTransition(async () => {
       try {
         const fd = new FormData();
@@ -232,11 +273,29 @@ export function PalaiPaymentForm({
     });
   }
 
+  const fieldProps = {
+    customers,
+    customerName,
+    onCustomerChange: setCustomerName,
+    serviceMonth,
+    onServiceMonthChange: setServiceMonth,
+    existingForMonth,
+    ratePerGoat,
+    onRatePerGoatChange: setRatePerGoat,
+    mergeWithExisting,
+    onMergeWithExistingChange: setMergeWithExisting,
+  };
+
   return (
     <div className="space-y-3">
       {error && (
         <p className="rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700 ring-1 ring-red-200">
           {error}
+        </p>
+      )}
+      {savedNotice && !error && (
+        <p className="rounded-xl bg-emerald-50 px-3 py-2 text-sm text-emerald-900 ring-1 ring-emerald-200">
+          {savedNotice}
         </p>
       )}
 
@@ -245,23 +304,18 @@ export function PalaiPaymentForm({
           action={actionRecordPalai}
           onSuccess={() => {
             setError(null);
+            setSavedNotice(
+              "Payment saved. Another rate for this month is added as a new line and will not replace this one."
+            );
+            setMergeWithExisting(false);
+            router.refresh();
             onSuccess?.();
           }}
         >
-          <PalaiFields
-            customers={customers}
-            customerName={customerName}
-            onCustomerChange={setCustomerName}
-            serviceMonth={serviceMonth}
-            onServiceMonthChange={setServiceMonth}
-            existingForMonth={existingForMonth}
-            separatePayment={separatePayment}
-            onSeparatePaymentChange={setSeparatePayment}
-          />
+          <PalaiFields {...fieldProps} />
           <p className="text-xs text-stone-500">
-            Pick which month the fee is for. Adding goats for a month that is already recorded updates
-            that entry unless you check &quot;separate payment&quot;. Splits 50/50 based on who received
-            the cash.
+            Pick which month the fee is for. Different rates (for example 5 goats at 7,000 and 1
+            kid at 4,000) are two lines. Splits 50/50 based on who received the cash.
           </p>
           <SubmitButton label="Record palai payment" />
         </ActionForm>
@@ -281,6 +335,7 @@ export function PalaiPaymentForm({
             action={actionUpdatePalai}
             onSuccess={() => {
               setError(null);
+              setSavedNotice(null);
               setEditing(null);
               router.refresh();
               onSuccess?.();
@@ -288,15 +343,11 @@ export function PalaiPaymentForm({
           >
             <input type="hidden" name="transactionId" value={editing.transactionId} />
             <PalaiFields
+              {...fieldProps}
               defaults={editing}
-              customers={customers}
-              customerName={customerName}
-              onCustomerChange={setCustomerName}
               serviceMonth={editing.serviceMonth}
               onServiceMonthChange={() => {}}
-              existingForMonth={null}
-              separatePayment={false}
-              onSeparatePaymentChange={() => {}}
+              existingForMonth={[]}
             />
             <SubmitButton label="Save changes" pendingLabel="Saving…" />
           </ActionForm>
@@ -334,6 +385,7 @@ export function PalaiPaymentForm({
                       type="button"
                       onClick={() => {
                         setError(null);
+                        setSavedNotice(null);
                         setEditing(entry);
                       }}
                       disabled={pending || editing != null}

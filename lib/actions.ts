@@ -8,7 +8,7 @@ import {
   getPartnerIds,
 } from "./partner-equity/settlement";
 import { recognizePalaiPayment, applyPalaiToDb } from "./palai/recognize-payment";
-import { findPalaiForCustomerMonth, normalizeServiceMonth } from "./palai/service-month";
+import { palaiMergeTarget, normalizeServiceMonth } from "./palai/service-month";
 import { applyLivestockSaleToDb, applySaleReceiptToDb, beginLivestockSale, buildSaleReceipt, findSaleForAnimal } from "./livestock/record-sale";
 import {
   applyDeleteSaleReceipt,
@@ -142,8 +142,8 @@ export async function recordPalai(input: {
   paymentMethod?: string;
   notes?: string;
   receivedBy?: "Monis" | "Saad";
-  /** When false (default), add goats to an existing entry for this customer + month. */
-  separatePayment?: boolean;
+  /** When true, add goats onto an existing same-rate line. Default: always insert a new payment. */
+  mergeWithExisting?: boolean;
 }) {
   const before = await fetchDb();
   let db = before;
@@ -164,13 +164,18 @@ export async function recordPalai(input: {
   }
 
   const serviceMonth = normalizeServiceMonth(input.serviceMonth);
-  const existing = findPalaiForCustomerMonth(db, customer.id, serviceMonth);
-  if (
-    existing?.transaction_id &&
-    !input.separatePayment &&
-    existing.goat_count != null &&
-    existing.rate_per_goat != null
-  ) {
+  const existing = palaiMergeTarget(db.palai_payments, {
+    customerId: customer.id,
+    serviceMonth,
+    ratePerGoat: input.ratePerGoat,
+    mergeWithExisting: input.mergeWithExisting,
+  });
+  if (input.mergeWithExisting && !existing) {
+    throw new Error(
+      "No existing palai line at this rate for that month. Leave “add to existing” unchecked to save a new payment."
+    );
+  }
+  if (existing?.transaction_id && existing.goat_count != null && existing.rate_per_goat != null) {
     return updatePalai({
       transactionId: existing.transaction_id,
       date: input.date,

@@ -129,7 +129,7 @@ export async function actionRecordPalai(formData: FormData): Promise<PalaiAction
       paymentMethod: String(formData.get("paymentMethod") || ""),
       notes: String(formData.get("notes") || ""),
       receivedBy: String(formData.get("receivedBy") || "Saad") as "Monis" | "Saad",
-      separatePayment: formData.get("separatePayment") === "on",
+      mergeWithExisting: formData.get("mergeWithExisting") === "on",
     });
     revalidateTxnPaths();
     return { ok: true };
