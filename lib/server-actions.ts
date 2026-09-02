@@ -21,8 +21,6 @@ import {
   deleteCustomVaccine,
   ensureCustomVaccine,
   ensureCustomDewormer,
-  addCustomCategory,
-  deleteCustomCategory,
   ensureCustomCategory,
   recordLivestockSale,
   registerBornGoat,
@@ -273,18 +271,6 @@ export async function actionDeleteCustomVaccine(formData: FormData) {
   const id = String(formData.get("id") || "").trim();
   if (!id) throw new Error("Vaccine type not found");
   await deleteCustomVaccine(id);
-  revalidateTxnPaths();
-}
-
-export async function actionAddCustomCategory(formData: FormData) {
-  await addCustomCategory({ name: String(formData.get("name") || "") });
-  revalidateTxnPaths();
-}
-
-export async function actionDeleteCustomCategory(formData: FormData) {
-  const id = String(formData.get("id") || "").trim();
-  if (!id) throw new Error("Category not found");
-  await deleteCustomCategory(id);
   revalidateTxnPaths();
 }
 

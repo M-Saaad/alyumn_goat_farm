@@ -678,44 +678,6 @@ export async function ensureCustomDewormer(
   return dewormer;
 }
 
-export async function addCustomCategory(input: { name: string }) {
-  const before = await fetchDb();
-  const trimmed = assertNewCategoryName(input.name, before.custom_categories ?? []);
-
-  const category: CustomCategory = {
-    id: crypto.randomUUID(),
-    name: trimmed,
-  };
-  const after = {
-    ...before,
-    custom_categories: [...(before.custom_categories ?? []), category],
-  };
-  if (isSupabaseDb()) {
-    await applyWritePlan({ upsertCustomCategories: [category] });
-    return after;
-  }
-  return persistMutation(before, after);
-}
-
-export async function deleteCustomCategory(id: string) {
-  const before = await fetchDb();
-  const custom = before.custom_categories ?? [];
-  const row = custom.find((c) => c.id === id);
-  if (!row) throw new Error("Category not found");
-
-  const inUse = before.transactions.some((t) => t.category === row.name);
-  if (inUse) {
-    throw new Error(`Cannot remove "${row.name}" — it is used by existing transactions`);
-  }
-
-  const after = { ...before, custom_categories: custom.filter((c) => c.id !== id) };
-  if (isSupabaseDb()) {
-    await applyWritePlan({ deleteCustomCategoryIds: [id] });
-    return after;
-  }
-  return persistMutation(before, after);
-}
-
 export async function ensureCustomCategory(name: string): Promise<CustomCategory | null> {
   const trimmed = name.trim();
   if (!trimmed) throw new Error("Enter a category name");

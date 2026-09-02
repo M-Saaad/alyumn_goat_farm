@@ -7,7 +7,6 @@ import { loadTransactionsData, contactNameFrom } from "@/lib/db/queries";
 import { AppHeader } from "@/components/AppHeader";
 import { BottomNav } from "@/components/BottomNav";
 import { QuickEntryLoader } from "@/components/QuickEntryLoader";
-import { CategoryManager } from "@/components/CategoryManager";
 import { TransactionsFilters } from "@/components/TransactionsFilters";
 import {
   TransactionEditor,
@@ -194,8 +193,6 @@ export default async function TransactionsPage({
                 : undefined
         }
       />
-
-      <CategoryManager customCategories={data.custom_categories} />
 
       <Suspense fallback={<div className="mb-4 h-16 animate-pulse rounded-xl bg-stone-200" />}>
         <TransactionsFilters customCategories={data.custom_categories} />
