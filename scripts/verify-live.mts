@@ -211,6 +211,35 @@ async function main() {
     console.log("PASS buy goat creates animal + linked transaction");
 
     await buyGoat({
+      date: "2026-07-27",
+      price: 45000,
+      paidNow: 0,
+      breed: "Teddy",
+      sex: "Female",
+      description: "Deferred payment goat",
+      name: "DeferredPayGoat",
+      ownerName: "Farm",
+      paidBy: "Saad",
+    });
+    const afterDeferred = loadDb();
+    const deferred = afterDeferred.animals.find((a) => a.name === "DeferredPayGoat");
+    if (!deferred) throw new Error("deferred buy goat missing animal");
+    const deferredTx = afterDeferred.transactions.find(
+      (t) => t.animal_id === deferred.id && t.category === "Livestock Purchase"
+    );
+    if (deferredTx) throw new Error("paid now 0 should not create purchase transaction yet");
+    const deferredAgreement = afterDeferred.purchase_agreements?.find(
+      (a) => a.animal_id === deferred.id
+    );
+    if (!deferredAgreement || deferredAgreement.status !== "open") {
+      throw new Error("paid now 0 should leave purchase agreement open");
+    }
+    if (deferredAgreement.amount_paid !== 0 || deferredAgreement.total_amount !== 45000) {
+      throw new Error("deferred agreement totals wrong");
+    }
+    console.log("PASS buy goat with paid now 0 leaves open installment balance");
+
+    await buyGoat({
       date: "2026-07-01",
       price: 37000,
       breed: "Tapra",

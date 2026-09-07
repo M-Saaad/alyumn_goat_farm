@@ -90,3 +90,13 @@ export function parseOptionalPositiveAmount(
   }
   return n;
 }
+
+/** Blank = caller default (usually full price). 0 = explicitly unpaid — balance due later. */
+export function parseOptionalPaidNowAmount(
+  raw: string | null | undefined,
+  label = "Amount paid now"
+): number | null {
+  const trimmed = String(raw ?? "").trim();
+  if (!trimmed) return null;
+  return parseNonNegativeAmount(trimmed, label);
+}

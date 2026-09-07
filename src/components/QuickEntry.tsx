@@ -579,14 +579,16 @@ function AcquireFromCustomerForm({
       <Field label="Purchase date" name="date" type="date" defaultValue={todayIso()} required />
       <Field label="Purchase price (PKR)" name="price" type="number" required />
       <Field
-        label="Paid now (optional — leave blank for full amount)"
+        label="Paid now (optional)"
         name="paidNow"
         type="number"
+        min={0}
       />
       <PartnerSelect />
       <Field label="Notes (optional)" name="notes" />
       <p className="text-xs text-stone-500">
-        Records a livestock purchase linked to this goat and updates farm ownership in one step.
+        Leave blank to record full payment now. Enter 0 to defer payment — add installments later on
+        the goat profile.
       </p>
       <SubmitButton label="Buy from customer" pendingLabel="Saving…" />
     </ActionForm>
@@ -677,11 +679,16 @@ function BuyGoatForm({
         required={!priceOptional}
       />
       <Field
-        label="Paid now (optional — leave blank for full amount)"
+        label="Paid now (optional)"
         name="paidNow"
         type="number"
+        min={0}
       />
       <SubmitButton label="Add goat" pendingLabel="Adding…" />
+      <p className="text-xs text-stone-500">
+        Leave blank to record full payment now. Enter 0 if the balance will be paid in future
+        installments (add payments from the goat profile).
+      </p>
     </ActionForm>
   );
 }
