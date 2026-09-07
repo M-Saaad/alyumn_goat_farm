@@ -47,6 +47,7 @@ import {
   parseOptionalNonNegativeAmount,
   parsePositiveInteger,
   parseOptionalNonNegativeInteger,
+  parseOptionalPaidNowAmount,
   parseOptionalPositiveAmount,
 } from "@/lib/form-numbers";
 
@@ -181,7 +182,7 @@ export async function actionBuyGoat(formData: FormData) {
     await buyGoat({
       date: String(formData.get("date")),
       price: priceRaw ? parseOptionalPositiveAmount(priceRaw, "Price") : null,
-      paidNow: paidNowRaw ? parseOptionalPositiveAmount(paidNowRaw, "Amount paid now") : null,
+      paidNow: parseOptionalPaidNowAmount(paidNowRaw),
       breed: String(formData.get("breed")) as AnimalBreed,
       sex: String(formData.get("sex")) as AnimalSex,
       description: String(formData.get("description")),
@@ -209,9 +210,7 @@ export async function actionAcquireFromCustomer(formData: FormData) {
       animalId,
       date: String(formData.get("date")),
       price: parsePositiveAmount(String(formData.get("price")), "Price"),
-      paidNow: paidNowRaw
-        ? parseOptionalPositiveAmount(paidNowRaw, "Amount paid now")
-        : null,
+      paidNow: parseOptionalPaidNowAmount(paidNowRaw),
       paidBy: String(formData.get("paidBy")) as "Monis" | "Saad",
       notes: String(formData.get("notes") || "") || undefined,
     });
