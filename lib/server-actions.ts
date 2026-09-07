@@ -414,53 +414,67 @@ export async function actionChangeStatus(formData: FormData) {
 }
 
 export async function actionRecordLivestockSale(formData: FormData) {
-  const date = String(formData.get("date") || "").trim();
-  const animalId = Number(formData.get("animalId"));
-  const grossSalePrice = parsePositiveAmount(
-    String(formData.get("grossSalePrice") || "").trim(),
-    "Gross sale price"
-  );
-  const deliveryRaw = String(formData.get("deliveryCost") || "").trim();
-  const receivedBy = String(formData.get("receivedBy") || "").trim();
-  const additional = String(formData.get("additionalAnimalId") || "").trim();
-  const receivedNowRaw = String(formData.get("amountReceivedNow") || "").trim();
+  try {
+    const date = String(formData.get("date") || "").trim();
+    const animalId = Number(formData.get("animalId"));
+    const grossSalePrice = parsePositiveAmount(
+      String(formData.get("grossSalePrice") || "").trim(),
+      "Gross sale price"
+    );
+    const deliveryRaw = String(formData.get("deliveryCost") || "").trim();
+    const receivedBy = String(formData.get("receivedBy") || "").trim();
+    const additional = String(formData.get("additionalAnimalId") || "").trim();
+    const receivedNowRaw = String(formData.get("amountReceivedNow") || "").trim();
 
-  if (!date) throw new Error("Sale date is required");
-  if (!animalId || Number.isNaN(animalId)) throw new Error("Select a goat");
-  if (receivedBy !== "Monis" && receivedBy !== "Saad") {
-    throw new Error("Select who received cash (Monis or Saad)");
+    if (!date) return { ok: false, error: "Sale date is required" };
+    if (!animalId || Number.isNaN(animalId)) return { ok: false, error: "Select a goat" };
+    if (receivedBy !== "Monis" && receivedBy !== "Saad") {
+      return { ok: false, error: "Select who received cash (Monis or Saad)" };
+    }
+    const receivedNow = receivedNowRaw !== ""
+      ? parseNonNegativeAmount(receivedNowRaw, "Received now")
+      : null;
+
+    const soldOnPalai =
+      formData.get("soldOnPalai") === "on" || formData.get("soldOnPalai") === "true";
+    const buyerName = String(formData.get("buyerName") || "").trim();
+    const palaiRateRaw = String(formData.get("palaiRatePerGoat") || "").trim();
+    let palaiRatePerGoat: number | null = null;
+
+    if (soldOnPalai) {
+      if (!buyerName) return { ok: false, error: "Select the buyer for sold-on-palai" };
+      palaiRatePerGoat = parsePositiveAmount(palaiRateRaw, "Palai rate per goat");
+    }
+
+    let notes = String(formData.get("notes") || "").trim();
+    if (buyerName && !soldOnPalai) {
+      const prefix = `Sold to ${buyerName}`;
+      notes = notes ? `${prefix} — ${notes}` : prefix;
+    }
+
+    await recordLivestockSale({
+      date,
+      animalId,
+      additionalAnimalIds: additional ? [Number(additional)] : undefined,
+      grossSalePrice,
+      deliveryCost: deliveryRaw
+        ? parseNonNegativeAmount(deliveryRaw, "Delivery cost", 0)
+        : undefined,
+      receivedBy: receivedBy as "Monis" | "Saad",
+      amountReceivedNow: receivedNow,
+      notes: notes || undefined,
+      soldOnPalai,
+      buyerName: soldOnPalai ? buyerName : null,
+      palaiRatePerGoat,
+    });
+    revalidateTxnPaths();
+    return { ok: true };
+  } catch (err) {
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : "Could not record sale",
+    };
   }
-  const receivedNow = receivedNowRaw
-    ? parseNonNegativeAmount(receivedNowRaw, "Received now")
-    : null;
-
-  const soldOnPalai =
-    formData.get("soldOnPalai") === "on" || formData.get("soldOnPalai") === "true";
-  const buyerName = String(formData.get("buyerName") || "").trim();
-  const palaiRateRaw = String(formData.get("palaiRatePerGoat") || "").trim();
-  let palaiRatePerGoat: number | null = null;
-
-  if (soldOnPalai) {
-    if (!buyerName) throw new Error("Select the buyer for sold-on-palai");
-    palaiRatePerGoat = parsePositiveAmount(palaiRateRaw, "Palai rate per goat");
-  }
-
-  await recordLivestockSale({
-    date,
-    animalId,
-    additionalAnimalIds: additional ? [Number(additional)] : undefined,
-    grossSalePrice,
-    deliveryCost: deliveryRaw
-      ? parseNonNegativeAmount(deliveryRaw, "Delivery cost", 0)
-      : undefined,
-    receivedBy: receivedBy as "Monis" | "Saad",
-    amountReceivedNow: receivedNow,
-    notes: String(formData.get("notes") || "") || undefined,
-    soldOnPalai,
-    buyerName: soldOnPalai ? buyerName : null,
-    palaiRatePerGoat,
-  });
-  revalidateTxnPaths();
 }
 
 export async function actionDeleteSaleReceipt(formData: FormData) {

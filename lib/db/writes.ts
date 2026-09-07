@@ -315,11 +315,19 @@ export async function applyWritePlan(plan: WritePlan): Promise<void> {
       plan.upsertPurchaseAgreements.map(purchaseAgreementRow)
     );
   }
+
+  const allTxs = plan.upsertTransactions ?? [];
+  const txsBeforeSales = allTxs.filter((t) => !t.livestock_sale_id);
+  const txsAfterSales = allTxs.filter((t) => t.livestock_sale_id);
+
+  if (txsBeforeSales.length) {
+    await upsertRows(client, "transactions", txsBeforeSales.map(txRow));
+  }
   if (plan.upsertSales?.length) {
     await upsertRows(client, "livestock_sales", plan.upsertSales.map(saleRow));
   }
-  if (plan.upsertTransactions?.length) {
-    await upsertRows(client, "transactions", plan.upsertTransactions.map(txRow));
+  if (txsAfterSales.length) {
+    await upsertRows(client, "transactions", txsAfterSales.map(txRow));
   }
   if (plan.upsertLedger?.length) {
     await upsertRows(client, "partner_ledger_entries", plan.upsertLedger.map(ledgerRow));
