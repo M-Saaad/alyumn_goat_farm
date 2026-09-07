@@ -223,7 +223,12 @@ export function QuickEntry({
             )}
 
             {mode === "sell" && (
-              <SellGoatForm animals={animals} customers={customers} onSuccess={close} />
+              <SellGoatForm
+                animals={animals}
+                customers={customers}
+                vendors={vendors}
+                onSuccess={close}
+              />
             )}
 
             {mode === "status" && (
@@ -454,13 +459,16 @@ function MedicalForm({
 function SellGoatForm({
   animals,
   customers,
+  vendors,
   onSuccess,
 }: {
   animals: AnimalOption[];
   customers: ContactOption[];
+  vendors: ContactOption[];
   onSuccess: () => void;
 }) {
   const [soldOnPalai, setSoldOnPalai] = useState(false);
+  const buyerOptions = [...vendors, ...customers].sort((a, b) => a.name.localeCompare(b.name));
 
   return (
     <ActionForm action={actionRecordLivestockSale} onSuccess={onSuccess}>
@@ -474,10 +482,15 @@ function SellGoatForm({
       <Field label="Sale date" name="date" type="date" defaultValue={todayIso()} required />
       <Field label="Gross sale price (PKR)" name="grossSalePrice" type="number" required />
       <Field
-        label="Received now (PKR, optional — leave blank for full net)"
+        label="Received now (PKR, optional)"
         name="amountReceivedNow"
         type="number"
+        min={0}
       />
+      <p className="text-xs text-stone-500">
+        Leave blank for full net proceeds now. Enter 0 to record the sale now and collect payment
+        later from the goat profile.
+      </p>
       <Field
         label="Delivery deducted from proceeds"
         name="deliveryCost"
@@ -491,6 +504,16 @@ function SellGoatForm({
           <option value="Saad">Saad</option>
         </select>
       </div>
+      {!soldOnPalai && (
+        <ContactSelect
+          label="Buyer (optional)"
+          name="buyerName"
+          options={buyerOptions}
+          allowEmpty
+          emptyLabel="—"
+          addNewLabel="+ Add buyer"
+        />
+      )}
       <label className="flex items-center gap-2 text-sm text-stone-700">
         <input
           type="checkbox"
