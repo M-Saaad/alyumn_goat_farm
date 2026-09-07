@@ -170,44 +170,60 @@ export async function actionUpdatePalai(formData: FormData): Promise<PalaiAction
 }
 
 export async function actionBuyGoat(formData: FormData) {
-  const palaiRaw = String(formData.get("palaiRate") || "").trim();
-  const paidBy = String(formData.get("paidBy")) as "Monis" | "Saad" | "Customer";
-  const priceRaw = String(formData.get("price") || "").trim();
-  const paidNowRaw = String(formData.get("paidNow") || "").trim();
-  if (paidBy !== "Customer" && !priceRaw) {
-    throw new Error("Price is required");
+  try {
+    const palaiRaw = String(formData.get("palaiRate") || "").trim();
+    const paidBy = String(formData.get("paidBy")) as "Monis" | "Saad" | "Customer";
+    const priceRaw = String(formData.get("price") || "").trim();
+    const paidNowRaw = String(formData.get("paidNow") || "").trim();
+    if (paidBy !== "Customer" && !priceRaw) {
+      return { ok: false, error: "Price is required" };
+    }
+    await buyGoat({
+      date: String(formData.get("date")),
+      price: priceRaw ? parseOptionalPositiveAmount(priceRaw, "Price") : null,
+      paidNow: paidNowRaw ? parseOptionalPositiveAmount(paidNowRaw, "Amount paid now") : null,
+      breed: String(formData.get("breed")) as AnimalBreed,
+      sex: String(formData.get("sex")) as AnimalSex,
+      description: String(formData.get("description")),
+      name: String(formData.get("name") || "") || undefined,
+      ownerName: String(formData.get("ownerName")),
+      vendorName: String(formData.get("vendorName") || "") || undefined,
+      paidBy,
+      palaiRate: palaiRaw ? parseOptionalPositiveAmount(palaiRaw, "Palai rate") : null,
+    });
+    revalidateTxnPaths();
+    return { ok: true };
+  } catch (err) {
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : "Could not add goat",
+    };
   }
-  await buyGoat({
-    date: String(formData.get("date")),
-    price: priceRaw ? parseOptionalPositiveAmount(priceRaw, "Price") : null,
-    paidNow: paidNowRaw ? parseOptionalPositiveAmount(paidNowRaw, "Amount paid now") : null,
-    breed: String(formData.get("breed")) as AnimalBreed,
-    sex: String(formData.get("sex")) as AnimalSex,
-    description: String(formData.get("description")),
-    name: String(formData.get("name") || "") || undefined,
-    ownerName: String(formData.get("ownerName")),
-    vendorName: String(formData.get("vendorName") || "") || undefined,
-    paidBy,
-    palaiRate: palaiRaw ? parseOptionalPositiveAmount(palaiRaw, "Palai rate") : null,
-  });
-  revalidateTxnPaths();
 }
 
 export async function actionAcquireFromCustomer(formData: FormData) {
-  const paidNowRaw = String(formData.get("paidNow") || "").trim();
-  const animalId = parsePositiveInteger(String(formData.get("animalId")), "Goat");
-  await acquireGoatFromCustomer({
-    animalId,
-    date: String(formData.get("date")),
-    price: parsePositiveAmount(String(formData.get("price")), "Price"),
-    paidNow: paidNowRaw
-      ? parseOptionalPositiveAmount(paidNowRaw, "Amount paid now")
-      : null,
-    paidBy: String(formData.get("paidBy")) as "Monis" | "Saad",
-    notes: String(formData.get("notes") || "") || undefined,
-  });
-  revalidatePath(`/animals/${animalId}`);
-  revalidateTxnPaths();
+  try {
+    const paidNowRaw = String(formData.get("paidNow") || "").trim();
+    const animalId = parsePositiveInteger(String(formData.get("animalId")), "Goat");
+    await acquireGoatFromCustomer({
+      animalId,
+      date: String(formData.get("date")),
+      price: parsePositiveAmount(String(formData.get("price")), "Price"),
+      paidNow: paidNowRaw
+        ? parseOptionalPositiveAmount(paidNowRaw, "Amount paid now")
+        : null,
+      paidBy: String(formData.get("paidBy")) as "Monis" | "Saad",
+      notes: String(formData.get("notes") || "") || undefined,
+    });
+    revalidatePath(`/animals/${animalId}`);
+    revalidateTxnPaths();
+    return { ok: true };
+  } catch (err) {
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : "Could not buy goat from customer",
+    };
+  }
 }
 
 export async function actionRegisterBornGoat(formData: FormData) {

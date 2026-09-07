@@ -308,6 +308,16 @@ export async function applyWritePlan(plan: WritePlan): Promise<void> {
       animalsToWrite.map((a) => animalRow(a, parentCols))
     );
   }
+  if (plan.upsertPurchaseAgreements?.length) {
+    await upsertRows(
+      client,
+      "purchase_agreements",
+      plan.upsertPurchaseAgreements.map(purchaseAgreementRow)
+    );
+  }
+  if (plan.upsertSales?.length) {
+    await upsertRows(client, "livestock_sales", plan.upsertSales.map(saleRow));
+  }
   if (plan.upsertTransactions?.length) {
     await upsertRows(client, "transactions", plan.upsertTransactions.map(txRow));
   }
@@ -316,16 +326,6 @@ export async function applyWritePlan(plan: WritePlan): Promise<void> {
   }
   if (plan.upsertPalai?.length) {
     await upsertRows(client, "palai_payments", plan.upsertPalai.map(palaiRow));
-  }
-  if (plan.upsertSales?.length) {
-    await upsertRows(client, "livestock_sales", plan.upsertSales.map(saleRow));
-  }
-  if (plan.upsertPurchaseAgreements?.length) {
-    await upsertRows(
-      client,
-      "purchase_agreements",
-      plan.upsertPurchaseAgreements.map(purchaseAgreementRow)
-    );
   }
   if (plan.upsertMedical?.length) {
     await upsertRows(client, "medical_events", plan.upsertMedical.map(medicalRow));
