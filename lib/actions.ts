@@ -30,6 +30,10 @@ import {
 import { applyDeleteAnimal } from "./animals/delete";
 import { applyUpdateAnimalDetails, type UpdateAnimalInput } from "./animals/update";
 import {
+  applyAcquireFromCustomer,
+  type AcquireFromCustomerInput,
+} from "./livestock/acquire-from-customer";
+import {
   applyDeleteTransaction,
   applyUpdateTransaction,
   type UpdateTransactionInput,
@@ -392,6 +396,38 @@ export async function buyGoat(input: {
       upsertContacts: newContacts.length ? newContacts : undefined,
       upsertAnimals: [animal],
       upsertPurchaseAgreements: [agreement],
+    });
+    return after;
+  }
+  return persistMutation(before, after);
+}
+
+export async function acquireGoatFromCustomer(input: AcquireFromCustomerInput) {
+  const before = await fetchDb();
+  const result = applyAcquireFromCustomer(before, input);
+  const updatedAnimal = result.db.animals.find((a) => a.id === input.animalId)!;
+  let after = result.db;
+
+  if (result.transaction) {
+    const entries = withLedgerIds(result.ledger);
+    after = {
+      ...after,
+      partner_ledger_entries: [...after.partner_ledger_entries, ...entries],
+    };
+    if (isSupabaseDb()) {
+      await insertTransactionWithLedger(result.transaction, entries, {
+        animals: [updatedAnimal],
+        purchaseAgreements: [result.agreement],
+      });
+      return after;
+    }
+    return persistMutation(before, after);
+  }
+
+  if (isSupabaseDb()) {
+    await applyWritePlan({
+      upsertAnimals: [updatedAnimal],
+      upsertPurchaseAgreements: [result.agreement],
     });
     return after;
   }

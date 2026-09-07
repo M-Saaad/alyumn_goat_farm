@@ -5,7 +5,7 @@ import { loadDb, saveDb } from "../lib/db";
 import { computeSettlement, assertCanonicalSettlement } from "../lib/partner-equity/settlement";
 import { recognizePalaiPayment, applyPalaiToDb } from "../lib/palai/recognize-payment";
 import { computeSaleSplit, saleAdjustmentAmount } from "../lib/livestock/record-sale";
-import { buyGoat, logExpense, logMedical, recordBreeding, recordLivestockSale, addSaleReceipt, updateAnimal, deleteSaleReceipt, undoLivestockSale, registerBornGoat } from "../lib/actions";
+import { buyGoat, acquireGoatFromCustomer, logExpense, logMedical, recordBreeding, recordLivestockSale, addSaleReceipt, updateAnimal, deleteSaleReceipt, undoLivestockSale, registerBornGoat } from "../lib/actions";
 import { isSoldOnPalaiSale } from "../lib/livestock/cancel-sale";
 import fs from "fs";
 import path from "path";
@@ -209,6 +209,65 @@ async function main() {
       throw new Error("buy goat missing settled purchase agreement");
     }
     console.log("PASS buy goat creates animal + linked transaction");
+
+    await buyGoat({
+      date: "2026-07-01",
+      price: 37000,
+      breed: "Tapra",
+      sex: "Female",
+      description: "Palai goat for farm acquisition test",
+      name: "AcquireTest",
+      ownerName: "Awais",
+      paidBy: "Customer",
+      palaiRate: 5000,
+    });
+    const beforeAcquire = loadDb();
+    const acquireGoat = beforeAcquire.animals.find((a) => a.name === "AcquireTest");
+    const awaisForAcquire = beforeAcquire.contacts.find((c) => c.name === "Awais");
+    const farmContact = beforeAcquire.contacts.find((c) => c.name === "Farm");
+    if (!acquireGoat || !awaisForAcquire || !farmContact) {
+      throw new Error("acquire test setup missing goat or contacts");
+    }
+    if (acquireGoat.owner_id !== awaisForAcquire.id) {
+      throw new Error("acquire test goat should start under customer");
+    }
+    await acquireGoatFromCustomer({
+      animalId: acquireGoat.id,
+      date: "2026-08-01",
+      price: 68000,
+      paidBy: "Saad",
+      notes: "Purchase from Awais — AcquireTest",
+    });
+    const afterAcquire = loadDb();
+    const acquired = afterAcquire.animals.find((a) => a.id === acquireGoat.id);
+    if (!acquired || acquired.owner_id !== farmContact.id) {
+      throw new Error("acquire should transfer ownership to farm");
+    }
+    if (acquired.palai_rate != null) {
+      throw new Error("acquire should clear palai rate");
+    }
+    if (acquired.price !== 68000) {
+      throw new Error(`acquire should set farm cost basis to 68000 got ${acquired.price}`);
+    }
+    const acquireTx = afterAcquire.transactions.find(
+      (t) =>
+        t.animal_id === acquireGoat.id &&
+        t.category === "Livestock Purchase" &&
+        t.customer_id === awaisForAcquire.id &&
+        t.amount === 68000
+    );
+    if (!acquireTx) throw new Error("acquire missing linked purchase transaction");
+    const acquireAgreements = (afterAcquire.purchase_agreements ?? []).filter(
+      (a) => a.animal_id === acquireGoat.id
+    );
+    const latestAgreement = acquireAgreements[acquireAgreements.length - 1];
+    if (!latestAgreement || latestAgreement.vendor_id !== awaisForAcquire.id) {
+      throw new Error("acquire missing purchase agreement with customer seller");
+    }
+    if (latestAgreement.status !== "settled" || latestAgreement.total_amount !== 68000) {
+      throw new Error("acquire agreement should be settled at 68000");
+    }
+    console.log("PASS buy from customer transfers ownership + ledger + agreement");
 
     await logMedical({ animalIds: [vg.id], eventType: "Vaccine", date: "2026-07-26", notes: "test vax" });
     const med = loadDb().medical_events.find((m) => m.animal_id === vg.id && m.notes === "test vax");

@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import {
   addPurchasePayment,
   addSaleReceipt,
+  acquireGoatFromCustomer,
   buyGoat,
   changeStatus,
   deleteTransaction,
@@ -189,6 +190,23 @@ export async function actionBuyGoat(formData: FormData) {
     paidBy,
     palaiRate: palaiRaw ? parseOptionalPositiveAmount(palaiRaw, "Palai rate") : null,
   });
+  revalidateTxnPaths();
+}
+
+export async function actionAcquireFromCustomer(formData: FormData) {
+  const paidNowRaw = String(formData.get("paidNow") || "").trim();
+  const animalId = parsePositiveInteger(String(formData.get("animalId")), "Goat");
+  await acquireGoatFromCustomer({
+    animalId,
+    date: String(formData.get("date")),
+    price: parsePositiveAmount(String(formData.get("price")), "Price"),
+    paidNow: paidNowRaw
+      ? parseOptionalPositiveAmount(paidNowRaw, "Amount paid now")
+      : null,
+    paidBy: String(formData.get("paidBy")) as "Monis" | "Saad",
+    notes: String(formData.get("notes") || "") || undefined,
+  });
+  revalidatePath(`/animals/${animalId}`);
   revalidateTxnPaths();
 }
 

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import {
+  actionAcquireFromCustomer,
   actionBuyGoat,
   actionChangeStatus,
   actionLogExpense,
@@ -29,11 +30,13 @@ import { BuckSelect, ContactSelect, type ContactOption } from "@/components/Cont
 import { PalaiPaymentForm, type PalaiHistoryEntry } from "@/components/PalaiPaymentForm";
 
 type AnimalOption = { id: number; label: string };
+type CustomerOwnedAnimalOption = { id: number; label: string; ownerName: string };
 type Mode =
   | null
   | "expense"
   | "palai"
   | "buy"
+  | "acquire"
   | "born"
   | "medical"
   | "weight"
@@ -48,6 +51,7 @@ const label = "block text-sm font-medium text-stone-700";
 
 export type QuickEntryProps = {
   animals: AnimalOption[];
+  customerOwnedAnimals?: CustomerOwnedAnimalOption[];
   femaleAnimals?: AnimalOption[];
   damAnimals?: AnimalOption[];
   vendors: ContactOption[];
@@ -63,6 +67,7 @@ export type QuickEntryProps = {
 
 export function QuickEntry({
   animals,
+  customerOwnedAnimals = [],
   femaleAnimals,
   damAnimals,
   vendors,
@@ -119,6 +124,7 @@ export function QuickEntry({
                     ["expense", "Log Expense"],
                     ["palai", "Palai Payment"],
                     ["buy", "Buy Goat"],
+                    ["acquire", "Buy from Customer"],
                     ["born", "Record Birth"],
                     ["medical", "Log Medical"],
                     ["weight", "Log Weight"],
@@ -154,6 +160,13 @@ export function QuickEntry({
 
             {mode === "buy" && (
               <BuyGoatForm vendors={vendors} ownerOptions={ownerOptions} onSuccess={close} />
+            )}
+
+            {mode === "acquire" && (
+              <AcquireFromCustomerForm
+                animals={customerOwnedAnimals}
+                onSuccess={close}
+              />
             )}
 
             {mode === "born" && (
@@ -517,6 +530,69 @@ function SellGoatForm({
   );
 }
 
+function AcquireFromCustomerForm({
+  animals,
+  onSuccess,
+}: {
+  animals: CustomerOwnedAnimalOption[];
+  onSuccess: () => void;
+}) {
+  const [selectedId, setSelectedId] = useState(
+    animals.length === 1 ? String(animals[0].id) : ""
+  );
+  const selected = animals.find((a) => String(a.id) === selectedId);
+
+  if (animals.length === 0) {
+    return (
+      <p className="text-sm text-stone-600">
+        No active palai goats owned by customers. Only customer-owned goats can be bought by the
+        farm.
+      </p>
+    );
+  }
+
+  return (
+    <ActionForm action={actionAcquireFromCustomer} onSuccess={onSuccess}>
+      <div>
+        <label className={label}>Goat (customer-owned)</label>
+        <select
+          name="animalId"
+          className={field}
+          required
+          value={selectedId}
+          onChange={(e) => setSelectedId(e.target.value)}
+        >
+          <option value="" disabled>Select goat</option>
+          {animals.map((a) => (
+            <option key={a.id} value={a.id}>
+              {a.label}
+            </option>
+          ))}
+        </select>
+      </div>
+      {selected && (
+        <p className="text-xs text-stone-500">
+          Seller: <span className="font-medium text-stone-700">{selected.ownerName}</span> — ownership
+          transfers to Farm and palai rate is cleared.
+        </p>
+      )}
+      <Field label="Purchase date" name="date" type="date" defaultValue={todayIso()} required />
+      <Field label="Purchase price (PKR)" name="price" type="number" required />
+      <Field
+        label="Paid now (optional — leave blank for full amount)"
+        name="paidNow"
+        type="number"
+      />
+      <PartnerSelect />
+      <Field label="Notes (optional)" name="notes" />
+      <p className="text-xs text-stone-500">
+        Records a livestock purchase linked to this goat and updates farm ownership in one step.
+      </p>
+      <SubmitButton label="Buy from customer" pendingLabel="Saving…" />
+    </ActionForm>
+  );
+}
+
 function BuyGoatForm({
   vendors,
   ownerOptions,
@@ -696,6 +772,8 @@ function modeLabel(m: Mode) {
       return "Palai Payment";
     case "buy":
       return "Buy Goat";
+    case "acquire":
+      return "Buy from Customer";
     case "born":
       return "Record Birth";
     case "medical":

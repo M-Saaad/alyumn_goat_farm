@@ -7,6 +7,7 @@ import type { QuickEntryProps } from "@/components/QuickEntry";
 import type { ContactOption } from "@/components/ContactSelect";
 import { mergeVaccineSchedules } from "@/lib/livestock/vaccine-schedule";
 import { mergeDewormerNames } from "@/lib/livestock/medical-notes";
+import { customerOwnedAnimals } from "@/lib/livestock/acquire-from-customer";
 import { mergeExpenseCategories } from "@/lib/transactions/expense-categories";
 
 /** Build QuickEntry contact/animal props from the loaded database. */
@@ -81,8 +82,11 @@ export function quickEntryPropsFromDb(db: FarmDatabase): QuickEntryProps {
     })
     .filter((p): p is NonNullable<typeof p> => Boolean(p && p.transactionId));
 
+  const customerOwned = customerOwnedAnimals(db);
+
   return {
     animals,
+    customerOwnedAnimals: customerOwned,
     femaleAnimals: femaleAnimals.length > 0 ? femaleAnimals : animals,
     damAnimals,
     vendors,

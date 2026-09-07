@@ -252,7 +252,8 @@ function resolvePurchaseAgreement(
   db: FarmDatabase,
   animal: Animal
 ): { agreement: PurchaseAgreement | null; balance: number } {
-  const agreement = db.purchase_agreements?.find((a) => a.animal_id === animal.id) ?? null;
+  const agreements = (db.purchase_agreements ?? []).filter((a) => a.animal_id === animal.id);
+  const agreement = agreements.length > 0 ? agreements[agreements.length - 1] : null;
   if (agreement) {
     return {
       agreement,
