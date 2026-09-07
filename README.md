@@ -50,6 +50,6 @@ Do not change without asking first:
 
 - Partner equity dashboard + settlement
 - Livestock list + animal profiles (photos/videos on Supabase)
-- Quick entry: expense, Palai, buy goat, sell goat, medical, breeding, status, transfer
+- Quick entry: expense, Palai, buy goat, buy from customer, sell goat, medical, breeding, status, transfer
 - Partner login (Supabase Auth)
 - CSV import with canonical settlement Monis +192,247 / Saad −192,247

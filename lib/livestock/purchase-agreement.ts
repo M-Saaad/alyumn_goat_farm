@@ -8,11 +8,19 @@ export function agreementStatus(amount: number, total: number): AgreementStatus 
   return amount >= total - 0.005 ? "settled" : "open";
 }
 
+export function findLatestPurchaseAgreement(
+  db: FarmDatabase,
+  animalId: number
+): PurchaseAgreement | undefined {
+  const matches = (db.purchase_agreements ?? []).filter((a) => a.animal_id === animalId);
+  return matches.length > 0 ? matches[matches.length - 1] : undefined;
+}
+
 export function findPurchaseAgreement(
   db: FarmDatabase,
   animalId: number
 ): PurchaseAgreement | undefined {
-  return db.purchase_agreements?.find((a) => a.animal_id === animalId);
+  return findLatestPurchaseAgreement(db, animalId);
 }
 
 /** Legacy: infer paid amount from purchase transactions when no agreement exists. */
