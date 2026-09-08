@@ -24,6 +24,8 @@ import { createServiceClient } from "../supabase/admin";
 import { isSupabaseDb, persistDb } from "../db";
 import { hasAnimalParentColumns } from "./parent-columns";
 import { animalsWithEncodedParentComments } from "../livestock/animal-parents-store";
+import { isMissingRelationMessage } from "./supabase";
+import { applyMigrationFile } from "../supabase/postgres-url";
 
 export type WritePlan = {
   upsertContacts?: Contact[];
@@ -239,6 +241,48 @@ async function upsertRows(
   if (error) throw new Error(`${table} upsert: ${error.message}`);
 }
 
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function upsertOptionalTable(
+  client: SupabaseClient,
+  table: string,
+  rows: Record<string, unknown>[],
+  migrationFile: string
+) {
+  try {
+    await upsertRows(client, table, rows);
+    return;
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    if (!isMissingRelationMessage(message, table)) throw err;
+  }
+
+  const applied = await applyMigrationFile(migrationFile);
+  if (!applied.ok) {
+    throw new Error(
+      `Database is missing the ${table} table. In Supabase SQL Editor, run migration ${migrationFile} (see DEPLOY.md).`
+    );
+  }
+
+  let lastErr: unknown;
+  for (let attempt = 0; attempt < 4; attempt++) {
+    try {
+      await upsertRows(client, table, rows);
+      return;
+    } catch (err) {
+      lastErr = err;
+      const message = err instanceof Error ? err.message : String(err);
+      if (!isMissingRelationMessage(message, table)) throw err;
+      await sleep(250 * (attempt + 1));
+    }
+  }
+  throw lastErr instanceof Error
+    ? lastErr
+    : new Error(`Database is missing the ${table} table. In Supabase SQL Editor, run migration ${migrationFile} (see DEPLOY.md).`);
+}
+
 async function deleteByIds(
   client: SupabaseClient,
   table: string,
@@ -358,7 +402,12 @@ export async function applyWritePlan(plan: WritePlan): Promise<void> {
     );
   }
   if (plan.upsertCustomVaccines?.length) {
-    await upsertRows(client, "custom_vaccines", plan.upsertCustomVaccines.map(customVaccineRow));
+    await upsertOptionalTable(
+      client,
+      "custom_vaccines",
+      plan.upsertCustomVaccines.map(customVaccineRow),
+      "010_custom_vaccines.sql"
+    );
   }
   if (plan.upsertCustomDewormers?.length) {
     await upsertRows(client, "custom_dewormers", plan.upsertCustomDewormers.map(customDewormerRow));

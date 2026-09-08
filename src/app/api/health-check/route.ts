@@ -73,13 +73,22 @@ export async function GET() {
     } catch (e) {
       checks.breeding_ultrasound_schema = e instanceof Error ? e.message : "error";
     }
+    try {
+      const client = createServiceClient();
+      const { error } = await client.from("custom_vaccines").select("id").limit(1);
+      checks.custom_vaccines_schema = error ? error.message : "ok";
+    } catch (e) {
+      checks.custom_vaccines_schema = e instanceof Error ? e.message : "error";
+    }
   } else {
     checks.breeding_ultrasound_schema = "n/a";
+    checks.custom_vaccines_schema = "n/a";
   }
 
   const ok =
     loadersOk &&
     envOk &&
-    (checks.breeding_ultrasound_schema === "ok" || checks.breeding_ultrasound_schema === "n/a");
+    (checks.breeding_ultrasound_schema === "ok" || checks.breeding_ultrasound_schema === "n/a") &&
+    (checks.custom_vaccines_schema === "ok" || checks.custom_vaccines_schema === "n/a");
   return NextResponse.json({ ok, checks }, { status: ok ? 200 : 500 });
 }

@@ -233,17 +233,26 @@ export async function selectAll(client: SupabaseClient, table: string) {
   return rows;
 }
 
+/** True when PostgREST/Postgres cannot see a table (missing migration, cache, or grants). */
+export function isMissingRelationMessage(message: string, table?: string): boolean {
+  const lower = message.toLowerCase();
+  const missing =
+    lower.includes("does not exist") ||
+    lower.includes("could not find the table") ||
+    lower.includes("schema cache") ||
+    lower.includes("permission denied");
+  if (!missing) return false;
+  if (!table) return true;
+  return lower.includes(table.toLowerCase());
+}
+
 /** Like selectAll but returns [] when a table is missing (e.g. migration not applied). */
 export async function selectAllOptional(client: SupabaseClient, table: string) {
   try {
     return await selectAll(client, table);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    if (
-      message.includes("does not exist") ||
-      message.includes("Could not find the table") ||
-      message.includes("permission denied")
-    ) {
+    if (isMissingRelationMessage(message, table)) {
       console.warn(`[farm] optional table ${table} unavailable: ${message}`);
       return [] as Record<string, unknown>[];
     }

@@ -1,6 +1,8 @@
 import type { FarmDatabase } from "./types";
 import { fetchDb, isSupabaseDb } from "./db";
 import { loadPartnerIds } from "./db/queries";
+import { createServiceClient } from "./supabase/admin";
+import { mapCustomVaccine, selectAllOptional } from "./db/supabase";
 import { computeSettlement } from "./partner-equity/settlement";
 import {
   createCostTransaction,
@@ -626,13 +628,21 @@ export async function updateAnimal(input: UpdateAnimalInput) {
   return persistMutation(before, after);
 }
 
+async function listCustomVaccines(): Promise<CustomVaccine[]> {
+  if (!isSupabaseDb()) {
+    return (await fetchDb()).custom_vaccines ?? [];
+  }
+  const rows = await selectAllOptional(createServiceClient(), "custom_vaccines");
+  return rows.map(mapCustomVaccine);
+}
+
 export async function ensureCustomVaccine(name: string, intervalDays: number): Promise<CustomVaccine | null> {
   const trimmed = name.trim();
   if (!trimmed) throw new Error("Enter a vaccine name");
   if (builtinVaccineByName(trimmed)) return null;
 
-  const before = await fetchDb();
-  const existing = findCustomVaccineByName(before.custom_vaccines ?? [], trimmed);
+  const custom = await listCustomVaccines();
+  const existing = findCustomVaccineByName(custom, trimmed);
   if (existing) return existing;
 
   const vaccine: CustomVaccine = {
@@ -640,15 +650,15 @@ export async function ensureCustomVaccine(name: string, intervalDays: number): P
     name: trimmed,
     interval_days: intervalDays,
   };
-  const after = {
-    ...before,
-    custom_vaccines: [...(before.custom_vaccines ?? []), vaccine],
-  };
   if (isSupabaseDb()) {
     await applyWritePlan({ upsertCustomVaccines: [vaccine] });
     return vaccine;
   }
-  await persistMutation(before, after);
+  const before = await fetchDb();
+  await persistMutation(before, {
+    ...before,
+    custom_vaccines: [...(before.custom_vaccines ?? []), vaccine],
+  });
   return vaccine;
 }
 
@@ -659,8 +669,7 @@ export async function addCustomVaccine(input: { name: string; intervalDays: numb
     throw new Error(`"${trimmed}" is already a standard vaccine`);
   }
 
-  const before = await fetchDb();
-  const custom = before.custom_vaccines ?? [];
+  const custom = await listCustomVaccines();
   if (findCustomVaccineByName(custom, trimmed)) {
     throw new Error(`"${trimmed}" already exists`);
   }
@@ -670,24 +679,32 @@ export async function addCustomVaccine(input: { name: string; intervalDays: numb
     name: trimmed,
     interval_days: input.intervalDays,
   };
-  const after = { ...before, custom_vaccines: [...custom, vaccine] };
   if (isSupabaseDb()) {
     await applyWritePlan({ upsertCustomVaccines: [vaccine] });
-    return after;
+    return vaccine;
   }
-  return persistMutation(before, after);
+  const before = await fetchDb();
+  await persistMutation(before, {
+    ...before,
+    custom_vaccines: [...(before.custom_vaccines ?? []), vaccine],
+  });
+  return vaccine;
 }
 
 export async function deleteCustomVaccine(id: string) {
+  if (isSupabaseDb()) {
+    const custom = await listCustomVaccines();
+    if (!custom.some((v) => v.id === id)) throw new Error("Vaccine type not found");
+    await applyWritePlan({ deleteCustomVaccineIds: [id] });
+    return;
+  }
   const before = await fetchDb();
   const custom = before.custom_vaccines ?? [];
   if (!custom.some((v) => v.id === id)) throw new Error("Vaccine type not found");
-  const after = { ...before, custom_vaccines: custom.filter((v) => v.id !== id) };
-  if (isSupabaseDb()) {
-    await applyWritePlan({ deleteCustomVaccineIds: [id] });
-    return after;
-  }
-  return persistMutation(before, after);
+  return persistMutation(before, {
+    ...before,
+    custom_vaccines: custom.filter((v) => v.id !== id),
+  });
 }
 
 export async function ensureCustomDewormer(
@@ -754,7 +771,6 @@ export async function logMedical(input: {
   const animalIds = [...new Set(input.animalIds.filter((id) => Number.isFinite(id) && id > 0))];
   if (animalIds.length === 0) throw new Error("Select at least one goat");
 
-  const before = await fetchDb();
   const events = animalIds.map((animalId) => ({
     id: crypto.randomUUID(),
     animal_id: animalId,
@@ -763,14 +779,15 @@ export async function logMedical(input: {
     notes: input.notes || null,
     transaction_id: null,
   }));
+  if (isSupabaseDb()) {
+    await applyWritePlan({ upsertMedical: events });
+    return;
+  }
+  const before = await fetchDb();
   const after = {
     ...before,
     medical_events: [...before.medical_events, ...events],
   };
-  if (isSupabaseDb()) {
-    await applyWritePlan({ upsertMedical: events });
-    return after;
-  }
   return persistMutation(before, after);
 }
 

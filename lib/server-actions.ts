@@ -75,6 +75,27 @@ async function resolveExpenseCategory(formData: FormData): Promise<string> {
 export type UltrasoundActionResult = { ok: true } | { ok: false; error: string };
 export type PalaiActionResult = { ok: true } | { ok: false; error: string };
 
+function friendlyVaccineWriteError(err: unknown): string {
+  const message = err instanceof Error ? err.message : "Could not save vaccine";
+  const lower = message.toLowerCase();
+  if (
+    lower.includes("custom_vaccines") &&
+    (lower.includes("schema cache") ||
+      lower.includes("does not exist") ||
+      lower.includes("permission denied") ||
+      lower.includes("missing the custom_vaccines table"))
+  ) {
+    return "Database is missing the custom vaccine table. In Supabase SQL Editor, run migration 010_custom_vaccines.sql (see DEPLOY.md).";
+  }
+  if (lower.includes("duplicate") || lower.includes("unique constraint")) {
+    return "That vaccine type already exists";
+  }
+  if (lower.includes("supabase_service_role_key")) {
+    return "Server is missing SUPABASE_SERVICE_ROLE_KEY. Add it in Vercel environment variables.";
+  }
+  return message;
+}
+
 function friendlyUltrasoundError(err: unknown): string {
   const message = err instanceof Error ? err.message : "Could not save ultrasound";
   const lower = message.toLowerCase();
@@ -250,61 +271,85 @@ export async function actionRegisterBornGoat(formData: FormData) {
 }
 
 export async function actionLogMedical(formData: FormData) {
-  const animalIds = formData
-    .getAll("animalId")
-    .map((v) => Number(String(v).trim()))
-    .filter((id) => Number.isFinite(id) && id > 0);
-  if (animalIds.length === 0) throw new Error("Select at least one goat");
+  try {
+    const animalIds = formData
+      .getAll("animalId")
+      .map((v) => Number(String(v).trim()))
+      .filter((id) => Number.isFinite(id) && id > 0);
+    if (animalIds.length === 0) throw new Error("Select at least one goat");
 
-  const eventType = String(formData.get("eventType")) as MedicalEventType;
-  let notes = String(formData.get("notes") || "").trim();
+    const eventType = String(formData.get("eventType")) as MedicalEventType;
+    let notes = String(formData.get("notes") || "").trim();
 
-  if (eventType === "Vaccine") {
-    const selectedName = String(formData.get("vaccineName") || "").trim();
-    let name = selectedName;
-    if (selectedName === NEW_VACCINE_VALUE) {
-      name = String(formData.get("vaccineNameOther") || "").trim();
-      const intervalDays = parseVaccineIntervalDays(String(formData.get("vaccineIntervalDays") || ""));
-      await ensureCustomVaccine(name, intervalDays);
+    if (eventType === "Vaccine") {
+      const selectedName = String(formData.get("vaccineName") || "").trim();
+      let name = selectedName;
+      if (selectedName === NEW_VACCINE_VALUE) {
+        name = String(formData.get("vaccineNameOther") || "").trim();
+        const intervalDays = parseVaccineIntervalDays(String(formData.get("vaccineIntervalDays") || ""));
+        await ensureCustomVaccine(name, intervalDays);
+      }
+      notes = formatVaccineNotes(name, String(formData.get("dosage") || ""));
+    } else if (eventType === "Deworming") {
+      const dewormType = String(formData.get("dewormType") || "") as DewormType;
+      const dewormerName = String(formData.get("dewormerName") || "").trim();
+      const customName = String(formData.get("dewormerNameOther") || "").trim();
+      const resolvedName = dewormerName === "Other" ? customName : dewormerName;
+      if (dewormerName === "Other") {
+        await ensureCustomDewormer(resolvedName, dewormType);
+      }
+      notes = formatDewormNotes({
+        type: dewormType,
+        name: resolvedName,
+        dosage: String(formData.get("dosage") || ""),
+      });
     }
-    notes = formatVaccineNotes(name, String(formData.get("dosage") || ""));
-  } else if (eventType === "Deworming") {
-    const dewormType = String(formData.get("dewormType") || "") as DewormType;
-    const dewormerName = String(formData.get("dewormerName") || "").trim();
-    const customName = String(formData.get("dewormerNameOther") || "").trim();
-    const resolvedName = dewormerName === "Other" ? customName : dewormerName;
-    if (dewormerName === "Other") {
-      await ensureCustomDewormer(resolvedName, dewormType);
-    }
-    notes = formatDewormNotes({
-      type: dewormType,
-      name: resolvedName,
-      dosage: String(formData.get("dosage") || ""),
+
+    await logMedical({
+      animalIds,
+      eventType,
+      date: String(formData.get("date")),
+      notes,
     });
+    revalidateTxnPaths();
+    return { ok: true as const };
+  } catch (err) {
+    return {
+      ok: false as const,
+      error: friendlyVaccineWriteError(err),
+    };
   }
-
-  await logMedical({
-    animalIds,
-    eventType,
-    date: String(formData.get("date")),
-    notes,
-  });
-  revalidateTxnPaths();
 }
 
 export async function actionAddCustomVaccine(formData: FormData) {
-  await addCustomVaccine({
-    name: String(formData.get("name") || ""),
-    intervalDays: parseVaccineIntervalDays(String(formData.get("intervalDays") || "")),
-  });
-  revalidateTxnPaths();
+  try {
+    await addCustomVaccine({
+      name: String(formData.get("name") || ""),
+      intervalDays: parseVaccineIntervalDays(String(formData.get("intervalDays") || "")),
+    });
+    revalidateTxnPaths();
+    return { ok: true as const };
+  } catch (err) {
+    return {
+      ok: false as const,
+      error: friendlyVaccineWriteError(err),
+    };
+  }
 }
 
 export async function actionDeleteCustomVaccine(formData: FormData) {
-  const id = String(formData.get("id") || "").trim();
-  if (!id) throw new Error("Vaccine type not found");
-  await deleteCustomVaccine(id);
-  revalidateTxnPaths();
+  try {
+    const id = String(formData.get("id") || "").trim();
+    if (!id) throw new Error("Vaccine type not found");
+    await deleteCustomVaccine(id);
+    revalidateTxnPaths();
+    return { ok: true as const };
+  } catch (err) {
+    return {
+      ok: false as const,
+      error: friendlyVaccineWriteError(err),
+    };
+  }
 }
 
 export async function actionLogWeight(formData: FormData) {

@@ -83,14 +83,17 @@ async function runSqlViaManagementApi(sql: string): Promise<{ ok: true } | { ok:
   return { ok: true };
 }
 
-async function runSqlViaPg(url: string): Promise<{ ok: true } | { ok: false; detail: string }> {
+async function runSqlViaPg(
+  url: string,
+  sql: string
+): Promise<{ ok: true } | { ok: false; detail: string }> {
   const client = new pg.Client({
     connectionString: url,
     ssl: { rejectUnauthorized: false },
   });
   try {
     await client.connect();
-    await client.query(sqlFromMigrationFile());
+    await client.query(sql);
     return { ok: true };
   } catch (e) {
     return { ok: false, detail: e instanceof Error ? e.message : String(e) };
@@ -99,11 +102,27 @@ async function runSqlViaPg(url: string): Promise<{ ok: true } | { ok: false; det
   }
 }
 
-export function sqlFromMigrationFile(): string {
-  return readFileSync(
-    path.join(process.cwd(), "supabase/migrations/008_animal_parents.sql"),
-    "utf8"
-  );
+export function sqlFromMigrationFile(filename = "008_animal_parents.sql"): string {
+  return readFileSync(path.join(process.cwd(), "supabase/migrations", filename), "utf8");
+}
+
+async function applySql(sql: string): Promise<{
+  ok: boolean;
+  method?: string;
+  detail?: string;
+  env: Record<string, boolean>;
+}> {
+  const env = postgresEnvStatus();
+  const pgConfig = resolvePostgresUrl();
+  if (pgConfig) {
+    const result = await runSqlViaPg(pgConfig.url, sql);
+    if (result.ok) return { ok: true, method: `pg:${pgConfig.source}`, env };
+    return { ok: false, method: `pg:${pgConfig.source}`, detail: result.detail, env };
+  }
+
+  const mgmt = await runSqlViaManagementApi(sql);
+  if (mgmt.ok) return { ok: true, method: "supabase-management-api", env };
+  return { ok: false, method: "supabase-management-api", detail: mgmt.detail, env };
 }
 
 /** Apply 008_animal_parents.sql using Postgres URL or Supabase Management API. */
@@ -113,15 +132,15 @@ export async function applyAnimalParentsMigration(): Promise<{
   detail?: string;
   env: Record<string, boolean>;
 }> {
-  const env = postgresEnvStatus();
-  const pgConfig = resolvePostgresUrl();
-  if (pgConfig) {
-    const result = await runSqlViaPg(pgConfig.url);
-    if (result.ok) return { ok: true, method: `pg:${pgConfig.source}`, env };
-    return { ok: false, method: `pg:${pgConfig.source}`, detail: result.detail, env };
-  }
+  return applySql(sqlFromMigrationFile("008_animal_parents.sql"));
+}
 
-  const mgmt = await runSqlViaManagementApi(sqlFromMigrationFile());
-  if (mgmt.ok) return { ok: true, method: "supabase-management-api", env };
-  return { ok: false, method: "supabase-management-api", detail: mgmt.detail, env };
+/** Apply a SQL file from supabase/migrations using Postgres URL or Management API. */
+export async function applyMigrationFile(filename: string): Promise<{
+  ok: boolean;
+  method?: string;
+  detail?: string;
+  env: Record<string, boolean>;
+}> {
+  return applySql(sqlFromMigrationFile(filename));
 }

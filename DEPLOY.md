@@ -70,7 +70,8 @@ SUPABASE_SERVICE_ROLE_KEY=...
 - [ ] Animal profile shows linked transactions
 - [ ] Photo/video upload works on a goat profile
 - [ ] Herd Health → Breeding → record ultrasound saves without error
-- [ ] `/api/health-check` returns `"breeding_ultrasound_schema": "ok"` in production
+- [ ] Herd Health → Vaccination → Add vaccine type saves without error
+- [ ] `/api/health-check` returns `"breeding_ultrasound_schema": "ok"` and `"custom_vaccines_schema": "ok"` in production
 
 ## Auth redirect URL
 
