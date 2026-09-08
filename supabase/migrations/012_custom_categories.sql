@@ -1,4 +1,6 @@
--- User-defined expense categories (beyond built-in ledger_category enum values).
+-- custom_categories lookup table is dropped by 013_drop_custom_lookup_tables.sql.
+-- Extra category names live on transactions.category (this migration still converts
+-- category columns from enum to text — keep running it on fresh installs).
 create table custom_categories (
   id uuid primary key default gen_random_uuid(),
   name text not null unique,

@@ -3,6 +3,7 @@ import { animalLabel } from "@/lib/labels";
 import { palaiServiceMonth } from "@/lib/palai/service-month";
 import { palaiReceivedByFromTx } from "@/lib/palai/received-by";
 import { LEDGER_CATEGORIES, slugToCategory, categoryToSlug } from "@/lib/constants";
+import { extraCategoryNames } from "@/lib/transactions/expense-categories";
 import { loadTransactionsData, contactNameFrom } from "@/lib/db/queries";
 import { AppHeader } from "@/components/AppHeader";
 import { BottomNav } from "@/components/BottomNav";
@@ -51,10 +52,11 @@ export default async function TransactionsPage({
     txs = txs.filter((t) => t.kind === "partner_adjustment");
   } else {
     const fromSlug = slugToCategory(filter);
-    const customMatch = data.custom_categories.find((c) => categoryToSlug(c.name) === filter);
+    const extraNames = extraCategoryNames(data.transactions.map((t) => t.category));
+    const customMatch = extraNames.find((name) => categoryToSlug(name) === filter);
     const category =
       fromSlug ||
-      customMatch?.name ||
+      customMatch ||
       ((LEDGER_CATEGORIES as readonly string[]).includes(filter) ? filter : null);
     if (category) txs = txs.filter((t) => t.category === category);
   }
@@ -195,7 +197,7 @@ export default async function TransactionsPage({
       />
 
       <Suspense fallback={<div className="mb-4 h-16 animate-pulse rounded-xl bg-stone-200" />}>
-        <TransactionsFilters customCategories={data.custom_categories} />
+        <TransactionsFilters extraCategoryNames={extraCategoryNames(data.transactions.map((t) => t.category))} />
       </Suspense>
 
       <section className="mb-4 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-stone-200">

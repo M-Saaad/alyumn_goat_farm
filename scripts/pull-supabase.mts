@@ -43,9 +43,6 @@ async function main() {
     breeding_events: db.breeding_events,
     weight_logs: db.weight_logs ?? [],
     animal_media: db.animal_media ?? [],
-    custom_vaccines: db.custom_vaccines ?? [],
-    custom_dewormers: db.custom_dewormers ?? [],
-    custom_categories: db.custom_categories ?? [],
     meta: db.meta,
   };
 

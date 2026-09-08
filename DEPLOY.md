@@ -17,7 +17,10 @@ This app needs Postgres + auth for production. Local JSON (`data/farm.db.json`) 
    - [`supabase/migrations/009_breeding_fetus_count.sql`](supabase/migrations/009_breeding_fetus_count.sql)
    - [`supabase/migrations/010_custom_vaccines.sql`](supabase/migrations/010_custom_vaccines.sql)
    - [`supabase/migrations/011_custom_dewormers.sql`](supabase/migrations/011_custom_dewormers.sql)
-   - [`supabase/migrations/012_custom_categories.sql`](supabase/migrations/012_custom_categories.sql)
+   - [`supabase/migrations/012_custom_categories.sql`](supabase/migrations/012_custom_categories.sql) — also converts `transactions.category` / `partner_ledger_entries.category` to text
+   - [`supabase/migrations/013_drop_custom_lookup_tables.sql`](supabase/migrations/013_drop_custom_lookup_tables.sql) — drops the unused `custom_vaccines` / `custom_dewormers` / `custom_categories` lookup tables; extra names live on medical notes and transaction categories, same as PPR / Feed
+
+If 010–012 already ran in production, only run **013**.
 3. Confirm Storage bucket `animal-media` exists (created by migration 002).
 4. Copy from **Project Settings → API**:
    - Project URL → `NEXT_PUBLIC_SUPABASE_URL`
@@ -70,8 +73,7 @@ SUPABASE_SERVICE_ROLE_KEY=...
 - [ ] Animal profile shows linked transactions
 - [ ] Photo/video upload works on a goat profile
 - [ ] Herd Health → Breeding → record ultrasound saves without error
-- [ ] Herd Health → Vaccination → Add vaccine type saves without error
-- [ ] `/api/health-check` returns `"breeding_ultrasound_schema": "ok"` and `"custom_vaccines_schema": "ok"` in production
+- [ ] `/api/health-check` returns `"breeding_ultrasound_schema": "ok"` in production
 
 ## Auth redirect URL
 

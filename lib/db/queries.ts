@@ -86,16 +86,14 @@ export const getQuickEntryData = cache(async (): Promise<QuickEntryProps> => {
     return quickEntryPropsFromDb(await getCachedDb());
   }
   const client = createServiceClient();
-  const [animals, contacts, breeding, palai, transactions, customVaccines, customDewormers, customCategories] =
+  const [animals, contacts, breeding, palai, transactions, medical] =
     await Promise.all([
       selectAll(client, "animals"),
       selectAll(client, "contacts"),
       selectAll(client, "breeding_events"),
       selectAll(client, "palai_payments"),
       selectAll(client, "transactions"),
-      selectAllOptional(client, "custom_vaccines"),
-      selectAllOptional(client, "custom_dewormers"),
-      selectAllOptional(client, "custom_categories"),
+      selectAllOptional(client, "medical_events"),
     ]);
   const db = emptyDb();
   db.animals = await mapAnimalsWithParents(client, animals);
@@ -103,20 +101,7 @@ export const getQuickEntryData = cache(async (): Promise<QuickEntryProps> => {
   db.breeding_events = breeding.map(mapBreeding);
   db.palai_payments = palai.map(mapPalai);
   db.transactions = filterLedgerTxs(transactions);
-  db.custom_vaccines = customVaccines.map((r) => ({
-    id: String(r.id),
-    name: String(r.name),
-    interval_days: Number(r.interval_days),
-  }));
-  db.custom_dewormers = customDewormers.map((r) => ({
-    id: String(r.id),
-    name: String(r.name),
-    deworm_type: String(r.deworm_type) as "internal" | "external",
-  }));
-  db.custom_categories = customCategories.map((r) => ({
-    id: String(r.id),
-    name: String(r.name),
-  }));
+  db.medical_events = medical.map(mapMedical);
   return quickEntryPropsFromDb(db);
 });
 
@@ -125,7 +110,6 @@ export type HomeData = {
   transactions: Transaction[];
   palai_payments: PalaiPayment[];
   animals: Animal[];
-  custom_categories: import("../types").CustomCategory[];
   meta: FarmDatabase["meta"];
   quickEntry: QuickEntryProps;
 };
@@ -138,14 +122,13 @@ export const loadHomeData = cache(async (): Promise<HomeData> => {
       transactions: db.transactions,
       palai_payments: db.palai_payments,
       animals: db.animals,
-      custom_categories: db.custom_categories ?? [],
       meta: db.meta,
       quickEntry: quickEntryPropsFromDb(db),
     };
   }
 
   const client = createServiceClient();
-  const [contacts, transactions, palai, metaRows, animalRows, quickEntry, customCategories] =
+  const [contacts, transactions, palai, metaRows, animalRows, quickEntry] =
     await Promise.all([
       selectAll(client, "contacts"),
       selectAll(client, "transactions"),
@@ -153,7 +136,6 @@ export const loadHomeData = cache(async (): Promise<HomeData> => {
       selectAll(client, "app_meta"),
       selectAll(client, "animals"),
       getQuickEntryData(),
-      selectAllOptional(client, "custom_categories"),
     ]);
 
   return {
@@ -161,10 +143,6 @@ export const loadHomeData = cache(async (): Promise<HomeData> => {
     transactions: filterLedgerTxs(transactions),
     palai_payments: palai.map(mapPalai),
     animals: animalRows.map(mapAnimal),
-    custom_categories: customCategories.map((r) => ({
-      id: String(r.id),
-      name: String(r.name),
-    })),
     meta: mapMeta(metaRows[0]),
     quickEntry,
   };
@@ -411,7 +389,6 @@ export type TransactionsData = {
   animals: Animal[];
   palai_payments: PalaiPayment[];
   livestock_sales: LivestockSale[];
-  custom_categories: import("../types").CustomCategory[];
   quickEntry: QuickEntryProps;
 };
 
@@ -424,13 +401,12 @@ export const loadTransactionsData = cache(async (): Promise<TransactionsData> =>
       animals: db.animals,
       palai_payments: db.palai_payments,
       livestock_sales: db.livestock_sales,
-      custom_categories: db.custom_categories ?? [],
       quickEntry: quickEntryPropsFromDb(db),
     };
   }
 
   const client = createServiceClient();
-  const [transactions, contacts, animals, palai, sales, breeding, customCategories] =
+  const [transactions, contacts, animals, palai, sales, breeding, medical] =
     await Promise.all([
       selectAll(client, "transactions"),
       selectAll(client, "contacts"),
@@ -438,7 +414,7 @@ export const loadTransactionsData = cache(async (): Promise<TransactionsData> =>
       selectAll(client, "palai_payments"),
       selectAll(client, "livestock_sales"),
       selectAll(client, "breeding_events"),
-      selectAllOptional(client, "custom_categories"),
+      selectAllOptional(client, "medical_events"),
     ]);
 
   const mappedAnimals = await mapAnimalsWithParents(client, animals);
@@ -447,18 +423,15 @@ export const loadTransactionsData = cache(async (): Promise<TransactionsData> =>
   db.animals = mappedAnimals;
   db.contacts = mappedContacts;
   db.breeding_events = breeding.map(mapBreeding);
-  db.custom_categories = customCategories.map((r) => ({
-    id: String(r.id),
-    name: String(r.name),
-  }));
+  db.medical_events = medical.map(mapMedical);
+  db.transactions = filterLedgerTxs(transactions);
 
   return {
-    transactions: filterLedgerTxs(transactions),
+    transactions: db.transactions,
     contacts: mappedContacts,
     animals: mappedAnimals,
     palai_payments: palai.map(mapPalai),
     livestock_sales: sales.map(mapSale),
-    custom_categories: db.custom_categories,
     quickEntry: quickEntryPropsFromDb(db),
   };
 });
@@ -467,63 +440,45 @@ export type HerdHealthPageData = {
   herd: HerdHealthData;
   quickEntry: QuickEntryProps;
   vaccineSchedules: VaccineScheduleEntry[];
-  customVaccines: import("../types").CustomVaccine[];
 };
 
 export const loadHerdHealthData = cache(async (): Promise<HerdHealthPageData> => {
   if (!isSupabaseDb()) {
     const db = await getCachedDb();
-    const customVaccines = db.custom_vaccines ?? [];
+    const medicalEvents = db.medical_events ?? [];
     return {
       herd: computeHerdHealth({
         animals: db.animals,
-        medical_events: db.medical_events ?? [],
+        medical_events: medicalEvents,
         breeding_events: db.breeding_events ?? [],
         weight_logs: db.weight_logs ?? [],
-        custom_vaccines: customVaccines,
       }),
       quickEntry: quickEntryPropsFromDb(db),
-      vaccineSchedules: mergeVaccineSchedules(customVaccines),
-      customVaccines,
+      vaccineSchedules: mergeVaccineSchedules(medicalEvents),
     };
   }
 
   const client = createServiceClient();
-  const [animals, medical, breeding, weights, contacts, customVaccinesRows] = await Promise.all([
+  const [animals, medical, breeding, weights, quickEntry] = await Promise.all([
     selectAll(client, "animals"),
     selectAllOptional(client, "medical_events"),
     selectAllOptional(client, "breeding_events"),
     selectAllOptional(client, "weight_logs"),
-    selectAll(client, "contacts"),
-    selectAllOptional(client, "custom_vaccines"),
+    getQuickEntryData(),
   ]);
 
   const mappedAnimals = await mapAnimalsWithParents(client, animals);
-  const customVaccines = customVaccinesRows.map(
-    (row) =>
-      ({
-        id: String(row.id),
-        name: String(row.name),
-        interval_days: Number(row.interval_days),
-      }) satisfies import("../types").CustomVaccine
-  );
-  const db = emptyDb();
-  db.animals = mappedAnimals;
-  db.contacts = contacts.map(mapContact);
-  db.breeding_events = breeding.map(mapBreeding);
-  db.custom_vaccines = customVaccines;
+  const medicalEvents = medical.map(mapMedical);
 
   return {
     herd: computeHerdHealth({
       animals: mappedAnimals,
-      medical_events: medical.map(mapMedical),
+      medical_events: medicalEvents,
       breeding_events: breeding.map(mapBreeding),
       weight_logs: weights.map(mapWeight),
-      custom_vaccines: customVaccines,
     }),
-    quickEntry: quickEntryPropsFromDb(db),
-    vaccineSchedules: mergeVaccineSchedules(customVaccines),
-    customVaccines,
+    quickEntry,
+    vaccineSchedules: mergeVaccineSchedules(medicalEvents),
   };
 });
 

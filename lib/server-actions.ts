@@ -18,11 +18,6 @@ import {
   recordBreedingUltrasound,
   updateBreeding,
   deleteBreeding,
-  addCustomVaccine,
-  deleteCustomVaccine,
-  ensureCustomVaccine,
-  ensureCustomDewormer,
-  ensureCustomCategory,
   recordLivestockSale,
   registerBornGoat,
   recordPalai,
@@ -34,9 +29,10 @@ import {
 import { revalidatePath } from "next/cache";
 import type { AnimalBreed, AnimalSex, AnimalStatus, LedgerCategory, MedicalEventType } from "@/lib/types";
 import { formatDewormNotes, formatVaccineNotes, type DewormType } from "@/lib/livestock/medical-notes";
-import { NEW_VACCINE_VALUE, parseVaccineIntervalDays } from "@/lib/livestock/vaccine-schedule";
+import { NEW_VACCINE_VALUE, builtinVaccineByName, parseVaccineIntervalDays } from "@/lib/livestock/vaccine-schedule";
 import {
   NEW_EXPENSE_CATEGORY_VALUE,
+  assertNewCategoryName,
   isValidExpenseCategory,
 } from "@/lib/transactions/expense-categories";
 import { uploadAnimalMedia } from "@/lib/media/upload";
@@ -61,12 +57,9 @@ function revalidateTxnPaths() {
 async function resolveExpenseCategory(formData: FormData): Promise<string> {
   let category = String(formData.get("category") || "").trim();
   if (category === NEW_EXPENSE_CATEGORY_VALUE) {
-    category = String(formData.get("categoryOther") || "").trim();
-    if (!category) throw new Error("Enter a category name");
-    await ensureCustomCategory(category);
+    category = assertNewCategoryName(String(formData.get("categoryOther") || ""));
   }
-  const db = await import("@/lib/db").then((m) => m.fetchDb());
-  if (!isValidExpenseCategory(category, db.custom_categories ?? [])) {
+  if (!isValidExpenseCategory(category)) {
     throw new Error("Invalid category");
   }
   return category;
@@ -75,22 +68,9 @@ async function resolveExpenseCategory(formData: FormData): Promise<string> {
 export type UltrasoundActionResult = { ok: true } | { ok: false; error: string };
 export type PalaiActionResult = { ok: true } | { ok: false; error: string };
 
-function friendlyVaccineWriteError(err: unknown): string {
-  const message = err instanceof Error ? err.message : "Could not save vaccine";
-  const lower = message.toLowerCase();
-  if (
-    lower.includes("custom_vaccines") &&
-    (lower.includes("schema cache") ||
-      lower.includes("does not exist") ||
-      lower.includes("permission denied") ||
-      lower.includes("missing the custom_vaccines table"))
-  ) {
-    return "Database is missing the custom vaccine table. In Supabase SQL Editor, run migration 010_custom_vaccines.sql (see DEPLOY.md).";
-  }
-  if (lower.includes("duplicate") || lower.includes("unique constraint")) {
-    return "That vaccine type already exists";
-  }
-  if (lower.includes("supabase_service_role_key")) {
+function friendlyMedicalError(err: unknown): string {
+  const message = err instanceof Error ? err.message : "Could not save medical record";
+  if (message.toLowerCase().includes("supabase_service_role_key")) {
     return "Server is missing SUPABASE_SERVICE_ROLE_KEY. Add it in Vercel environment variables.";
   }
   return message;
@@ -283,21 +263,19 @@ export async function actionLogMedical(formData: FormData) {
 
     if (eventType === "Vaccine") {
       const selectedName = String(formData.get("vaccineName") || "").trim();
-      let name = selectedName;
-      if (selectedName === NEW_VACCINE_VALUE) {
-        name = String(formData.get("vaccineNameOther") || "").trim();
-        const intervalDays = parseVaccineIntervalDays(String(formData.get("vaccineIntervalDays") || ""));
-        await ensureCustomVaccine(name, intervalDays);
-      }
-      notes = formatVaccineNotes(name, String(formData.get("dosage") || ""));
+      const name =
+        selectedName === NEW_VACCINE_VALUE
+          ? String(formData.get("vaccineNameOther") || "").trim()
+          : selectedName;
+      const intervalRaw = String(formData.get("vaccineIntervalDays") || "").trim();
+      const intervalDays =
+        !builtinVaccineByName(name) && intervalRaw ? parseVaccineIntervalDays(intervalRaw) : undefined;
+      notes = formatVaccineNotes(name, String(formData.get("dosage") || ""), intervalDays);
     } else if (eventType === "Deworming") {
       const dewormType = String(formData.get("dewormType") || "") as DewormType;
       const dewormerName = String(formData.get("dewormerName") || "").trim();
       const customName = String(formData.get("dewormerNameOther") || "").trim();
       const resolvedName = dewormerName === "Other" ? customName : dewormerName;
-      if (dewormerName === "Other") {
-        await ensureCustomDewormer(resolvedName, dewormType);
-      }
       notes = formatDewormNotes({
         type: dewormType,
         name: resolvedName,
@@ -316,38 +294,7 @@ export async function actionLogMedical(formData: FormData) {
   } catch (err) {
     return {
       ok: false as const,
-      error: friendlyVaccineWriteError(err),
-    };
-  }
-}
-
-export async function actionAddCustomVaccine(formData: FormData) {
-  try {
-    await addCustomVaccine({
-      name: String(formData.get("name") || ""),
-      intervalDays: parseVaccineIntervalDays(String(formData.get("intervalDays") || "")),
-    });
-    revalidateTxnPaths();
-    return { ok: true as const };
-  } catch (err) {
-    return {
-      ok: false as const,
-      error: friendlyVaccineWriteError(err),
-    };
-  }
-}
-
-export async function actionDeleteCustomVaccine(formData: FormData) {
-  try {
-    const id = String(formData.get("id") || "").trim();
-    if (!id) throw new Error("Vaccine type not found");
-    await deleteCustomVaccine(id);
-    revalidateTxnPaths();
-    return { ok: true as const };
-  } catch (err) {
-    return {
-      ok: false as const,
-      error: friendlyVaccineWriteError(err),
+      error: friendlyMedicalError(err),
     };
   }
 }

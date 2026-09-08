@@ -6,7 +6,7 @@ import type { FarmDatabase } from "@/lib/types";
 import type { QuickEntryProps } from "@/components/QuickEntry";
 import type { ContactOption } from "@/components/ContactSelect";
 import { mergeVaccineSchedules } from "@/lib/livestock/vaccine-schedule";
-import { mergeDewormerNames } from "@/lib/livestock/medical-notes";
+import { extraDewormerNamesFromEvents, mergeDewormerNames } from "@/lib/livestock/medical-notes";
 import { customerOwnedAnimals } from "@/lib/livestock/acquire-from-customer";
 import { mergeExpenseCategories } from "@/lib/transactions/expense-categories";
 
@@ -95,11 +95,17 @@ export function quickEntryPropsFromDb(db: FarmDatabase): QuickEntryProps {
     maleAnimals,
     pastBuckNames,
     palaiHistory,
-    vaccineSchedules: mergeVaccineSchedules(db.custom_vaccines ?? []),
+    vaccineSchedules: mergeVaccineSchedules(db.medical_events ?? []),
     dewormerNamesByType: {
-      internal: mergeDewormerNames(db.custom_dewormers ?? [], "internal"),
-      external: mergeDewormerNames(db.custom_dewormers ?? [], "external"),
+      internal: mergeDewormerNames(
+        extraDewormerNamesFromEvents(db.medical_events ?? [], "internal"),
+        "internal"
+      ),
+      external: mergeDewormerNames(
+        extraDewormerNamesFromEvents(db.medical_events ?? [], "external"),
+        "external"
+      ),
     },
-    expenseCategories: mergeExpenseCategories(db.custom_categories ?? []),
+    expenseCategories: mergeExpenseCategories((db.transactions ?? []).map((t) => t.category)),
   };
 }

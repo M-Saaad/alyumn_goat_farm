@@ -169,7 +169,7 @@ async function HomePageContent({
               totalInvested={periodReport.totalInvested}
               totalReceived={periodReport.totalReceived}
               totalTransfers={periodReport.totalTransfers}
-              investedOrder={investedCategoryOrder(data.custom_categories)}
+              investedOrder={investedCategoryOrder(data.transactions.map((t) => t.category))}
             />
             <FinanceMonthlyTransactions report={periodReport} viewAllHref={viewAllHref} />
           </>

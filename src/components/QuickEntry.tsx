@@ -21,6 +21,7 @@ import {
 import {
   NEW_VACCINE_VALUE,
   VACCINE_INTERVAL_PRESETS,
+  isBuiltinVaccineKey,
   type VaccineScheduleEntry,
 } from "@/lib/livestock/vaccine-schedule";
 import { todayIso } from "@/lib/format";
@@ -335,6 +336,11 @@ function MedicalForm({
   );
 
   const dewormerOptions = dewormerNamesByType[dewormType];
+  const selectedVaccine = vaccineSchedules.find((v) => v.name === vaccineName);
+  const extraVaccineIntervalDays =
+    selectedVaccine && !isBuiltinVaccineKey(selectedVaccine.key)
+      ? selectedVaccine.intervalDays
+      : null;
 
   function onDewormTypeChange(next: DewormType) {
     setDewormType(next);
@@ -375,7 +381,6 @@ function MedicalForm({
               {vaccineSchedules.map((v) => (
                 <option key={v.key} value={v.name}>
                   {v.name}
-                  {v.custom ? ` (${v.scheduleLabel})` : ""}
                 </option>
               ))}
               <option value={NEW_VACCINE_VALUE}>+ Add new vaccine type…</option>
@@ -400,6 +405,9 @@ function MedicalForm({
                 </select>
               </div>
             </>
+          )}
+          {vaccineName !== NEW_VACCINE_VALUE && extraVaccineIntervalDays != null && (
+            <input type="hidden" name="vaccineIntervalDays" value={String(extraVaccineIntervalDays)} />
           )}
           <Field label="Dosage" name="dosage" defaultValue="1ml" required />
         </>

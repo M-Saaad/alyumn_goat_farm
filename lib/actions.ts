@@ -1,8 +1,6 @@
 import type { FarmDatabase } from "./types";
 import { fetchDb, isSupabaseDb } from "./db";
 import { loadPartnerIds } from "./db/queries";
-import { createServiceClient } from "./supabase/admin";
-import { mapCustomVaccine, selectAllOptional } from "./db/supabase";
 import { computeSettlement } from "./partner-equity/settlement";
 import {
   createCostTransaction,
@@ -53,26 +51,9 @@ import type {
   BreedingOutcome,
   BreedingStatus,
   BreedingEvent,
-  CustomVaccine,
-  CustomDewormer,
-  CustomCategory,
 } from "./types";
 import { animalLabel } from "./labels";
 import { uploadAnimalMedia } from "./media/upload";
-import {
-  builtinVaccineByName,
-  findCustomVaccineByName,
-} from "./livestock/vaccine-schedule";
-import {
-  builtinDewormerByName,
-  findCustomDewormerByName,
-  type DewormType,
-} from "./livestock/medical-notes";
-import {
-  assertNewCategoryName,
-  findCustomCategoryByName,
-  isBuiltinExpenseCategory,
-} from "./transactions/expense-categories";
 
 export { animalLabel };
 
@@ -626,140 +607,6 @@ export async function updateAnimal(input: UpdateAnimalInput) {
     return after;
   }
   return persistMutation(before, after);
-}
-
-async function listCustomVaccines(): Promise<CustomVaccine[]> {
-  if (!isSupabaseDb()) {
-    return (await fetchDb()).custom_vaccines ?? [];
-  }
-  const rows = await selectAllOptional(createServiceClient(), "custom_vaccines");
-  return rows.map(mapCustomVaccine);
-}
-
-export async function ensureCustomVaccine(name: string, intervalDays: number): Promise<CustomVaccine | null> {
-  const trimmed = name.trim();
-  if (!trimmed) throw new Error("Enter a vaccine name");
-  if (builtinVaccineByName(trimmed)) return null;
-
-  const custom = await listCustomVaccines();
-  const existing = findCustomVaccineByName(custom, trimmed);
-  if (existing) return existing;
-
-  const vaccine: CustomVaccine = {
-    id: crypto.randomUUID(),
-    name: trimmed,
-    interval_days: intervalDays,
-  };
-  if (isSupabaseDb()) {
-    await applyWritePlan({ upsertCustomVaccines: [vaccine] });
-    return vaccine;
-  }
-  const before = await fetchDb();
-  await persistMutation(before, {
-    ...before,
-    custom_vaccines: [...(before.custom_vaccines ?? []), vaccine],
-  });
-  return vaccine;
-}
-
-export async function addCustomVaccine(input: { name: string; intervalDays: number }) {
-  const trimmed = input.name.trim();
-  if (!trimmed) throw new Error("Enter a vaccine name");
-  if (builtinVaccineByName(trimmed)) {
-    throw new Error(`"${trimmed}" is already a standard vaccine`);
-  }
-
-  const custom = await listCustomVaccines();
-  if (findCustomVaccineByName(custom, trimmed)) {
-    throw new Error(`"${trimmed}" already exists`);
-  }
-
-  const vaccine: CustomVaccine = {
-    id: crypto.randomUUID(),
-    name: trimmed,
-    interval_days: input.intervalDays,
-  };
-  if (isSupabaseDb()) {
-    await applyWritePlan({ upsertCustomVaccines: [vaccine] });
-    return vaccine;
-  }
-  const before = await fetchDb();
-  await persistMutation(before, {
-    ...before,
-    custom_vaccines: [...(before.custom_vaccines ?? []), vaccine],
-  });
-  return vaccine;
-}
-
-export async function deleteCustomVaccine(id: string) {
-  if (isSupabaseDb()) {
-    const custom = await listCustomVaccines();
-    if (!custom.some((v) => v.id === id)) throw new Error("Vaccine type not found");
-    await applyWritePlan({ deleteCustomVaccineIds: [id] });
-    return;
-  }
-  const before = await fetchDb();
-  const custom = before.custom_vaccines ?? [];
-  if (!custom.some((v) => v.id === id)) throw new Error("Vaccine type not found");
-  return persistMutation(before, {
-    ...before,
-    custom_vaccines: custom.filter((v) => v.id !== id),
-  });
-}
-
-export async function ensureCustomDewormer(
-  name: string,
-  dewormType: DewormType
-): Promise<CustomDewormer | null> {
-  const trimmed = name.trim();
-  if (!trimmed) throw new Error("Enter a dewormer name");
-  if (builtinDewormerByName(trimmed, dewormType)) return null;
-
-  const before = await fetchDb();
-  const existing = findCustomDewormerByName(before.custom_dewormers ?? [], trimmed, dewormType);
-  if (existing) return existing as CustomDewormer;
-
-  const dewormer: CustomDewormer = {
-    id: crypto.randomUUID(),
-    name: trimmed,
-    deworm_type: dewormType,
-  };
-  const after = {
-    ...before,
-    custom_dewormers: [...(before.custom_dewormers ?? []), dewormer],
-  };
-  if (isSupabaseDb()) {
-    await applyWritePlan({ upsertCustomDewormers: [dewormer] });
-    return dewormer;
-  }
-  await persistMutation(before, after);
-  return dewormer;
-}
-
-export async function ensureCustomCategory(name: string): Promise<CustomCategory | null> {
-  const trimmed = name.trim();
-  if (!trimmed) throw new Error("Enter a category name");
-  if (isBuiltinExpenseCategory(trimmed)) return null;
-
-  const before = await fetchDb();
-  const custom = before.custom_categories ?? [];
-  const existing = findCustomCategoryByName(custom, trimmed);
-  if (existing) return existing;
-
-  const category: CustomCategory = {
-    id: crypto.randomUUID(),
-    name: assertNewCategoryName(trimmed, custom),
-  };
-  const after = {
-    ...before,
-    custom_categories: [...custom, category],
-  };
-  if (isSupabaseDb()) {
-    await applyWritePlan({ upsertCustomCategories: [category] });
-    return category;
-  }
-  await persistMutation(before, after);
-  return category;
 }
 
 export async function logMedical(input: {

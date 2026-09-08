@@ -159,26 +159,6 @@ export interface WeightLog {
   notes: string | null;
 }
 
-/** User-defined vaccine type with a recurring due schedule. */
-export interface CustomVaccine {
-  id: string;
-  name: string;
-  interval_days: number;
-}
-
-/** User-defined dewormer product name, scoped to internal or external type. */
-export interface CustomDewormer {
-  id: string;
-  name: string;
-  deworm_type: "internal" | "external";
-}
-
-/** User-defined expense category for Log Expense and finance reports. */
-export interface CustomCategory {
-  id: string;
-  name: string;
-}
-
 export type MediaType = "image" | "video";
 
 export interface AnimalMedia {
@@ -202,9 +182,6 @@ export interface FarmDatabase {
   breeding_events: BreedingEvent[];
   weight_logs: WeightLog[];
   animal_media: AnimalMedia[];
-  custom_vaccines: CustomVaccine[];
-  custom_dewormers: CustomDewormer[];
-  custom_categories: CustomCategory[];
   meta: {
     importedAt: string | null;
     settlementVerified: boolean;
