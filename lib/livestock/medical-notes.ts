@@ -1,3 +1,5 @@
+import { builtinVaccineByName, scheduleLabelFromDays } from "./vaccine-schedule";
+
 export {
   BUILTIN_VACCINE_SCHEDULE,
   mergeVaccineSchedules,
@@ -35,9 +37,11 @@ export const DEWORMER_NAMES = [
   ...DEWORMER_NAMES_BY_TYPE.external,
 ] as const;
 
-export type CustomDewormerLike = {
-  name: string;
-  deworm_type: DewormType;
+const DOSAGE_SUFFIX = /\s+\d+(?:\.\d+)?\s*ml\s*$/i;
+
+export type DewormNoteEvent = {
+  event_type: string;
+  notes: string | null;
 };
 
 export function builtinDewormerByName(name: string, type: DewormType): string | null {
@@ -46,34 +50,61 @@ export function builtinDewormerByName(name: string, type: DewormType): string | 
   return match ?? null;
 }
 
-export function findCustomDewormerByName(
-  custom: CustomDewormerLike[],
-  name: string,
-  type: DewormType
-): CustomDewormerLike | null {
-  const upper = name.trim().toUpperCase();
-  return custom.find((d) => d.deworm_type === type && d.name.toUpperCase() === upper) ?? null;
+export function parseDewormNote(
+  notes: string | null | undefined
+): { type: DewormType; name: string } | null {
+  const text = (notes ?? "").trim();
+  const match = text.match(/^(I-DW|E-DW)\s+(.+)$/i);
+  if (!match) return null;
+  const type: DewormType = match[1].toUpperCase() === "I-DW" ? "internal" : "external";
+  const name = match[2].replace(DOSAGE_SUFFIX, "").trim();
+  if (!name) return null;
+  return { type, name };
 }
 
-export function mergeDewormerNames(
-  custom: CustomDewormerLike[],
+export function extraDewormerNamesFromEvents(
+  events: DewormNoteEvent[],
   type: DewormType
 ): string[] {
-  const builtins = [...DEWORMER_NAMES_BY_TYPE[type]];
-  const builtinUpper = new Set(builtins.map((n) => n.toUpperCase()));
-  const customs = custom
-    .filter((d) => d.deworm_type === type)
-    .map((d) => d.name.trim())
-    .filter((name) => name && !builtinUpper.has(name.toUpperCase()));
-  return [...builtins, ...customs];
+  const byLower = new Map<string, string>();
+  for (const event of events) {
+    if (event.event_type !== "Deworming") continue;
+    const parsed = parseDewormNote(event.notes);
+    if (!parsed || parsed.type !== type) continue;
+    if (builtinDewormerByName(parsed.name, type)) continue;
+    const key = parsed.name.toLowerCase();
+    if (!byLower.has(key)) byLower.set(key, parsed.name);
+  }
+  return [...byLower.values()];
 }
 
-export function formatVaccineNotes(name: string, dosage: string): string {
+export function mergeDewormerNames(extraNames: string[], type: DewormType): string[] {
+  const builtins = [...DEWORMER_NAMES_BY_TYPE[type]];
+  const builtinUpper = new Set(builtins.map((n) => n.toUpperCase()));
+  const extras = extraNames
+    .map((n) => n.trim())
+    .filter((name) => name && !builtinUpper.has(name.toUpperCase()));
+  const seen = new Set<string>(builtins.map((n) => n.toUpperCase()));
+  const uniqueExtras: string[] = [];
+  for (const name of extras) {
+    const key = name.toUpperCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    uniqueExtras.push(name);
+  }
+  return [...builtins, ...uniqueExtras];
+}
+
+export function formatVaccineNotes(name: string, dosage: string, intervalDays?: number): string {
   const n = name.trim();
   const d = dosage.trim();
   if (!n) throw new Error("Enter a vaccine name");
   if (!d) throw new Error("Enter vaccine dosage");
-  return `${n} ${d}`;
+  const base = `${n} ${d}`;
+  if (intervalDays && !builtinVaccineByName(n)) {
+    return `${base} · ${scheduleLabelFromDays(intervalDays)}`;
+  }
+  return base;
 }
 
 export function formatDewormNotes(input: {

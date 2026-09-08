@@ -18,16 +18,20 @@ export function isSupabaseDb(): boolean {
 
 function loadJsonDb(): FarmDatabase {
   if (!fs.existsSync(DB_PATH)) return emptyDb();
-  const db = JSON.parse(fs.readFileSync(DB_PATH, "utf8")) as FarmDatabase;
+  const db = JSON.parse(fs.readFileSync(DB_PATH, "utf8")) as FarmDatabase & {
+    custom_vaccines?: unknown;
+    custom_dewormers?: unknown;
+    custom_categories?: unknown;
+  };
+  delete db.custom_vaccines;
+  delete db.custom_dewormers;
+  delete db.custom_categories;
   if (!db.livestock_sales) db.livestock_sales = [];
   if (!db.purchase_agreements) db.purchase_agreements = [];
   if (!db.animal_media) db.animal_media = [];
   if (!db.weight_logs) db.weight_logs = [];
   if (!db.medical_events) db.medical_events = [];
   if (!db.breeding_events) db.breeding_events = [];
-  if (!db.custom_vaccines) db.custom_vaccines = [];
-  if (!db.custom_dewormers) db.custom_dewormers = [];
-  if (!db.custom_categories) db.custom_categories = [];
   for (const event of db.breeding_events) {
     if (event.fetus_count === undefined) event.fetus_count = null;
   }

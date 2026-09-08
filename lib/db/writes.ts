@@ -16,9 +16,6 @@ import type {
   PurchaseAgreement,
   Transaction,
   WeightLog,
-  CustomVaccine,
-  CustomDewormer,
-  CustomCategory,
 } from "../types";
 import { createServiceClient } from "../supabase/admin";
 import { isSupabaseDb, persistDb } from "../db";
@@ -46,12 +43,6 @@ export type WritePlan = {
   deleteBreedingIds?: string[];
   upsertMedia?: AnimalMedia[];
   upsertWeights?: WeightLog[];
-  upsertCustomVaccines?: CustomVaccine[];
-  deleteCustomVaccineIds?: string[];
-  upsertCustomDewormers?: CustomDewormer[];
-  deleteCustomDewormerIds?: string[];
-  upsertCustomCategories?: CustomCategory[];
-  deleteCustomCategoryIds?: string[];
 };
 
 function txRow(t: Transaction): Record<string, unknown> {
@@ -206,29 +197,6 @@ function mediaRow(m: AnimalMedia): Record<string, unknown> {
   };
 }
 
-function customVaccineRow(v: CustomVaccine): Record<string, unknown> {
-  return {
-    id: v.id,
-    name: v.name,
-    interval_days: v.interval_days,
-  };
-}
-
-function customDewormerRow(d: CustomDewormer): Record<string, unknown> {
-  return {
-    id: d.id,
-    name: d.name,
-    deworm_type: d.deworm_type,
-  };
-}
-
-function customCategoryRow(c: CustomCategory): Record<string, unknown> {
-  return {
-    id: c.id,
-    name: c.name,
-  };
-}
-
 async function upsertRows(
   client: SupabaseClient,
   table: string,
@@ -279,15 +247,6 @@ export async function applyWritePlan(plan: WritePlan): Promise<void> {
   }
   if (plan.deleteBreedingIds?.length) {
     await deleteByIds(client, "breeding_events", plan.deleteBreedingIds);
-  }
-  if (plan.deleteCustomVaccineIds?.length) {
-    await deleteByIds(client, "custom_vaccines", plan.deleteCustomVaccineIds);
-  }
-  if (plan.deleteCustomDewormerIds?.length) {
-    await deleteByIds(client, "custom_dewormers", plan.deleteCustomDewormerIds);
-  }
-  if (plan.deleteCustomCategoryIds?.length) {
-    await deleteByIds(client, "custom_categories", plan.deleteCustomCategoryIds);
   }
 
   if (plan.deleteTransactionIds?.length) {
@@ -357,15 +316,6 @@ export async function applyWritePlan(plan: WritePlan): Promise<void> {
       }))
     );
   }
-  if (plan.upsertCustomVaccines?.length) {
-    await upsertRows(client, "custom_vaccines", plan.upsertCustomVaccines.map(customVaccineRow));
-  }
-  if (plan.upsertCustomDewormers?.length) {
-    await upsertRows(client, "custom_dewormers", plan.upsertCustomDewormers.map(customDewormerRow));
-  }
-  if (plan.upsertCustomCategories?.length) {
-    await upsertRows(client, "custom_categories", plan.upsertCustomCategories.map(customCategoryRow));
-  }
 }
 
 function byId<T extends { id: string | number }>(rows: T[]): Map<string, T> {
@@ -412,21 +362,6 @@ export function diffDb(before: FarmDatabase, after: FarmDatabase): WritePlan {
   const breeding = changed(before.breeding_events, after.breeding_events, jsonEq);
   const media = changed(before.animal_media ?? [], after.animal_media ?? [], jsonEq);
   const weights = changed(before.weight_logs ?? [], after.weight_logs ?? [], jsonEq);
-  const customVaccines = changed(
-    before.custom_vaccines ?? [],
-    after.custom_vaccines ?? [],
-    jsonEq
-  );
-  const customDewormers = changed(
-    before.custom_dewormers ?? [],
-    after.custom_dewormers ?? [],
-    jsonEq
-  );
-  const customCategories = changed(
-    before.custom_categories ?? [],
-    after.custom_categories ?? [],
-    jsonEq
-  );
 
   // When ledger rows for a tx were replaced (delete+insert with new UUIDs),
   // also clear by transaction_id so orphans are gone even if we miss an id.
@@ -468,12 +403,6 @@ export function diffDb(before: FarmDatabase, after: FarmDatabase): WritePlan {
     deleteBreedingIds: breeding.deleteIds,
     upsertMedia: media.upsert,
     upsertWeights: weights.upsert,
-    upsertCustomVaccines: customVaccines.upsert,
-    deleteCustomVaccineIds: customVaccines.deleteIds,
-    upsertCustomDewormers: customDewormers.upsert,
-    deleteCustomDewormerIds: customDewormers.deleteIds,
-    upsertCustomCategories: customCategories.upsert,
-    deleteCustomCategoryIds: customCategories.deleteIds,
   };
 }
 

@@ -163,22 +163,20 @@ const nitroxinil = recentNitroxinil.vaccines.find((v) => v.vaccineKind === "nitr
 assert(nitroxinil?.status === "ok", `recent Nitroxinil should be ok, got ${nitroxinil?.status}`);
 assert(NITROXINIL_INTERVAL_DAYS === 365, "Nitroxinil interval is yearly");
 
-const customSchedules = mergeVaccineSchedules([
-  { id: "custom-fmd", name: "FMD", interval_days: 182 },
-]);
-const customHerd = computeHerdHealth({
+const fmdEvent = med("2025-12-01", "FMD 2ml · twice a year");
+const extraSchedules = mergeVaccineSchedules([fmdEvent]);
+const extraHerd = computeHerdHealth({
   animals: [animal],
-  medical_events: [med("2025-12-01", "FMD 2ml")],
+  medical_events: [fmdEvent],
   breeding_events: [],
   weight_logs: [],
-  custom_vaccines: [{ id: "custom-fmd", name: "FMD", interval_days: 182 }],
   today,
 });
-const fmd = customHerd.vaccines.find((v) => v.vaccineKind === "custom-fmd");
-assert(fmd?.status === "overdue", `custom FMD twice-yearly should be overdue, got ${fmd?.status}`);
+const fmd = extraHerd.vaccines.find((v) => v.vaccineKind === "fmd");
+assert(fmd?.status === "overdue", `FMD twice-yearly should be overdue, got ${fmd?.status}`);
 assert(
-  vaccineKeyFromNotes("FMD 2ml", customSchedules) === "custom-fmd",
-  "custom vaccine notes match by name prefix"
+  vaccineKeyFromNotes("FMD 2ml · twice a year", extraSchedules) === "fmd",
+  "extra vaccine notes match by name prefix, same as builtins"
 );
 
 assert(DEWORM_INTERVAL_DAYS === 182, "deworm interval is twice yearly");

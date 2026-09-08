@@ -11,9 +11,6 @@ import type {
   PartnerLedgerEntry,
   Transaction,
   WeightLog,
-  CustomVaccine,
-  CustomDewormer,
-  CustomCategory,
 } from "../types";
 import { emptyDb } from "../db-empty";
 import { mapAnimalsWithParents, animalsWithEncodedParentComments } from "../livestock/animal-parents-store";
@@ -177,33 +174,6 @@ export function mapWeight(r: Record<string, unknown>): WeightLog {
   };
 }
 
-export function mapCustomVaccine(r: Record<string, unknown>): CustomVaccine {
-  return {
-    id: String(r.id),
-    name: String(r.name),
-    interval_days: num(r.interval_days),
-  };
-}
-
-export function mapCustomDewormer(r: Record<string, unknown>): CustomDewormer {
-  const dewormType = String(r.deworm_type);
-  if (dewormType !== "internal" && dewormType !== "external") {
-    throw new Error(`Invalid deworm_type: ${dewormType}`);
-  }
-  return {
-    id: String(r.id),
-    name: String(r.name),
-    deworm_type: dewormType,
-  };
-}
-
-export function mapCustomCategory(r: Record<string, unknown>): CustomCategory {
-  return {
-    id: String(r.id),
-    name: String(r.name),
-  };
-}
-
 export function mapMedia(r: Record<string, unknown>): AnimalMedia {
   return {
     id: String(r.id),
@@ -233,17 +203,26 @@ export async function selectAll(client: SupabaseClient, table: string) {
   return rows;
 }
 
+/** True when PostgREST/Postgres cannot see a table (missing migration, cache, or grants). */
+export function isMissingRelationMessage(message: string, table?: string): boolean {
+  const lower = message.toLowerCase();
+  const missing =
+    lower.includes("does not exist") ||
+    lower.includes("could not find the table") ||
+    lower.includes("schema cache") ||
+    lower.includes("permission denied");
+  if (!missing) return false;
+  if (!table) return true;
+  return lower.includes(table.toLowerCase());
+}
+
 /** Like selectAll but returns [] when a table is missing (e.g. migration not applied). */
 export async function selectAllOptional(client: SupabaseClient, table: string) {
   try {
     return await selectAll(client, table);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    if (
-      message.includes("does not exist") ||
-      message.includes("Could not find the table") ||
-      message.includes("permission denied")
-    ) {
+    if (isMissingRelationMessage(message, table)) {
       console.warn(`[farm] optional table ${table} unavailable: ${message}`);
       return [] as Record<string, unknown>[];
     }
@@ -273,9 +252,6 @@ export async function loadFromSupabase(client: SupabaseClient): Promise<FarmData
     breeding,
     weights,
     media,
-    customVaccines,
-    customDewormers,
-    customCategories,
     metaRows,
   ] = await Promise.all([
     selectAll(client, "contacts"),
@@ -289,9 +265,6 @@ export async function loadFromSupabase(client: SupabaseClient): Promise<FarmData
     selectAll(client, "breeding_events"),
     selectAll(client, "weight_logs"),
     selectAll(client, "animal_media"),
-    selectAllOptional(client, "custom_vaccines"),
-    selectAllOptional(client, "custom_dewormers"),
-    selectAllOptional(client, "custom_categories"),
     selectAll(client, "app_meta"),
   ]);
 
@@ -310,9 +283,6 @@ export async function loadFromSupabase(client: SupabaseClient): Promise<FarmData
   db.breeding_events = breeding.map(mapBreeding);
   db.weight_logs = weights.map(mapWeight);
   db.animal_media = media.map(mapMedia);
-  db.custom_vaccines = customVaccines.map(mapCustomVaccine);
-  db.custom_dewormers = customDewormers.map(mapCustomDewormer);
-  db.custom_categories = customCategories.map(mapCustomCategory);
   db.meta = mapMeta(meta);
   return db;
 }
@@ -482,35 +452,6 @@ export async function saveToSupabase(client: SupabaseClient, db: FarmDatabase): 
       media_type: m.media_type,
       caption: m.caption,
       created_at: m.created_at,
-    }))
-  );
-
-  await syncTable(
-    client,
-    "custom_vaccines",
-    (db.custom_vaccines ?? []).map((v) => ({
-      id: v.id,
-      name: v.name,
-      interval_days: v.interval_days,
-    }))
-  );
-
-  await syncTable(
-    client,
-    "custom_dewormers",
-    (db.custom_dewormers ?? []).map((d) => ({
-      id: d.id,
-      name: d.name,
-      deworm_type: d.deworm_type,
-    }))
-  );
-
-  await syncTable(
-    client,
-    "custom_categories",
-    (db.custom_categories ?? []).map((c) => ({
-      id: c.id,
-      name: c.name,
     }))
   );
 

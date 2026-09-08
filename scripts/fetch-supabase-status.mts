@@ -19,9 +19,6 @@ const TABLES = [
   "breeding_events",
   "weight_logs",
   "animal_media",
-  "custom_vaccines",
-  "custom_dewormers",
-  "custom_categories",
   "app_meta",
 ] as const;
 

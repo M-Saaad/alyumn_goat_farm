@@ -1,5 +1,3 @@
-import type { CustomVaccine } from "@/lib/types";
-
 export const VACCINE_INTERVAL_PRESETS = [
   { value: 365, label: "Once a year" },
   { value: 182, label: "Twice a year" },
@@ -19,10 +17,18 @@ export type VaccineScheduleEntry = {
   name: string;
   scheduleLabel: string;
   intervalDays: number;
-  custom?: boolean;
+};
+
+export type VaccineNoteEvent = {
+  event_type: string;
+  notes: string | null;
 };
 
 export const NEW_VACCINE_VALUE = "__new__";
+
+const DOSAGE_SUFFIX = /\s+\d+(?:\.\d+)?\s*ml\s*$/i;
+const SCHEDULE_SUFFIX =
+  /\s·\s(once a year|twice a year|every (\d+) days)\s*$/i;
 
 export function scheduleLabelFromDays(days: number): string {
   if (days === 365) return "once a year";
@@ -30,21 +36,17 @@ export function scheduleLabelFromDays(days: number): string {
   return `every ${days} days`;
 }
 
-export function mergeVaccineSchedules(custom: CustomVaccine[]): VaccineScheduleEntry[] {
-  const builtins: VaccineScheduleEntry[] = BUILTIN_VACCINE_SCHEDULE.map((v) => ({
-    key: v.key,
-    name: v.name,
-    scheduleLabel: v.scheduleLabel,
-    intervalDays: v.intervalDays,
-  }));
-  const customs: VaccineScheduleEntry[] = custom.map((v) => ({
-    key: v.id,
-    name: v.name,
-    scheduleLabel: scheduleLabelFromDays(v.interval_days),
-    intervalDays: v.interval_days,
-    custom: true,
-  }));
-  return [...builtins, ...customs];
+export function isBuiltinVaccineKey(key: string): boolean {
+  return BUILTIN_VACCINE_SCHEDULE.some((b) => b.key === key);
+}
+
+export function vaccineKeyFromName(name: string): string {
+  const slug = name
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  return slug || "vaccine";
 }
 
 export function builtinVaccineByName(name: string): VaccineScheduleEntry | null {
@@ -59,19 +61,74 @@ export function builtinVaccineByName(name: string): VaccineScheduleEntry | null 
   };
 }
 
-export function findCustomVaccineByName(
-  custom: CustomVaccine[],
-  name: string
-): CustomVaccine | null {
-  const upper = name.trim().toUpperCase();
-  return custom.find((v) => v.name.toUpperCase() === upper) ?? null;
-}
-
 function matchesBuiltinNotes(upper: string, key: BuiltinVaccineKey): boolean {
   if (key === "ppr") return upper.includes("PPR");
   if (key === "etv") return upper.includes("ETV");
   if (key === "nitroxinil") return upper.includes("NITROX") || upper.includes("LIVER VACCINE");
   return false;
+}
+
+function intervalFromScheduleLabel(label: string, everyDays?: string): number | null {
+  const lower = label.toLowerCase();
+  if (lower === "once a year") return 365;
+  if (lower === "twice a year") return 182;
+  if (everyDays) {
+    const days = Number.parseInt(everyDays, 10);
+    if (Number.isFinite(days) && days > 0) return days;
+  }
+  return null;
+}
+
+export function parseVaccineNote(notes: string | null | undefined): {
+  name: string;
+  intervalDays: number | null;
+} | null {
+  let text = (notes ?? "").trim();
+  if (!text) return null;
+
+  let intervalDays: number | null = null;
+  const scheduleMatch = text.match(SCHEDULE_SUFFIX);
+  if (scheduleMatch) {
+    intervalDays = intervalFromScheduleLabel(scheduleMatch[1], scheduleMatch[2]);
+    text = text.slice(0, scheduleMatch.index).trim();
+  }
+
+  const name = text.replace(DOSAGE_SUFFIX, "").trim() || text;
+  if (!name) return null;
+  return { name, intervalDays };
+}
+
+function extraVaccinesFromEvents(events: VaccineNoteEvent[]): VaccineScheduleEntry[] {
+  const byKey = new Map<string, VaccineScheduleEntry>();
+  for (const event of events) {
+    if (event.event_type !== "Vaccine") continue;
+    const parsed = parseVaccineNote(event.notes);
+    if (!parsed) continue;
+    if (builtinVaccineByName(parsed.name)) continue;
+    const upper = parsed.name.toUpperCase();
+    if (BUILTIN_VACCINE_SCHEDULE.some((b) => matchesBuiltinNotes(upper, b.key))) continue;
+
+    const key = vaccineKeyFromName(parsed.name);
+    if (isBuiltinVaccineKey(key)) continue;
+    const intervalDays = parsed.intervalDays ?? byKey.get(key)?.intervalDays ?? 365;
+    byKey.set(key, {
+      key,
+      name: byKey.get(key)?.name ?? parsed.name,
+      scheduleLabel: scheduleLabelFromDays(intervalDays),
+      intervalDays,
+    });
+  }
+  return [...byKey.values()].sort((a, b) => a.name.localeCompare(b.name));
+}
+
+export function mergeVaccineSchedules(events: VaccineNoteEvent[] = []): VaccineScheduleEntry[] {
+  const builtins: VaccineScheduleEntry[] = BUILTIN_VACCINE_SCHEDULE.map((v) => ({
+    key: v.key,
+    name: v.name,
+    scheduleLabel: v.scheduleLabel,
+    intervalDays: v.intervalDays,
+  }));
+  return [...builtins, ...extraVaccinesFromEvents(events)];
 }
 
 export function vaccineKeyFromNotes(
@@ -84,7 +141,7 @@ export function vaccineKeyFromNotes(
 
   for (const schedule of schedules) {
     if (
-      BUILTIN_VACCINE_SCHEDULE.some((b) => b.key === schedule.key) &&
+      isBuiltinVaccineKey(schedule.key) &&
       matchesBuiltinNotes(upper, schedule.key as BuiltinVaccineKey)
     ) {
       return schedule.key;

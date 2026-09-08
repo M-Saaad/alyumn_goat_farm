@@ -4,7 +4,6 @@ import { loadHerdHealthData } from "@/lib/db/queries";
 import { formatDate } from "@/lib/format";
 import { parseHealthTab, type DueStatus, type HerdHealthData, type HerdHealthSummary } from "@/lib/livestock/herd-health";
 import type { VaccineScheduleEntry } from "@/lib/livestock/vaccine-schedule";
-import type { CustomVaccine } from "@/lib/types";
 import { animalLinkFromHealth, healthTabForActionKind } from "@/lib/livestock/health-nav";
 import type { HealthTab } from "@/lib/livestock/health-tabs";
 import { AppHeader } from "@/components/AppHeader";
@@ -12,7 +11,6 @@ import { BottomNav } from "@/components/BottomNav";
 import { QuickEntryLoader } from "@/components/QuickEntryLoader";
 import { HealthFilters } from "@/components/HealthFilters";
 import { HealthBreedingList } from "@/components/HealthBreedingList";
-import { VaccineScheduleManager } from "@/components/VaccineScheduleManager";
 import { isSupabaseDb } from "@/lib/db";
 import type { QuickEntryProps } from "@/components/QuickEntry";
 
@@ -103,7 +101,6 @@ async function HealthPageContent({
       summary={summary}
       quickEntry={data.quickEntry}
       vaccineSchedules={data.vaccineSchedules}
-      customVaccines={data.customVaccines}
     />
   );
 }
@@ -114,14 +111,12 @@ function HealthPageView({
   summary,
   quickEntry,
   vaccineSchedules,
-  customVaccines,
 }: {
   tab: ReturnType<typeof parseHealthTab>;
   herd: HerdHealthData;
   summary: HerdHealthSummary;
   quickEntry: QuickEntryProps;
   vaccineSchedules: VaccineScheduleEntry[];
-  customVaccines: CustomVaccine[];
 }) {
   const supabaseEnabled = isSupabaseDb();
 
@@ -225,7 +220,6 @@ function HealthPageView({
 
       {tab === "vaccine" && (
         <>
-          <VaccineScheduleManager customVaccines={customVaccines} />
           {vaccineSchedules.map((schedule) => (
             <DueList
               key={schedule.key}

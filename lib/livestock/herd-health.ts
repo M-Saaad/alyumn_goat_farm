@@ -333,13 +333,12 @@ export function computeHerdHealth(input: {
   medical_events: MedicalEvent[];
   breeding_events: BreedingEvent[];
   weight_logs: WeightLog[];
-  custom_vaccines?: import("@/lib/types").CustomVaccine[];
   today?: string;
 }): HerdHealthData {
   const today = input.today ?? todayIso();
-  const vaccineSchedules = mergeVaccineSchedules(input.custom_vaccines ?? []);
   const weightLogs = input.weight_logs ?? [];
   const medicalEvents = input.medical_events ?? [];
+  const vaccineSchedules = mergeVaccineSchedules(medicalEvents);
   const breedingEvents = input.breeding_events ?? [];
   const activeAnimals = input.animals.filter((a) => a.status === "Active");
   const adultFemales = activeAnimals.filter((a) => isAdultBreedingFemale(a, today));
