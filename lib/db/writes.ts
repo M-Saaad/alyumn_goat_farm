@@ -39,6 +39,7 @@ export type WritePlan = {
   upsertPurchaseAgreements?: PurchaseAgreement[];
   deletePurchaseAgreementIds?: string[];
   upsertMedical?: MedicalEvent[];
+  deleteMedicalIds?: string[];
   upsertBreeding?: BreedingEvent[];
   deleteBreedingIds?: string[];
   upsertMedia?: AnimalMedia[];
@@ -248,6 +249,9 @@ export async function applyWritePlan(plan: WritePlan): Promise<void> {
   if (plan.deleteBreedingIds?.length) {
     await deleteByIds(client, "breeding_events", plan.deleteBreedingIds);
   }
+  if (plan.deleteMedicalIds?.length) {
+    await deleteByIds(client, "medical_events", plan.deleteMedicalIds);
+  }
 
   if (plan.deleteTransactionIds?.length) {
     await deleteByIds(client, "transactions", plan.deleteTransactionIds);
@@ -399,6 +403,7 @@ export function diffDb(before: FarmDatabase, after: FarmDatabase): WritePlan {
     upsertPurchaseAgreements: purchaseAgreements.upsert,
     deletePurchaseAgreementIds: purchaseAgreements.deleteIds,
     upsertMedical: medical.upsert,
+    deleteMedicalIds: medical.deleteIds,
     upsertBreeding: breeding.upsert,
     deleteBreedingIds: breeding.deleteIds,
     upsertMedia: media.upsert,

@@ -81,6 +81,7 @@ function intervalFromScheduleLabel(label: string, everyDays?: string): number | 
 
 export function parseVaccineNote(notes: string | null | undefined): {
   name: string;
+  dosage: string | null;
   intervalDays: number | null;
 } | null {
   let text = (notes ?? "").trim();
@@ -93,9 +94,35 @@ export function parseVaccineNote(notes: string | null | undefined): {
     text = text.slice(0, scheduleMatch.index).trim();
   }
 
+  const dosageMatch = text.match(DOSAGE_SUFFIX);
+  const dosage = dosageMatch ? dosageMatch[0].trim() : null;
   const name = text.replace(DOSAGE_SUFFIX, "").trim() || text;
   if (!name) return null;
-  return { name, intervalDays };
+  return { name, dosage, intervalDays };
+}
+
+export type VaccineRecordMatch = {
+  id: string;
+  event_type: string;
+  date: string | null;
+  notes: string | null;
+};
+
+/** Other Vaccine rows logged the same day with the same notes (name + dosage + schedule). */
+export function similarVaccineEvents<T extends VaccineRecordMatch>(
+  events: T[],
+  target: VaccineRecordMatch
+): T[] {
+  if (target.event_type !== "Vaccine") return [];
+  const date = (target.date ?? "").slice(0, 10);
+  const notes = target.notes ?? "";
+  return events.filter(
+    (event) =>
+      event.id !== target.id &&
+      event.event_type === "Vaccine" &&
+      (event.date ?? "").slice(0, 10) === date &&
+      (event.notes ?? "") === notes
+  );
 }
 
 function extraVaccinesFromEvents(events: VaccineNoteEvent[]): VaccineScheduleEntry[] {
