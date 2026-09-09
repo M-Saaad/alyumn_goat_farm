@@ -373,7 +373,14 @@ function RecentActivity({
   medical,
   weights,
 }: {
-  medical: Array<{ id: string; animalLabel: string; event_type: string; date: string | null; notes: string | null }>;
+  medical: Array<{
+    id: string;
+    animalLabel: string;
+    event_type: string;
+    date: string | null;
+    notes: string | null;
+    comment: string | null;
+  }>;
   weights: Array<{ id: string; animalLabel: string; weighed_on: string; weight_kg: number }>;
 }) {
   const combined = [
@@ -382,7 +389,7 @@ function RecentActivity({
       date: m.date || "",
       label: m.animalLabel,
       detail: m.event_type,
-      sub: m.notes,
+      sub: [m.notes, m.comment].filter(Boolean).join(" — ") || null,
     })),
     ...weights.map((w) => ({
       id: w.id,

@@ -618,6 +618,7 @@ export async function logMedical(input: {
   eventType: MedicalEventType;
   date: string;
   notes?: string;
+  comment?: string;
 }) {
   const animalIds = [...new Set(input.animalIds.filter((id) => Number.isFinite(id) && id > 0))];
   if (animalIds.length === 0) throw new Error("Select at least one goat");
@@ -628,6 +629,7 @@ export async function logMedical(input: {
     event_type: input.eventType,
     date: input.date,
     notes: input.notes || null,
+    comment: input.comment?.trim() || null,
     transaction_id: null,
   }));
   if (isSupabaseDb()) {

@@ -143,6 +143,7 @@ export function mapMedical(r: Record<string, unknown>): MedicalEvent {
     event_type: r.event_type as MedicalEvent["event_type"],
     date: r.date ? String(r.date) : null,
     notes: (r.notes as string) ?? null,
+    comment: (r.comment as string) ?? null,
     transaction_id: (r.transaction_id as string) ?? null,
   };
 }
@@ -407,6 +408,7 @@ export async function saveToSupabase(client: SupabaseClient, db: FarmDatabase): 
       event_type: m.event_type,
       date: m.date,
       notes: m.notes,
+      comment: m.comment,
       transaction_id: m.transaction_id,
     }))
   );

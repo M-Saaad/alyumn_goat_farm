@@ -166,6 +166,7 @@ function medicalRow(m: MedicalEvent): Record<string, unknown> {
     event_type: m.event_type,
     date: m.date,
     notes: m.notes,
+    comment: m.comment,
     transaction_id: m.transaction_id,
   };
 }

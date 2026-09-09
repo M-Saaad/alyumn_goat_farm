@@ -132,6 +132,8 @@ export interface MedicalEvent {
   event_type: MedicalEventType;
   date: string | null;
   notes: string | null;
+  /** Optional user note (separate from structured vaccine/deworm notes). */
+  comment: string | null;
   transaction_id: string | null;
 }
 

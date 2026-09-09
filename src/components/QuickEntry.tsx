@@ -410,6 +410,7 @@ function MedicalForm({
             <input type="hidden" name="vaccineIntervalDays" value={String(extraVaccineIntervalDays)} />
           )}
           <Field label="Dosage" name="dosage" defaultValue="1ml" required />
+          <Field label="Note (optional)" name="comment" />
         </>
       )}
 
@@ -452,6 +453,7 @@ function MedicalForm({
             <Field label="Dewormer name" name="dewormerNameOther" required />
           )}
           <Field label="Dosage" name="dosage" defaultValue="1ml" required />
+          <Field label="Note (optional)" name="comment" />
         </>
       )}
 

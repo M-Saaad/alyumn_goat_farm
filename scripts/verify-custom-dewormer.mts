@@ -51,10 +51,12 @@ await logMedical({
   eventType: "Deworming",
   date: "2026-09-08",
   notes,
+  comment: "Mild reaction observed",
 });
 
 const db = JSON.parse(fs.readFileSync(path.join(tmpDir, "data", "farm.db.json"), "utf8"));
 assert.equal(db.medical_events.length, 1);
+assert.equal(db.medical_events[0].comment, "Mild reaction observed");
 assert.equal(db.custom_dewormers, undefined);
 assert.deepEqual(extraDewormerNamesFromEvents(db.medical_events, "internal"), ["Super Wormer"]);
 assert.equal(mergeDewormerNames(["Super Wormer"], "internal").includes("Super Wormer"), true);

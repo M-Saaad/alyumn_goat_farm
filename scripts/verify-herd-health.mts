@@ -62,6 +62,7 @@ function med(date: string, notes: string): MedicalEvent {
     event_type: "Vaccine",
     date,
     notes,
+    comment: null,
     transaction_id: null,
   };
 }
@@ -73,6 +74,7 @@ function deworm(date: string, notes: string): MedicalEvent {
     event_type: "Deworming",
     date,
     notes,
+    comment: null,
     transaction_id: null,
   };
 }
