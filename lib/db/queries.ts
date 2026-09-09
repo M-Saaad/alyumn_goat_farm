@@ -194,6 +194,7 @@ export type AnimalProfileData = {
   animals: Animal[];
   contacts: Contact[];
   medical_events: MedicalEvent[];
+  herd_vaccine_events: MedicalEvent[];
   breeding_events: BreedingEvent[];
   transactions: Transaction[];
   livestock_sales: LivestockSale[];
@@ -264,6 +265,7 @@ export const loadAnimalProfileData = cache(
         animals: db.animals,
         contacts: db.contacts,
         medical_events: db.medical_events.filter((m) => m.animal_id === animalId),
+        herd_vaccine_events: db.medical_events.filter((m) => m.event_type === "Vaccine"),
         breeding_events: db.breeding_events.filter((b) => b.female_animal_id === animalId),
         transactions: profileTransactions(db, animalId, saleMeta),
         livestock_sales: saleMeta,
@@ -277,12 +279,13 @@ export const loadAnimalProfileData = cache(
     }
 
     const client = createServiceClient();
-    const [animalRow, contacts, allAnimals, medical, breeding, sales, purchaseRows, weights, media, quickEntry] =
+    const [animalRow, contacts, allAnimals, medical, herdVaccines, breeding, sales, purchaseRows, weights, media, quickEntry] =
       await Promise.all([
         selectOne(client, "animals", "id", animalId),
         selectAll(client, "contacts"),
         selectAll(client, "animals"),
         selectWhere(client, "medical_events", "animal_id", animalId),
+        selectWhere(client, "medical_events", "event_type", "Vaccine"),
         selectWhere(client, "breeding_events", "female_animal_id", animalId),
         selectAll(client, "livestock_sales"),
         selectWhere(client, "purchase_agreements", "animal_id", animalId),
@@ -370,6 +373,7 @@ export const loadAnimalProfileData = cache(
       animals: mappedAllAnimals,
       contacts: contacts.map(mapContact),
       medical_events: medical.map(mapMedical),
+      herd_vaccine_events: herdVaccines.map(mapMedical),
       breeding_events: breeding.map(mapBreeding),
       transactions: profileTransactions(miniDb, animalId, mappedSales),
       livestock_sales: mappedSales,

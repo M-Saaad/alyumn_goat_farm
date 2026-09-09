@@ -1,6 +1,8 @@
 import type { FarmDatabase } from "./types";
 import { fetchDb, isSupabaseDb } from "./db";
 import { loadPartnerIds } from "./db/queries";
+import { createServiceClient } from "./supabase/admin";
+import { mapMedical } from "./db/supabase";
 import { computeSettlement } from "./partner-equity/settlement";
 import {
   createCostTransaction,
@@ -51,9 +53,11 @@ import type {
   BreedingOutcome,
   BreedingStatus,
   BreedingEvent,
+  MedicalEvent,
 } from "./types";
 import { animalLabel } from "./labels";
 import { uploadAnimalMedia } from "./media/upload";
+import { similarVaccineEvents } from "./livestock/vaccine-schedule";
 
 export { animalLabel };
 
@@ -638,6 +642,92 @@ export async function logMedical(input: {
     medical_events: [...before.medical_events, ...events],
   };
   return persistMutation(before, after);
+}
+
+async function loadVaccineEvent(id: string): Promise<{
+  event: MedicalEvent;
+  similar: MedicalEvent[];
+}> {
+  if (!isSupabaseDb()) {
+    const db = await fetchDb();
+    const event = db.medical_events.find((m) => m.id === id);
+    if (!event) throw new Error("Vaccination not found");
+    if (event.event_type !== "Vaccine") throw new Error("Not a vaccination");
+    return { event, similar: similarVaccineEvents(db.medical_events, event) };
+  }
+
+  const client = createServiceClient();
+  const { data, error } = await client.from("medical_events").select("*").eq("id", id).maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!data) throw new Error("Vaccination not found");
+  const event = mapMedical(data);
+  if (event.event_type !== "Vaccine") throw new Error("Not a vaccination");
+
+  let similarQuery = client.from("medical_events").select("*").eq("event_type", "Vaccine");
+  if (event.date) similarQuery = similarQuery.eq("date", event.date);
+  else similarQuery = similarQuery.is("date", null);
+  const { data: rows, error: similarError } = await similarQuery;
+  if (similarError) throw new Error(similarError.message);
+  const similar = similarVaccineEvents((rows ?? []).map(mapMedical), event);
+  return { event, similar };
+}
+
+function vaccineTargets(event: MedicalEvent, similar: MedicalEvent[], applySimilar: boolean): MedicalEvent[] {
+  return applySimilar ? [event, ...similar] : [event];
+}
+
+export async function updateVaccineEvents(input: {
+  id: string;
+  date: string;
+  notes: string;
+  applySimilar: boolean;
+}): Promise<{ animalIds: number[] }> {
+  const date = input.date.trim().slice(0, 10);
+  if (!date) throw new Error("Date is required");
+  const notes = input.notes.trim();
+  if (!notes) throw new Error("Enter a vaccine name");
+
+  const { event, similar } = await loadVaccineEvent(input.id);
+  const targets = vaccineTargets(event, similar, input.applySimilar);
+  const updated = targets.map((row) => ({ ...row, date, notes }));
+
+  if (isSupabaseDb()) {
+    await applyWritePlan({ upsertMedical: updated });
+    return { animalIds: [...new Set(updated.map((row) => row.animal_id))] };
+  }
+
+  const before = await fetchDb();
+  const byId = new Map(updated.map((row) => [row.id, row]));
+  const after = {
+    ...before,
+    medical_events: before.medical_events.map((row) => byId.get(row.id) ?? row),
+  };
+  await persistMutation(before, after);
+  return { animalIds: [...new Set(updated.map((row) => row.animal_id))] };
+}
+
+export async function deleteVaccineEvents(input: {
+  id: string;
+  applySimilar: boolean;
+}): Promise<{ animalIds: number[] }> {
+  const { event, similar } = await loadVaccineEvent(input.id);
+  const targets = vaccineTargets(event, similar, input.applySimilar);
+  const ids = targets.map((row) => row.id);
+  const animalIds = [...new Set(targets.map((row) => row.animal_id))];
+
+  if (isSupabaseDb()) {
+    await applyWritePlan({ deleteMedicalIds: ids });
+    return { animalIds };
+  }
+
+  const before = await fetchDb();
+  const remove = new Set(ids);
+  const after = {
+    ...before,
+    medical_events: before.medical_events.filter((row) => !remove.has(row.id)),
+  };
+  await persistMutation(before, after);
+  return { animalIds };
 }
 
 export async function recordBreeding(input: {

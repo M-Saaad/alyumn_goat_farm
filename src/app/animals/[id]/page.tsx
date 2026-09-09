@@ -16,6 +16,8 @@ import {
 } from "@/components/InstallmentCards";
 import { DeleteAnimalButton } from "@/components/DeleteAnimalButton";
 import { BreedingRecordActions } from "@/components/BreedingRecordActions";
+import { VaccineRecordEditor } from "@/components/VaccineRecordEditor";
+import { similarVaccineEvents } from "@/lib/livestock/vaccine-schedule";
 import { backFromAnimalProfile } from "@/lib/livestock/health-nav";
 import { computeUltrasoundStatus, daysSinceCrossed, breedingRecordStatusLabel, breedingTimeline } from "@/lib/livestock/breeding";
 import { estimateAnimalAge } from "@/lib/livestock/age";
@@ -270,7 +272,7 @@ export default async function AnimalProfilePage({
         </dl>
       </section>
 
-      <section className="mb-3 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-stone-200">
+      <section id="medical" className="mb-3 scroll-mt-20 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-stone-200">
         <div className="mb-2 flex items-center justify-between gap-2">
           <h2 className="text-sm font-bold">Medical ({medical.length})</h2>
           <Link href="/health?tab=vaccine" className="text-xs font-semibold text-emerald-700">
@@ -281,20 +283,42 @@ export default async function AnimalProfilePage({
           <p className="text-sm text-stone-500">No medical events yet.</p>
         ) : (
           <ul className="space-y-2 text-sm">
-            {medical.map((m) => (
-              <li key={m.id} className="flex justify-between gap-2 border-b border-stone-100 pb-2">
-                <span>
-                  <span className="font-medium">{m.event_type}</span>
-                  {(m.notes || m.comment) && (
-                    <span className="text-stone-500">
-                      {" — "}
-                      {[m.notes, m.comment].filter(Boolean).join(" — ")}
+            {medical.map((m) => {
+              const similarGoats =
+                m.event_type === "Vaccine"
+                  ? similarVaccineEvents(data.herd_vaccine_events, m).map((event) => {
+                      const goat = data.animals.find((a) => a.id === event.animal_id);
+                      return {
+                        id: event.id,
+                        animalId: event.animal_id,
+                        label: goat ? animalLabel(goat) : `Goat #${event.animal_id}`,
+                      };
+                    })
+                  : [];
+              return (
+                <li key={m.id} className="border-b border-stone-100 pb-2">
+                  <div className="flex justify-between gap-2">
+                    <span>
+                      <span className="font-medium">{m.event_type}</span>
+                      {(m.notes || m.comment) && (
+                        <span className="text-stone-500">
+                          {" — "}
+                          {[m.notes, m.comment].filter(Boolean).join(" — ")}
+                        </span>
+                      )}
                     </span>
+                    <span className="shrink-0 text-stone-500">{formatDate(m.date)}</span>
+                  </div>
+                  {m.event_type === "Vaccine" && (
+                    <VaccineRecordEditor
+                      event={m}
+                      similarGoats={similarGoats}
+                      vaccineSchedules={data.quickEntry.vaccineSchedules}
+                    />
                   )}
-                </span>
-                <span className="shrink-0 text-stone-500">{formatDate(m.date)}</span>
-              </li>
-            ))}
+                </li>
+              );
+            })}
           </ul>
         )}
       </section>

@@ -18,6 +18,8 @@ import {
   recordBreedingUltrasound,
   updateBreeding,
   deleteBreeding,
+  updateVaccineEvents,
+  deleteVaccineEvents,
   recordLivestockSale,
   registerBornGoat,
   recordPalai,
@@ -250,6 +252,23 @@ export async function actionRegisterBornGoat(formData: FormData) {
   revalidateTxnPaths();
 }
 
+function vaccineNotesFromForm(formData: FormData): string {
+  const selectedName = String(formData.get("vaccineName") || "").trim();
+  const name =
+    selectedName === NEW_VACCINE_VALUE
+      ? String(formData.get("vaccineNameOther") || "").trim()
+      : selectedName;
+  const intervalRaw = String(formData.get("vaccineIntervalDays") || "").trim();
+  const intervalDays =
+    !builtinVaccineByName(name) && intervalRaw ? parseVaccineIntervalDays(intervalRaw) : undefined;
+  return formatVaccineNotes(name, String(formData.get("dosage") || ""), intervalDays);
+}
+
+function applySimilarFromForm(formData: FormData): boolean {
+  const raw = String(formData.get("applySimilar") || "").trim();
+  return raw === "1" || raw.toLowerCase() === "on" || raw.toLowerCase() === "true";
+}
+
 export async function actionLogMedical(formData: FormData) {
   try {
     const animalIds = formData
@@ -262,15 +281,7 @@ export async function actionLogMedical(formData: FormData) {
     let notes = String(formData.get("notes") || "").trim();
 
     if (eventType === "Vaccine") {
-      const selectedName = String(formData.get("vaccineName") || "").trim();
-      const name =
-        selectedName === NEW_VACCINE_VALUE
-          ? String(formData.get("vaccineNameOther") || "").trim()
-          : selectedName;
-      const intervalRaw = String(formData.get("vaccineIntervalDays") || "").trim();
-      const intervalDays =
-        !builtinVaccineByName(name) && intervalRaw ? parseVaccineIntervalDays(intervalRaw) : undefined;
-      notes = formatVaccineNotes(name, String(formData.get("dosage") || ""), intervalDays);
+      notes = vaccineNotesFromForm(formData);
     } else if (eventType === "Deworming") {
       const dewormType = String(formData.get("dewormType") || "") as DewormType;
       const dewormerName = String(formData.get("dewormerName") || "").trim();
@@ -295,6 +306,50 @@ export async function actionLogMedical(formData: FormData) {
       notes,
       comment,
     });
+    revalidateTxnPaths();
+    return { ok: true as const };
+  } catch (err) {
+    return {
+      ok: false as const,
+      error: friendlyMedicalError(err),
+    };
+  }
+}
+
+export async function actionUpdateVaccine(formData: FormData) {
+  try {
+    const id = String(formData.get("id") || "").trim();
+    if (!id) throw new Error("Vaccination not found");
+    const { animalIds } = await updateVaccineEvents({
+      id,
+      date: String(formData.get("date") || ""),
+      notes: vaccineNotesFromForm(formData),
+      applySimilar: applySimilarFromForm(formData),
+    });
+    for (const animalId of animalIds) {
+      revalidatePath(`/animals/${animalId}`);
+    }
+    revalidateTxnPaths();
+    return { ok: true as const };
+  } catch (err) {
+    return {
+      ok: false as const,
+      error: friendlyMedicalError(err),
+    };
+  }
+}
+
+export async function actionDeleteVaccine(formData: FormData) {
+  try {
+    const id = String(formData.get("id") || "").trim();
+    if (!id) throw new Error("Vaccination not found");
+    const { animalIds } = await deleteVaccineEvents({
+      id,
+      applySimilar: applySimilarFromForm(formData),
+    });
+    for (const animalId of animalIds) {
+      revalidatePath(`/animals/${animalId}`);
+    }
     revalidateTxnPaths();
     return { ok: true as const };
   } catch (err) {
