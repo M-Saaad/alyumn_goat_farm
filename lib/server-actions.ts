@@ -283,11 +283,17 @@ export async function actionLogMedical(formData: FormData) {
       });
     }
 
+    const comment =
+      eventType === "Vaccine" || eventType === "Deworming"
+        ? String(formData.get("comment") || "").trim() || undefined
+        : undefined;
+
     await logMedical({
       animalIds,
       eventType,
       date: String(formData.get("date")),
       notes,
+      comment,
     });
     revalidateTxnPaths();
     return { ok: true as const };

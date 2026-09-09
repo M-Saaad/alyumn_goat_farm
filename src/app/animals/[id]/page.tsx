@@ -285,7 +285,12 @@ export default async function AnimalProfilePage({
               <li key={m.id} className="flex justify-between gap-2 border-b border-stone-100 pb-2">
                 <span>
                   <span className="font-medium">{m.event_type}</span>
-                  {m.notes && <span className="text-stone-500"> — {m.notes}</span>}
+                  {(m.notes || m.comment) && (
+                    <span className="text-stone-500">
+                      {" — "}
+                      {[m.notes, m.comment].filter(Boolean).join(" — ")}
+                    </span>
+                  )}
                 </span>
                 <span className="shrink-0 text-stone-500">{formatDate(m.date)}</span>
               </li>

@@ -35,6 +35,9 @@ function loadJsonDb(): FarmDatabase {
   for (const event of db.breeding_events) {
     if (event.fetus_count === undefined) event.fetus_count = null;
   }
+  for (const event of db.medical_events) {
+    if (event.comment === undefined) event.comment = null;
+  }
   for (const p of db.palai_payments ?? []) {
     if (!p.service_month) p.service_month = p.date.slice(0, 7);
   }
