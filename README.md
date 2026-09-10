@@ -2,6 +2,16 @@
 
 Mobile-first web app for goat farm livestock + partner equity.
 
+## Documentation
+
+| Audience | Start here |
+|----------|------------|
+| AI agents | [AGENTS.md](AGENTS.md) |
+| Developers | [docs/README.md](docs/README.md) |
+| Deploy | [DEPLOY.md](DEPLOY.md) |
+
+Full docs cover data model, business rules (settlement, Palai, sales), architecture, and operations.
+
 ## Quick start (local JSON)
 
 ```bash
