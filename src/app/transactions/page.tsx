@@ -8,7 +8,9 @@ import { loadTransactionsData, contactNameFrom } from "@/lib/db/queries";
 import { AppHeader } from "@/components/AppHeader";
 import { BottomNav } from "@/components/BottomNav";
 import { QuickEntryLoader } from "@/components/QuickEntryLoader";
+import { ViewOnlyBanner } from "@/components/ViewOnlyBanner";
 import { TransactionsFilters } from "@/components/TransactionsFilters";
+import { getWriteAccess } from "@/lib/auth/roles";
 import {
   TransactionEditor,
   type EditableTransaction,
@@ -26,6 +28,7 @@ export default async function TransactionsPage({
   searchParams: Promise<{ q?: string; filter?: string; from?: string; to?: string }>;
 }) {
   const sp = await searchParams;
+  const canWrite = await getWriteAccess();
   const data = await loadTransactionsData();
   const q = (sp.q || "").toLowerCase().trim();
   const filter = sp.filter || "all";
@@ -196,6 +199,8 @@ export default async function TransactionsPage({
         }
       />
 
+      {!canWrite && <ViewOnlyBanner />}
+
       <Suspense fallback={<div className="mb-4 h-16 animate-pulse rounded-xl bg-stone-200" />}>
         <TransactionsFilters extraCategoryNames={extraCategoryNames(data.transactions.map((t) => t.category))} />
       </Suspense>
@@ -211,11 +216,12 @@ export default async function TransactionsPage({
             vendors={data.quickEntry.vendors}
             customers={data.quickEntry.customers}
             expenseCategories={data.quickEntry.expenseCategories}
+            canWrite={canWrite}
           />
         )}
       </section>
 
-      <QuickEntryLoader {...data.quickEntry} />
+      <QuickEntryLoader {...data.quickEntry} canWrite={canWrite} />
       <BottomNav active="txns" />
     </main>
   );

@@ -6,11 +6,15 @@ import { actionDeleteAnimal } from "@/lib/server-actions";
 export function DeleteAnimalButton({
   animalId,
   label,
+  canWrite = true,
 }: {
   animalId: number;
   label: string;
+  canWrite?: boolean;
 }) {
   const [pending, startTransition] = useTransition();
+
+  if (!canWrite) return null;
 
   function onDelete() {
     const ok = window.confirm(

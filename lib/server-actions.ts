@@ -1,5 +1,6 @@
 "use server";
 
+import { requirePartner } from "@/lib/auth/roles";
 import { redirect } from "next/navigation";
 import {
   addPurchasePayment,
@@ -56,6 +57,10 @@ function revalidateTxnPaths() {
   revalidatePath("/health");
 }
 
+async function guardWrite() {
+  await requirePartner();
+}
+
 async function resolveExpenseCategory(formData: FormData): Promise<string> {
   let category = String(formData.get("category") || "").trim();
   if (category === NEW_EXPENSE_CATEGORY_VALUE) {
@@ -97,6 +102,7 @@ function friendlyUltrasoundError(err: unknown): string {
 }
 
 export async function actionLogExpense(formData: FormData) {
+  await guardWrite();
   const date = String(formData.get("date") || "").trim();
   const amountRaw = String(formData.get("amount") || "").trim();
   const paidBy = String(formData.get("paidBy") || "").trim();
@@ -122,6 +128,7 @@ export async function actionLogExpense(formData: FormData) {
 }
 
 export async function actionRecordPalai(formData: FormData): Promise<PalaiActionResult> {
+  await guardWrite();
   const serviceMonth = String(formData.get("serviceMonth") || "").trim();
   if (!serviceMonth) return { ok: false, error: "Select which month this payment is for" };
   try {
@@ -147,6 +154,7 @@ export async function actionRecordPalai(formData: FormData): Promise<PalaiAction
 }
 
 export async function actionUpdatePalai(formData: FormData): Promise<PalaiActionResult> {
+  await guardWrite();
   const transactionId = String(formData.get("transactionId") || "").trim();
   const serviceMonth = String(formData.get("serviceMonth") || "").trim();
   if (!transactionId) return { ok: false, error: "Payment id is required" };
@@ -174,6 +182,7 @@ export async function actionUpdatePalai(formData: FormData): Promise<PalaiAction
 }
 
 export async function actionBuyGoat(formData: FormData) {
+  await guardWrite();
   try {
     const palaiRaw = String(formData.get("palaiRate") || "").trim();
     const paidBy = String(formData.get("paidBy")) as "Monis" | "Saad" | "Customer";
@@ -206,6 +215,7 @@ export async function actionBuyGoat(formData: FormData) {
 }
 
 export async function actionAcquireFromCustomer(formData: FormData) {
+  await guardWrite();
   try {
     const paidNowRaw = String(formData.get("paidNow") || "").trim();
     const animalId = parsePositiveInteger(String(formData.get("animalId")), "Goat");
@@ -229,6 +239,7 @@ export async function actionAcquireFromCustomer(formData: FormData) {
 }
 
 export async function actionRegisterBornGoat(formData: FormData) {
+  await guardWrite();
   const palaiRaw = String(formData.get("palaiRate") || "").trim();
   const damRaw = String(formData.get("damId") || "").trim();
   const sireAnimalRaw = String(formData.get("sireAnimalId") || "").trim();
@@ -270,6 +281,7 @@ function applySimilarFromForm(formData: FormData): boolean {
 }
 
 export async function actionLogMedical(formData: FormData) {
+  await guardWrite();
   try {
     const animalIds = formData
       .getAll("animalId")
@@ -317,6 +329,7 @@ export async function actionLogMedical(formData: FormData) {
 }
 
 export async function actionUpdateVaccine(formData: FormData) {
+  await guardWrite();
   try {
     const id = String(formData.get("id") || "").trim();
     if (!id) throw new Error("Vaccination not found");
@@ -340,6 +353,7 @@ export async function actionUpdateVaccine(formData: FormData) {
 }
 
 export async function actionDeleteVaccine(formData: FormData) {
+  await guardWrite();
   try {
     const id = String(formData.get("id") || "").trim();
     if (!id) throw new Error("Vaccination not found");
@@ -361,6 +375,7 @@ export async function actionDeleteVaccine(formData: FormData) {
 }
 
 export async function actionLogWeight(formData: FormData) {
+  await guardWrite();
   const weightRaw = String(formData.get("weightKg") || "").trim();
   const weightKg = parsePositiveAmount(weightRaw, "Weight");
   await logWeight({
@@ -373,6 +388,7 @@ export async function actionLogWeight(formData: FormData) {
 }
 
 export async function actionRecordBreeding(formData: FormData) {
+  await guardWrite();
   const maleRaw = String(formData.get("maleAnimalId") || "").trim();
   await recordBreeding({
     femaleId: Number(formData.get("femaleId")),
@@ -385,6 +401,7 @@ export async function actionRecordBreeding(formData: FormData) {
 }
 
 export async function actionUpdateBreeding(formData: FormData) {
+  await guardWrite();
   const maleRaw = String(formData.get("maleAnimalId") || "").trim();
   const statusRaw = String(formData.get("status") || "").trim();
   const deliveredRaw = String(formData.get("deliveredDate") || "").trim();
@@ -412,6 +429,7 @@ export async function actionUpdateBreeding(formData: FormData) {
 export async function actionRecordBreedingUltrasound(
   formData: FormData
 ): Promise<UltrasoundActionResult> {
+  await guardWrite();
   try {
     const file = formData.get("file");
     const pregnancyResult = String(formData.get("pregnancyResult") || "").trim();
@@ -448,6 +466,7 @@ export async function actionRecordBreedingUltrasound(
 }
 
 export async function actionDeleteBreeding(formData: FormData) {
+  await guardWrite();
   const id = String(formData.get("id"));
   const femaleId = Number(formData.get("femaleId"));
   await deleteBreeding(id);
@@ -458,6 +477,7 @@ export async function actionDeleteBreeding(formData: FormData) {
 }
 
 export async function actionChangeStatus(formData: FormData) {
+  await guardWrite();
   await changeStatus({
     animalId: Number(formData.get("animalId")),
     status: String(formData.get("status")) as AnimalStatus,
@@ -467,6 +487,7 @@ export async function actionChangeStatus(formData: FormData) {
 }
 
 export async function actionRecordLivestockSale(formData: FormData) {
+  await guardWrite();
   try {
     const date = String(formData.get("date") || "").trim();
     const animalId = Number(formData.get("animalId"));
@@ -531,6 +552,7 @@ export async function actionRecordLivestockSale(formData: FormData) {
 }
 
 export async function actionDeleteSaleReceipt(formData: FormData) {
+  await guardWrite();
   const txId = String(formData.get("txId") || "").trim();
   const animalId = Number(formData.get("animalId"));
   if (!txId) throw new Error("Receipt id is required");
@@ -542,6 +564,7 @@ export async function actionDeleteSaleReceipt(formData: FormData) {
 }
 
 export async function actionUndoLivestockSale(formData: FormData) {
+  await guardWrite();
   const animalId = Number(formData.get("animalId"));
   if (!animalId || Number.isNaN(animalId)) throw new Error("Animal id is required");
   await undoLivestockSale(animalId);
@@ -550,6 +573,7 @@ export async function actionUndoLivestockSale(formData: FormData) {
 }
 
 export async function actionAddPurchasePayment(formData: FormData) {
+  await guardWrite();
   const amount = parsePositiveAmount(String(formData.get("amount") ?? ""));
   const paidBy = String(formData.get("paidBy"));
   if (paidBy !== "Monis" && paidBy !== "Saad" && paidBy !== "Customer") {
@@ -568,6 +592,7 @@ export async function actionAddPurchasePayment(formData: FormData) {
 }
 
 export async function actionAddSaleReceipt(formData: FormData) {
+  await guardWrite();
   const amount = parsePositiveAmount(String(formData.get("amount") ?? ""));
   await addSaleReceipt({
     animalId: Number(formData.get("animalId")),
@@ -582,6 +607,7 @@ export async function actionAddSaleReceipt(formData: FormData) {
 }
 
 export async function actionPartnerTransfer(formData: FormData) {
+  await guardWrite();
   await partnerTransfer({
     date: String(formData.get("date")),
     amount: parsePositiveAmount(String(formData.get("amount") ?? "")),
@@ -592,6 +618,7 @@ export async function actionPartnerTransfer(formData: FormData) {
 }
 
 export async function actionUpdateTransaction(formData: FormData) {
+  await guardWrite();
   const id = String(formData.get("id"));
   const variant = String(formData.get("variant")) as TransactionEditVariant;
 
@@ -668,12 +695,14 @@ export async function actionUpdateTransaction(formData: FormData) {
 }
 
 export async function actionDeleteTransaction(formData: FormData) {
+  await guardWrite();
   const id = String(formData.get("id"));
   await deleteTransaction(id);
   revalidateTxnPaths();
 }
 
 export async function actionUpdateAnimal(formData: FormData) {
+  await guardWrite();
   const id = Number(formData.get("id"));
   const palaiRaw = String(formData.get("palaiRate") || "").trim();
   const breedRaw = String(formData.get("breed") || "").trim();
@@ -726,6 +755,7 @@ export async function actionUpdateAnimal(formData: FormData) {
 }
 
 export async function actionDeleteAnimal(formData: FormData) {
+  await guardWrite();
   const animalId = Number(formData.get("animalId"));
   if (!animalId || Number.isNaN(animalId)) {
     throw new Error("Animal id is required");
@@ -736,6 +766,7 @@ export async function actionDeleteAnimal(formData: FormData) {
 }
 
 export async function actionUploadAnimalMedia(formData: FormData) {
+  await guardWrite();
   const animalId = Number(formData.get("animalId"));
   const file = formData.get("file");
   const caption = String(formData.get("caption") || "") || null;

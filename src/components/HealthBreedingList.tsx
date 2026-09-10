@@ -45,9 +45,11 @@ function statusBadge(
 export function HealthBreedingList({
   rows,
   supabaseEnabled,
+  canWrite = true,
 }: {
   rows: BreedingRow[];
   supabaseEnabled: boolean;
+  canWrite?: boolean;
 }) {
   const [recordingId, setRecordingId] = useState<string | null>(null);
 
@@ -96,7 +98,7 @@ export function HealthBreedingList({
                 {event?.notes && (
                   <p className="mt-1 text-xs text-stone-500">{event.notes}</p>
                 )}
-                {canUltrasound && event && recordingId !== event.id && (
+                {canWrite && canUltrasound && event && recordingId !== event.id && (
                   <button
                     type="button"
                     onClick={() => setRecordingId(event.id)}
@@ -108,7 +110,7 @@ export function HealthBreedingList({
               </div>
               {statusBadge(b.status, b.statusLabel)}
             </div>
-            {event && recordingId === event.id && (
+            {canWrite && event && recordingId === event.id && (
               <RecordUltrasoundForm
                 breedingId={event.id}
                 femaleId={b.femaleId}

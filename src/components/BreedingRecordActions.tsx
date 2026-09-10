@@ -14,6 +14,7 @@ export function BreedingRecordActions({
   maleAnimals,
   pastBuckNames,
   supabaseEnabled,
+  canWrite = true,
 }: {
   event: BreedingEditorEvent;
   ultrasoundStatus: UltrasoundStatus;
@@ -21,6 +22,7 @@ export function BreedingRecordActions({
   maleAnimals: { id: number; label: string }[];
   pastBuckNames: string[];
   supabaseEnabled: boolean;
+  canWrite?: boolean;
 }) {
   const [recording, setRecording] = useState(false);
   const breedingEvent = {
@@ -50,7 +52,7 @@ export function BreedingRecordActions({
         showWhenIdle={canUltrasound && !isEditing}
       />
       <div className="mt-1 flex flex-wrap gap-3">
-        {canUltrasound && !recording && (
+        {canWrite && canUltrasound && !recording && (
           <button
             type="button"
             onClick={() => setRecording(true)}
@@ -59,13 +61,15 @@ export function BreedingRecordActions({
             {isEditing ? "Edit ultrasound" : "Record ultrasound"}
           </button>
         )}
-        <BreedingEventEditor
-          event={event}
-          maleAnimals={maleAnimals}
-          pastBuckNames={pastBuckNames}
-        />
+        {canWrite && (
+          <BreedingEventEditor
+            event={event}
+            maleAnimals={maleAnimals}
+            pastBuckNames={pastBuckNames}
+          />
+        )}
       </div>
-      {recording && (
+      {canWrite && recording && (
         <RecordUltrasoundForm
           breedingId={event.id}
           femaleId={event.femaleId}

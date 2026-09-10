@@ -41,11 +41,13 @@ export function PurchaseInstallmentCard({
   agreement,
   balance,
   isCustomerOwner,
+  canWrite = true,
 }: {
   animalId: number;
   agreement: PurchaseAgreement;
   balance: number;
   isCustomerOwner: boolean;
+  canWrite?: boolean;
 }) {
   const [open, setOpen] = useState(false);
 
@@ -69,7 +71,7 @@ export function PurchaseInstallmentCard({
           <dd className="font-semibold text-amber-800">{formatPkr(balance)}</dd>
         </div>
       </dl>
-      {balance > 0 && (
+      {canWrite && balance > 0 && (
         <>
           {!open ? (
             <button
@@ -138,13 +140,17 @@ export function PurchaseInstallmentCard({
 function DeleteReceiptButton({
   animalId,
   receipt,
+  canWrite = true,
 }: {
   animalId: number;
   receipt: SaleReceiptRow;
+  canWrite?: boolean;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+
+  if (!canWrite) return null;
 
   function onDelete() {
     const ok = window.confirm(
@@ -180,10 +186,18 @@ function DeleteReceiptButton({
   );
 }
 
-function UndoSaleButton({ animalId }: { animalId: number }) {
+function UndoSaleButton({
+  animalId,
+  canWrite = true,
+}: {
+  animalId: number;
+  canWrite?: boolean;
+}) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+
+  if (!canWrite) return null;
 
   function onUndo() {
     const ok = window.confirm(
@@ -224,12 +238,14 @@ export function SaleInstallmentCard({
   balance,
   receipts,
   soldOnPalai,
+  canWrite = true,
 }: {
   animalId: number;
   sale: LivestockSale;
   balance: number;
   receipts: SaleReceiptRow[];
   soldOnPalai?: boolean;
+  canWrite?: boolean;
 }) {
   const [open, setOpen] = useState(false);
 
@@ -278,14 +294,14 @@ export function SaleInstallmentCard({
                     {r.notes ? ` · ${r.notes}` : ""}
                   </p>
                 </div>
-                <DeleteReceiptButton animalId={animalId} receipt={r} />
+                <DeleteReceiptButton animalId={animalId} receipt={r} canWrite={canWrite} />
               </li>
             ))}
           </ul>
         </div>
       )}
 
-      {balance > 0 && (
+      {canWrite && balance > 0 && (
         <>
           {!open ? (
             <button
@@ -347,9 +363,11 @@ export function SaleInstallmentCard({
         </>
       )}
 
-      <div className="mt-4 border-t border-stone-100 pt-3">
-        <UndoSaleButton animalId={animalId} />
-      </div>
+      {canWrite && (
+        <div className="mt-4 border-t border-stone-100 pt-3">
+          <UndoSaleButton animalId={animalId} canWrite={canWrite} />
+        </div>
+      )}
     </section>
   );
 }
