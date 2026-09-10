@@ -3,10 +3,35 @@
  * Requires NEXT_PUBLIC_SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY in env.
  *
  * Usage:
- *   npx tsx --env-file=.env.local scripts/create-guest-user.mts
- *   npx tsx --env-file=.env.local scripts/create-guest-user.mts guest@example.com 'SecurePass123!'
+ *   npm run create:guest
+ *   npx tsx scripts/create-guest-user.mts guest@example.com 'SecurePass123!'
  */
+import fs from "fs";
+import path from "path";
 import { createServiceClient } from "../lib/supabase/admin";
+
+function loadEnvFile(filePath: string) {
+  if (!fs.existsSync(filePath)) return;
+  const content = fs.readFileSync(filePath, "utf8");
+  for (const line of content.split("\n")) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#")) continue;
+    const eq = trimmed.indexOf("=");
+    if (eq === -1) continue;
+    const key = trimmed.slice(0, eq).trim();
+    if (process.env[key]) continue;
+    let value = trimmed.slice(eq + 1).trim();
+    if (
+      (value.startsWith('"') && value.endsWith('"')) ||
+      (value.startsWith("'") && value.endsWith("'"))
+    ) {
+      value = value.slice(1, -1);
+    }
+    process.env[key] = value;
+  }
+}
+
+loadEnvFile(path.join(process.cwd(), ".env.local"));
 
 const DEFAULT_EMAIL = "guest@farm.app";
 const DEFAULT_PASSWORD = "GuestView2026!";
