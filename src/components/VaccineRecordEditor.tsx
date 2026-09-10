@@ -28,10 +28,12 @@ export function VaccineRecordEditor({
   event,
   similarGoats,
   vaccineSchedules,
+  canWrite = true,
 }: {
   event: MedicalEvent;
   similarGoats: VaccineSibling[];
   vaccineSchedules: VaccineScheduleEntry[];
+  canWrite?: boolean;
 }) {
   const router = useRouter();
   const [editing, setEditing] = useState(false);
@@ -53,6 +55,8 @@ export function VaccineRecordEditor({
       : parsed?.intervalDays;
   const showSchedule =
     showNewName || (selectedVaccine != null && !isBuiltinVaccineKey(selectedVaccine.key));
+
+  if (!canWrite) return null;
 
   function onDelete() {
     const extra =

@@ -8,6 +8,10 @@ const QuickEntry = dynamic(
   { ssr: false }
 );
 
-export function QuickEntryLoader(props: QuickEntryProps) {
+export function QuickEntryLoader({
+  canWrite = true,
+  ...props
+}: QuickEntryProps & { canWrite?: boolean }) {
+  if (!canWrite) return null;
   return <QuickEntry {...props} />;
 }

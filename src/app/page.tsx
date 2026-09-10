@@ -18,6 +18,8 @@ import { FinanceReportPicker } from "@/components/FinanceReportPicker";
 import { FinancePeriodHeadcount } from "@/components/FinancePeriodHeadcount";
 import { QuickEntryLoader } from "@/components/QuickEntryLoader";
 import { SignOutButton } from "@/components/SignOutButton";
+import { ViewOnlyBanner } from "@/components/ViewOnlyBanner";
+import { getWriteAccess } from "@/lib/auth/roles";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 import type { FarmDatabase } from "@/lib/types";
 
@@ -52,6 +54,7 @@ async function HomePageContent({
 }) {
   const sp = await searchParams;
   const reportRange = parseFinanceReport(sp);
+  const canWrite = await getWriteAccess();
   const data = await loadHomeData();
   const settlementDb = {
     contacts: data.contacts,
@@ -94,6 +97,8 @@ async function HomePageContent({
         title="Partner Equity"
         action={isSupabaseConfigured() ? <SignOutButton /> : undefined}
       />
+
+      {!canWrite && <ViewOnlyBanner />}
 
       <section
         className={`mb-4 rounded-2xl p-4 text-white shadow ${
@@ -176,7 +181,7 @@ async function HomePageContent({
         )}
       </section>
 
-      <QuickEntryLoader {...data.quickEntry} />
+      <QuickEntryLoader {...data.quickEntry} canWrite={canWrite} />
       <BottomNav active="finance" />
     </main>
   );

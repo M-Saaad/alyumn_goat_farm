@@ -61,6 +61,7 @@ export function TransactionEditor({
   vendors,
   customers,
   expenseCategories,
+  canWrite = true,
 }: {
   transactions: EditableTransaction[];
   /** Active animals for expense linking. */
@@ -70,6 +71,7 @@ export function TransactionEditor({
   vendors: ContactOption[];
   customers: ContactOption[];
   expenseCategories: string[];
+  canWrite?: boolean;
 }) {
   const router = useRouter();
   const [editing, setEditing] = useState<EditableTransaction | null>(null);
@@ -135,6 +137,7 @@ export function TransactionEditor({
             </div>
             <div className="flex shrink-0 items-start gap-1">
               <p className="pt-0.5 font-semibold">{formatPkr(tx.amount)}</p>
+              {canWrite && (
               <div className="relative">
                 <button
                   type="button"
@@ -179,12 +182,13 @@ export function TransactionEditor({
                   </>
                 )}
               </div>
+              )}
             </div>
           </li>
         ))}
       </ul>
 
-      {editing && (
+      {canWrite && editing && (
         <div className="fixed inset-0 z-50 flex items-end bg-black/40 sm:items-center sm:justify-center">
           <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-t-2xl bg-stone-50 p-4 sm:rounded-2xl">
             <div className="mb-3 flex items-center justify-between">

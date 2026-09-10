@@ -9,7 +9,9 @@ import type { HealthTab } from "@/lib/livestock/health-tabs";
 import { AppHeader } from "@/components/AppHeader";
 import { BottomNav } from "@/components/BottomNav";
 import { QuickEntryLoader } from "@/components/QuickEntryLoader";
+import { ViewOnlyBanner } from "@/components/ViewOnlyBanner";
 import { HealthFilters } from "@/components/HealthFilters";
+import { getWriteAccess } from "@/lib/auth/roles";
 import { HealthBreedingList } from "@/components/HealthBreedingList";
 import { isSupabaseDb } from "@/lib/db";
 import type { QuickEntryProps } from "@/components/QuickEntry";
@@ -90,6 +92,7 @@ async function HealthPageContent({
 }) {
   const sp = await searchParams;
   const tab = parseHealthTab(sp.tab);
+  const canWrite = await getWriteAccess();
   const data = await loadHerdHealthData();
   const { herd } = data;
   const { summary } = herd;
@@ -101,6 +104,7 @@ async function HealthPageContent({
       summary={summary}
       quickEntry={data.quickEntry}
       vaccineSchedules={data.vaccineSchedules}
+      canWrite={canWrite}
     />
   );
 }
@@ -111,12 +115,14 @@ function HealthPageView({
   summary,
   quickEntry,
   vaccineSchedules,
+  canWrite,
 }: {
   tab: ReturnType<typeof parseHealthTab>;
   herd: HerdHealthData;
   summary: HerdHealthSummary;
   quickEntry: QuickEntryProps;
   vaccineSchedules: VaccineScheduleEntry[];
+  canWrite: boolean;
 }) {
   const supabaseEnabled = isSupabaseDb();
 
@@ -127,6 +133,8 @@ function HealthPageView({
         title="Herd Health"
         subtitle={`${summary.activeCount} active goats · Ultrasound day 40–75 · PPR yearly · ETV & internal deworm twice yearly · external deworm 2d after internal`}
       />
+
+      {!canWrite && <ViewOnlyBanner />}
 
       <Suspense fallback={<div className="mb-4 h-10 animate-pulse rounded-xl bg-stone-200" />}>
         <HealthFilters />
@@ -214,7 +222,7 @@ function HealthPageView({
       {tab === "breeding" && (
         <section className="mb-4 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-stone-200">
           <h2 className="mb-2 text-sm font-bold">Females (excluding kids)</h2>
-          <HealthBreedingList rows={herd.breeding} supabaseEnabled={supabaseEnabled} />
+          <HealthBreedingList rows={herd.breeding} supabaseEnabled={supabaseEnabled} canWrite={canWrite} />
         </section>
       )}
 
@@ -290,7 +298,7 @@ function HealthPageView({
         </section>
       )}
 
-      <QuickEntryLoader {...quickEntry} />
+      <QuickEntryLoader {...quickEntry} canWrite={canWrite} />
       <BottomNav active="health" />
     </main>
   );

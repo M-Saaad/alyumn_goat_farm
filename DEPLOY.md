@@ -20,6 +20,7 @@ This app needs Postgres + auth for production. Local JSON (`data/farm.db.json`) 
    - [`supabase/migrations/012_custom_categories.sql`](supabase/migrations/012_custom_categories.sql) — also converts `transactions.category` / `partner_ledger_entries.category` to text
    - [`supabase/migrations/013_drop_custom_lookup_tables.sql`](supabase/migrations/013_drop_custom_lookup_tables.sql) — drops the unused `custom_vaccines` / `custom_dewormers` / `custom_categories` lookup tables; extra names live on medical notes and transaction categories, same as PPR / Feed
    - [`supabase/migrations/014_medical_events_comment.sql`](supabase/migrations/014_medical_events_comment.sql) — optional `comment` column on `medical_events` for vaccine/deworming notes
+   - [`supabase/migrations/015_user_roles.sql`](supabase/migrations/015_user_roles.sql) — `profiles` table with `partner` / `guest` roles for view-only access
 
 If 010–012 already ran in production, only run **013** (and **014** when deploying comment support).
 3. Confirm Storage bucket `animal-media` exists (created by migration 002).
@@ -35,7 +36,34 @@ In Supabase **Authentication → Users → Add user**:
 - Monis: email + password
 - Saad: email + password
 
-Both partners share full data access (RLS allows any authenticated user).
+Both partners share full data access. Existing users are backfilled as `partner` when migration **015** runs.
+
+### Guest (view-only) login
+
+For someone who should browse the app but not change anything:
+
+```bash
+npm run create:guest
+```
+
+This creates (or updates) a Supabase user with role `guest`:
+
+- Default email: `guest@farm.app`
+- Default password: `GuestView2026!`
+
+Custom credentials:
+
+```bash
+npx tsx --env-file=.env.local scripts/create-guest-user.mts viewer@example.com 'YourSecurePassword'
+```
+
+Guests see a view-only banner, no Quick Entry, and no edit/delete controls. Server actions also reject writes from guest sessions.
+
+To promote a user to full partner access in Supabase SQL Editor:
+
+```sql
+update profiles set role = 'partner' where id = '<auth-user-uuid>';
+```
 
 ## 3. Local env + seed
 

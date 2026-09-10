@@ -9,9 +9,15 @@ type Props = {
   media: AnimalMedia[];
   animalId: number;
   supabaseEnabled: boolean;
+  canWrite?: boolean;
 };
 
-export function AnimalMediaGallery({ media, animalId, supabaseEnabled }: Props) {
+export function AnimalMediaGallery({
+  media,
+  animalId,
+  supabaseEnabled,
+  canWrite = true,
+}: Props) {
   const [urls, setUrls] = useState<Record<string, string | null>>({});
   const [loading, setLoading] = useState(media.length > 0);
 
@@ -71,13 +77,13 @@ export function AnimalMediaGallery({ media, animalId, supabaseEnabled }: Props) 
           })}
         </ul>
       )}
-      {supabaseEnabled ? (
+      {supabaseEnabled && canWrite ? (
         <AnimalMediaUpload animalId={animalId} />
-      ) : (
+      ) : !supabaseEnabled ? (
         <p className="mt-3 text-xs text-stone-500">
           Media upload is available when Supabase is configured.
         </p>
-      )}
+      ) : null}
     </section>
   );
 }

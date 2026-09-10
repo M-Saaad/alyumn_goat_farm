@@ -8,7 +8,9 @@ import { todayIso } from "@/lib/format";
 import { AppHeader } from "@/components/AppHeader";
 import { BottomNav } from "@/components/BottomNav";
 import { QuickEntryLoader } from "@/components/QuickEntryLoader";
+import { ViewOnlyBanner } from "@/components/ViewOnlyBanner";
 import { AnimalsFilters } from "@/components/AnimalsFilters";
+import { getWriteAccess } from "@/lib/auth/roles";
 
 export const dynamic = "force-dynamic";
 
@@ -18,6 +20,7 @@ export default async function AnimalsPage({
   searchParams: Promise<{ q?: string; filter?: string }>;
 }) {
   const sp = await searchParams;
+  const canWrite = await getWriteAccess();
   const data = await loadAnimalsListData();
   const today = todayIso();
   const q = (sp.q || "").toLowerCase();
@@ -66,6 +69,8 @@ export default async function AnimalsPage({
     <main className="px-4 pt-6">
       <AppHeader eyebrow="Livestock" title={`Goats (${animals.length})`} />
 
+      {!canWrite && <ViewOnlyBanner />}
+
       <Suspense fallback={<div className="mb-4 h-16 animate-pulse rounded-xl bg-stone-200" />}>
         <AnimalsFilters />
       </Suspense>
@@ -99,7 +104,7 @@ export default async function AnimalsPage({
         })}
       </ul>
 
-      <QuickEntryLoader {...data.quickEntry} />
+      <QuickEntryLoader {...data.quickEntry} canWrite={canWrite} />
       <BottomNav active="goats" />
     </main>
   );

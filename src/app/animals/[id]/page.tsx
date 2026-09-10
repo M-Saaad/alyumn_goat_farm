@@ -15,7 +15,9 @@ import {
   SaleInstallmentCard,
 } from "@/components/InstallmentCards";
 import { DeleteAnimalButton } from "@/components/DeleteAnimalButton";
+import { ViewOnlyBanner } from "@/components/ViewOnlyBanner";
 import { BreedingRecordActions } from "@/components/BreedingRecordActions";
+import { getWriteAccess } from "@/lib/auth/roles";
 import { VaccineRecordEditor } from "@/components/VaccineRecordEditor";
 import { similarVaccineEvents } from "@/lib/livestock/vaccine-schedule";
 import { backFromAnimalProfile } from "@/lib/livestock/health-nav";
@@ -35,6 +37,7 @@ export default async function AnimalProfilePage({
   const sp = await searchParams;
   const back = backFromAnimalProfile(sp);
   const animalId = Number(id);
+  const canWrite = await getWriteAccess();
   const data = await loadAnimalProfileData(animalId);
   if (!data) notFound();
 
@@ -106,8 +109,10 @@ export default async function AnimalProfilePage({
             {sale && isSoldOnPalaiSale(sale) ? " · Sold on palai" : ""}
           </p>
         </div>
-        <DeleteAnimalButton animalId={animal.id} label={animalLabel(animal)} />
+        <DeleteAnimalButton animalId={animal.id} label={animalLabel(animal)} canWrite={canWrite} />
       </header>
+
+      {!canWrite && <ViewOnlyBanner />}
 
       <AnimalEditor
         animal={{
@@ -145,12 +150,14 @@ export default async function AnimalProfilePage({
         damAnimals={data.quickEntry.damAnimals ?? data.quickEntry.femaleAnimals ?? []}
         maleAnimals={data.quickEntry.maleAnimals}
         pastBuckNames={data.quickEntry.pastBuckNames}
+        canWrite={canWrite}
       />
 
       <AnimalMediaGallery
         media={media}
         animalId={animalId}
         supabaseEnabled={supabaseEnabled}
+        canWrite={canWrite}
       />
 
       {data.purchase_agreement && !animal.home_bred ? (
@@ -159,6 +166,7 @@ export default async function AnimalProfilePage({
           agreement={data.purchase_agreement}
           balance={data.purchase_balance}
           isCustomerOwner={isCustomerOwner}
+          canWrite={canWrite}
         />
       ) : data.purchase_balance > 0 && !animal.home_bred ? (
         <section className="mb-3 rounded-2xl bg-amber-50 p-4 text-sm text-amber-900 ring-1 ring-amber-200">
@@ -177,6 +185,7 @@ export default async function AnimalProfilePage({
           balance={data.sale_balance ?? 0}
           receipts={saleReceipts}
           soldOnPalai={isSoldOnPalaiSale(sale)}
+          canWrite={canWrite}
         />
       )}
 
@@ -314,6 +323,7 @@ export default async function AnimalProfilePage({
                       event={m}
                       similarGoats={similarGoats}
                       vaccineSchedules={data.quickEntry.vaccineSchedules}
+                      canWrite={canWrite}
                     />
                   )}
                 </li>
@@ -378,6 +388,7 @@ export default async function AnimalProfilePage({
                   maleAnimals={data.quickEntry.maleAnimals}
                   pastBuckNames={data.quickEntry.pastBuckNames}
                   supabaseEnabled={supabaseEnabled}
+                  canWrite={canWrite}
                 />
               </li>
               );
@@ -433,7 +444,7 @@ export default async function AnimalProfilePage({
         )}
       </section>
 
-      <QuickEntryLoader {...data.quickEntry} />
+      <QuickEntryLoader {...data.quickEntry} canWrite={canWrite} />
       <BottomNav active={sp.from === "health" ? "health" : "goats"} />
     </main>
   );

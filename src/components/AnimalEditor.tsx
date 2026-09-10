@@ -50,6 +50,7 @@ export function AnimalEditor({
   damAnimals,
   maleAnimals,
   pastBuckNames,
+  canWrite = true,
 }: {
   animal: AnimalEditorData;
   vendors: ContactOption[];
@@ -57,6 +58,7 @@ export function AnimalEditor({
   damAnimals: { id: number; label: string }[];
   maleAnimals: { id: number; label: string }[];
   pastBuckNames: string[];
+  canWrite?: boolean;
 }) {
   const [editing, setEditing] = useState(false);
   const [status, setStatus] = useState<AnimalStatus>(animal.status);
@@ -68,6 +70,8 @@ export function AnimalEditor({
   );
 
   const showSaleFields = status === "Sold" || Boolean(animal.sale);
+
+  if (!canWrite) return null;
 
   return (
     <div className="mb-3">
