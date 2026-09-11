@@ -80,6 +80,26 @@ export default async function TransactionsPage({
 
   const allAnimals = data.animals.map((a) => ({ id: a.id, label: animalLabel(a) }));
 
+  const animalById = new Map(data.animals.map((a) => [a.id, a]));
+  const palaiByTxId = new Map(
+    data.palai_payments
+      .filter((p) => p.transaction_id)
+      .map((p) => [p.transaction_id as string, p])
+  );
+  const saleByTxId = new Map(
+    (data.livestock_sales ?? [])
+      .filter((s) => s.transaction_id)
+      .map((s) => [s.transaction_id as string, s])
+  );
+  const vendors = data.contacts
+    .filter((c) => c.type === "Vendor")
+    .map((c) => ({ id: c.id, name: c.name }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+  const customers = data.contacts
+    .filter((c) => c.type === "Customer")
+    .map((c) => ({ id: c.id, name: c.name }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+
   const editable: EditableTransaction[] = txs.map((tx) => {
     const variant = resolveTransactionKind(tx);
     const paidBy =
@@ -89,9 +109,9 @@ export default async function TransactionsPage({
           ? ("Saad" as const)
           : null;
 
-    const animal = tx.animal_id != null ? data.animals.find((a) => a.id === tx.animal_id) : null;
-    const palaiPayment = data.palai_payments.find((p) => p.transaction_id === tx.id);
-    const sale = (data.livestock_sales ?? []).find((s) => s.transaction_id === tx.id);
+    const animal = tx.animal_id != null ? animalById.get(tx.animal_id) : null;
+    const palaiPayment = palaiByTxId.get(tx.id);
+    const sale = saleByTxId.get(tx.id);
 
     let transferAbsAmount: number | null = null;
     let transferDirection: "from_monis" | "to_monis" | null = null;
@@ -213,15 +233,15 @@ export default async function TransactionsPage({
             transactions={editable}
             animals={animals}
             allAnimals={allAnimals}
-            vendors={data.quickEntry.vendors}
-            customers={data.quickEntry.customers}
-            expenseCategories={data.quickEntry.expenseCategories}
+            vendors={vendors}
+            customers={customers}
+            expenseCategories={data.expenseCategories}
             canWrite={canWrite}
           />
         )}
       </section>
 
-      <QuickEntryLoader {...data.quickEntry} canWrite={canWrite} />
+      <QuickEntryLoader canWrite={canWrite} />
       <BottomNav active="txns" />
     </main>
   );

@@ -60,7 +60,7 @@ export function FinanceMonthlyTransactions({
 }) {
   const periodLabel = report.periodLabel;
   const previewRows = buildPreviewRows(report);
-  const totalCount = previewRows.length;
+  const totalCount = report.transactionCount;
 
   if (totalCount === 0) {
     return (

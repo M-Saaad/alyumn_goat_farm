@@ -14,8 +14,6 @@ import { HealthFilters } from "@/components/HealthFilters";
 import { getWriteAccess } from "@/lib/auth/roles";
 import { HealthBreedingList } from "@/components/HealthBreedingList";
 import { isSupabaseDb } from "@/lib/db";
-import type { QuickEntryProps } from "@/components/QuickEntry";
-
 export const dynamic = "force-dynamic";
 
 function statusBadge(
@@ -102,7 +100,6 @@ async function HealthPageContent({
       tab={tab}
       herd={herd}
       summary={summary}
-      quickEntry={data.quickEntry}
       vaccineSchedules={data.vaccineSchedules}
       canWrite={canWrite}
     />
@@ -113,14 +110,12 @@ function HealthPageView({
   tab,
   herd,
   summary,
-  quickEntry,
   vaccineSchedules,
   canWrite,
 }: {
   tab: ReturnType<typeof parseHealthTab>;
   herd: HerdHealthData;
   summary: HerdHealthSummary;
-  quickEntry: QuickEntryProps;
   vaccineSchedules: VaccineScheduleEntry[];
   canWrite: boolean;
 }) {
@@ -298,7 +293,7 @@ function HealthPageView({
         </section>
       )}
 
-      <QuickEntryLoader {...quickEntry} canWrite={canWrite} />
+      <QuickEntryLoader canWrite={canWrite} />
       <BottomNav active="health" />
     </main>
   );
