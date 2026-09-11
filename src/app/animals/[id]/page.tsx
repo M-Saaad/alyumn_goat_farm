@@ -145,11 +145,11 @@ export default async function AnimalProfilePage({
               }
             : null,
         }}
-        vendors={data.quickEntry.vendors}
-        ownerOptions={data.quickEntry.ownerOptions}
-        damAnimals={data.quickEntry.damAnimals ?? data.quickEntry.femaleAnimals ?? []}
-        maleAnimals={data.quickEntry.maleAnimals}
-        pastBuckNames={data.quickEntry.pastBuckNames}
+        vendors={data.editorProps.vendors}
+        ownerOptions={data.editorProps.ownerOptions}
+        damAnimals={data.editorProps.damAnimals ?? data.editorProps.femaleAnimals ?? []}
+        maleAnimals={data.editorProps.maleAnimals}
+        pastBuckNames={data.editorProps.pastBuckNames}
         canWrite={canWrite}
       />
 
@@ -322,7 +322,7 @@ export default async function AnimalProfilePage({
                     <VaccineRecordEditor
                       event={m}
                       similarGoats={similarGoats}
-                      vaccineSchedules={data.quickEntry.vaccineSchedules}
+                      vaccineSchedules={data.editorProps.vaccineSchedules}
                       canWrite={canWrite}
                     />
                   )}
@@ -385,8 +385,8 @@ export default async function AnimalProfilePage({
                   }}
                   ultrasoundStatus={ultrasoundStatus}
                   daysSinceCrossed={crossedDays}
-                  maleAnimals={data.quickEntry.maleAnimals}
-                  pastBuckNames={data.quickEntry.pastBuckNames}
+                  maleAnimals={data.editorProps.maleAnimals}
+                  pastBuckNames={data.editorProps.pastBuckNames}
                   supabaseEnabled={supabaseEnabled}
                   canWrite={canWrite}
                 />
@@ -444,7 +444,7 @@ export default async function AnimalProfilePage({
         )}
       </section>
 
-      <QuickEntryLoader {...data.quickEntry} canWrite={canWrite} />
+      <QuickEntryLoader canWrite={canWrite} />
       <BottomNav active={sp.from === "health" ? "health" : "goats"} />
     </main>
   );
