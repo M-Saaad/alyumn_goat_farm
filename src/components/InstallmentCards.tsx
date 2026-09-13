@@ -140,10 +140,12 @@ export function PurchaseInstallmentCard({
 function DeleteReceiptButton({
   animalId,
   receipt,
+  receiptCount,
   canWrite = true,
 }: {
   animalId: number;
   receipt: SaleReceiptRow;
+  receiptCount: number;
   canWrite?: boolean;
 }) {
   const router = useRouter();
@@ -153,8 +155,11 @@ function DeleteReceiptButton({
   if (!canWrite) return null;
 
   function onDelete() {
+    const isLast = receiptCount <= 1;
     const ok = window.confirm(
-      `Delete receipt of ${formatPkr(receipt.amount)} on ${formatDate(receipt.date)}? Partner equity will be recalculated.`
+      isLast
+        ? `Delete the last receipt (${formatPkr(receipt.amount)} on ${formatDate(receipt.date)})? The entire sale will be voided and the goat marked Active again. Partner equity will be recalculated.`
+        : `Delete receipt of ${formatPkr(receipt.amount)} on ${formatDate(receipt.date)}? Partner equity will be recalculated.`
     );
     if (!ok) return;
     setError(null);
@@ -294,7 +299,12 @@ export function SaleInstallmentCard({
                     {r.notes ? ` · ${r.notes}` : ""}
                   </p>
                 </div>
-                <DeleteReceiptButton animalId={animalId} receipt={r} canWrite={canWrite} />
+                <DeleteReceiptButton
+                  animalId={animalId}
+                  receipt={r}
+                  receiptCount={receipts.length}
+                  canWrite={canWrite}
+                />
               </li>
             ))}
           </ul>

@@ -5,7 +5,7 @@ import { loadDb, saveDb } from "../lib/db";
 import { computeSettlement, assertCanonicalSettlement } from "../lib/partner-equity/settlement";
 import { recognizePalaiPayment, applyPalaiToDb } from "../lib/palai/recognize-payment";
 import { computeSaleSplit, saleAdjustmentAmount } from "../lib/livestock/record-sale";
-import { buyGoat, acquireGoatFromCustomer, logExpense, logMedical, recordBreeding, recordLivestockSale, addSaleReceipt, updateAnimal, deleteSaleReceipt, undoLivestockSale, registerBornGoat } from "../lib/actions";
+import { buyGoat, acquireGoatFromCustomer, logExpense, logMedical, recordBreeding, recordLivestockSale, addSaleReceipt, updateAnimal, updateTransaction, deleteSaleReceipt, undoLivestockSale, registerBornGoat } from "../lib/actions";
 import { isSoldOnPalaiSale } from "../lib/livestock/cancel-sale";
 import fs from "fs";
 import path from "path";
@@ -138,6 +138,24 @@ async function main() {
     console.log("PASS partial sale + follow-up receipt");
 
     const receiptTxId = receiptTx!.id;
+    await updateTransaction({
+      id: receiptTxId,
+      variant: "livestock_sale_receipt",
+      date: "2026-07-29",
+      receiptAmount: 20000,
+      receivedBy: "Monis",
+      notes: "partial sale receipt adjusted",
+    });
+    const afterReceiptEdit = loadDb();
+    const saleAfterEdit = (afterReceiptEdit.livestock_sales ?? []).find((s) => s.id === partialSale!.id);
+    if (!saleAfterEdit || saleAfterEdit.gross_sale_price !== 30000) {
+      throw new Error(`receipt edit changed gross: ${saleAfterEdit?.gross_sale_price}`);
+    }
+    if (saleAfterEdit.amount_received !== 30000) {
+      throw new Error(`receipt edit amount_received: ${saleAfterEdit.amount_received}`);
+    }
+    console.log("PASS edit installment receipt preserves sale gross");
+
     await deleteSaleReceipt(receiptTxId);
     const afterDelReceipt = loadDb();
     const saleAfterDel = (afterDelReceipt.livestock_sales ?? []).find((s) => s.id === partialSale!.id);
@@ -156,6 +174,67 @@ async function main() {
       throw new Error("undo sale left livestock_sales row");
     }
     console.log("PASS undo entire livestock sale");
+
+    restore();
+    const db120 = loadDb();
+    const goat120 =
+      db120.animals.find((a) => a.name === "Lallo") ??
+      db120.animals.find((a) => a.status === "Active");
+    if (!goat120) throw new Error("no goat for 120k sale test");
+    await recordLivestockSale({
+      date: "2026-08-01",
+      animalId: goat120.id,
+      grossSalePrice: 120000,
+      amountReceivedNow: 0,
+      receivedBy: "Monis",
+      notes: "120k installment test",
+    });
+    await addSaleReceipt({
+      animalId: goat120.id,
+      date: "2026-08-02",
+      amount: 50000,
+      receivedBy: "Monis",
+      notes: "120k r1",
+    });
+    await addSaleReceipt({
+      animalId: goat120.id,
+      date: "2026-08-03",
+      amount: 30000,
+      receivedBy: "Saad",
+      notes: "120k r2",
+    });
+    const afterAdd = loadDb();
+    const sale120 = (afterAdd.livestock_sales ?? []).find((s) => s.notes === "120k installment test");
+    if (!sale120 || sale120.gross_sale_price !== 120000 || sale120.amount_received !== 80000) {
+      throw new Error(
+        `120k sale setup failed: gross=${sale120?.gross_sale_price} received=${sale120?.amount_received}`
+      );
+    }
+    const r2 = afterAdd.transactions.find((t) => t.notes === "120k r2");
+    if (!r2) throw new Error("120k r2 missing");
+    await updateTransaction({
+      id: r2.id,
+      variant: "livestock_sale_receipt",
+      date: "2026-08-03",
+      receiptAmount: 30000,
+      receivedBy: "Saad",
+      notes: "120k r2",
+    });
+    const afterR2Edit = loadDb();
+    const sale120b = (afterR2Edit.livestock_sales ?? []).find((s) => s.id === sale120!.id);
+    if (!sale120b || sale120b.gross_sale_price !== 120000) {
+      throw new Error(`120k gross corrupted to ${sale120b?.gross_sale_price}`);
+    }
+    await deleteSaleReceipt(r2.id);
+    const afterDelR2 = loadDb();
+    const sale120c = (afterDelR2.livestock_sales ?? []).find((s) => s.id === sale120!.id);
+    if (!sale120c || sale120c.amount_received !== 50000 || sale120c.gross_sale_price !== 120000) {
+      throw new Error(
+        `after del r2: received=${sale120c?.amount_received} gross=${sale120c?.gross_sale_price}`
+      );
+    }
+    await undoLivestockSale(goat120.id);
+    console.log("PASS 120k multi-receipt installment integrity");
 
     restore();
     const dbPalaiSell = loadDb();
