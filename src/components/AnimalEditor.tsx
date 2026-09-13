@@ -5,6 +5,7 @@ import { actionUpdateAnimal } from "@/lib/server-actions";
 import { ActionForm, SubmitButton } from "@/components/ActionForm";
 import { BuckSelect, ContactSelect, type ContactOption } from "@/components/ContactSelect";
 import type { AnimalBreed, AnimalSex, AnimalStatus } from "@/lib/types";
+import { formatPkr } from "@/lib/format";
 import { NON_NEGATIVE_NUMBER_INPUT_PROPS } from "@/lib/form-numbers";
 
 const field =
@@ -361,14 +362,12 @@ export function AnimalEditor({
                     </div>
                     <div>
                       <label className={labelCls}>Amount received so far (PKR)</label>
-                      <input
-                        className={field}
-                        name="amountReceived"
-                        type="number"
-                    min={NON_NEGATIVE_NUMBER_INPUT_PROPS.min}
-                    step={NON_NEGATIVE_NUMBER_INPUT_PROPS.step}
-                        defaultValue={animal.sale.amount_received || ""}
-                      />
+                      <p className="mt-1 text-base font-semibold text-stone-900">
+                        {formatPkr(animal.sale.amount_received)}
+                      </p>
+                      <p className="mt-0.5 text-xs text-stone-500">
+                        Sum of sale receipts — edit via Sale installments below or Transactions.
+                      </p>
                     </div>
                   </>
                 )}

@@ -19,7 +19,13 @@ import {
   computeSaleSplit,
   saleAdjustmentAmount,
 } from "../livestock/record-sale";
-import { applyDeleteSaleReceipt, findSaleForReceipt } from "../livestock/cancel-sale";
+import {
+  applyDeleteSaleReceipt,
+  findSaleForReceipt,
+  isInstallmentReceipt,
+  saleReceiptAmount,
+} from "../livestock/cancel-sale";
+import { agreementStatus } from "../livestock/purchase-agreement";
 import { buildPalaiNotes, normalizeServiceMonth } from "../palai/service-month";
 import { diffDb, type WritePlan } from "../db/writes";
 
@@ -28,7 +34,8 @@ export type TransactionEditVariant =
   | "livestock_purchase"
   | "partner_transfer"
   | "palai_income"
-  | "livestock_sale";
+  | "livestock_sale"
+  | "livestock_sale_receipt";
 
 export function resolveTransactionKind(tx: Transaction): TransactionEditVariant {
   if (tx.category === "Livestock Sale") return "livestock_sale";
@@ -38,6 +45,18 @@ export function resolveTransactionKind(tx: Transaction): TransactionEditVariant 
   if (tx.kind === "cost") return "expense";
   // Fallback: treat other partner_adjustments like a transfer (date/amount/notes)
   return "partner_transfer";
+}
+
+/** UI + server should use this instead of resolveTransactionKind for edit routing. */
+export function resolveTransactionEditVariant(
+  db: FarmDatabase,
+  tx: Transaction
+): TransactionEditVariant {
+  const base = resolveTransactionKind(tx);
+  if (base !== "livestock_sale") return base;
+  const sale = findSaleForReceipt(db, tx.id);
+  if (sale && isInstallmentReceipt(db, tx, sale)) return "livestock_sale_receipt";
+  return base;
 }
 
 function rebuildLedger(db: FarmDatabase, tx: Transaction): FarmDatabase {
@@ -129,6 +148,14 @@ export type UpdateTransactionInput =
       deliveryCost?: number;
       receivedBy: "Monis" | "Saad";
       notes?: string | null;
+    }
+  | {
+      id: string;
+      variant: "livestock_sale_receipt";
+      date: string;
+      receiptAmount: number;
+      receivedBy: "Monis" | "Saad";
+      notes?: string | null;
     };
 
 export function applyUpdateTransaction(
@@ -137,9 +164,9 @@ export function applyUpdateTransaction(
 ): FarmDatabase {
   const tx = db.transactions.find((t) => t.id === input.id);
   if (!tx) throw new Error("Transaction not found");
-  const variant = resolveTransactionKind(tx);
-  if (variant !== input.variant) {
-    throw new Error(`Cannot edit as ${input.variant}; transaction is ${variant}`);
+  const expectedVariant = resolveTransactionEditVariant(db, tx);
+  if (expectedVariant !== input.variant) {
+    throw new Error(`Cannot edit as ${input.variant}; transaction is ${expectedVariant}`);
   }
 
   const { monisId, saadId } = getPartnerIds(db);
@@ -292,7 +319,61 @@ export function applyUpdateTransaction(
       return rebuildLedger(next, updated);
     }
 
+    case "livestock_sale_receipt": {
+      const sale = findSaleForReceipt(db, tx.id);
+      if (!sale) throw new Error("No sale linked to this receipt");
+
+      if (input.receiptAmount <= 0 || Number.isNaN(input.receiptAmount)) {
+        throw new Error("Receipt amount must be positive");
+      }
+
+      const oldReceiptAmount = saleReceiptAmount(tx.amount);
+      const nextReceived = sale.amount_received - oldReceiptAmount + input.receiptAmount;
+      if (nextReceived < -0.005) {
+        throw new Error("Receipt total cannot be negative");
+      }
+      if (nextReceived > sale.net_received + 0.005) {
+        throw new Error(
+          `Receipt total (${nextReceived}) cannot exceed net proceeds (${sale.net_received})`
+        );
+      }
+
+      const receivedByPartnerId = input.receivedBy === "Monis" ? monisId : saadId;
+      const updated: Transaction = {
+        ...tx,
+        date: input.date,
+        amount: saleAdjustmentAmount(input.receiptAmount, input.receivedBy),
+        notes: input.notes ?? tx.notes,
+        received_by_partner_id: receivedByPartnerId,
+        adjustment_partner_id: monisId,
+      };
+
+      const updatedSale: LivestockSale = {
+        ...sale,
+        amount_received: Math.max(0, nextReceived),
+        status: agreementStatus(Math.max(0, nextReceived), sale.net_received),
+        received_by_partner_id: receivedByPartnerId,
+      };
+
+      const next = {
+        ...db,
+        transactions: db.transactions.map((t) => (t.id === tx.id ? updated : t)),
+        livestock_sales: (db.livestock_sales ?? []).map((s) =>
+          s.id === sale.id ? updatedSale : s
+        ),
+      };
+      return rebuildLedger(next, updated);
+    }
+
     case "livestock_sale": {
+      const linkedSale = findSaleForReceipt(db, tx.id);
+      if (linkedSale && isInstallmentReceipt(db, tx, linkedSale)) {
+        throw new Error(
+          "Edit this installment receipt amount from Transactions (receipt fields only). " +
+            "To change gross sale price or delivery, use the goat profile."
+        );
+      }
+
       const deliveryCost = input.deliveryCost ?? 0;
       const { netReceived, partnerShare } = computeSaleSplit(
         input.grossSalePrice,
@@ -414,6 +495,7 @@ export function applyDeleteTransaction(db: FarmDatabase, id: string): FarmDataba
       };
     }
 
+    case "livestock_sale_receipt":
     case "livestock_sale": {
       const linkedSale = findSaleForReceipt(db, id);
       if (linkedSale) {

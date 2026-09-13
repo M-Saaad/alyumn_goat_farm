@@ -687,6 +687,18 @@ export async function actionUpdateTransaction(formData: FormData) {
       receivedBy: String(formData.get("receivedBy")) as "Monis" | "Saad",
       notes: String(formData.get("notes") || "") || null,
     });
+  } else if (variant === "livestock_sale_receipt") {
+    await updateTransaction({
+      id,
+      variant: "livestock_sale_receipt",
+      date: String(formData.get("date")),
+      receiptAmount: parsePositiveAmount(
+        String(formData.get("receiptAmount") ?? ""),
+        "Amount received"
+      ),
+      receivedBy: String(formData.get("receivedBy")) as "Monis" | "Saad",
+      notes: String(formData.get("notes") || "") || null,
+    });
   } else {
     throw new Error(`Unknown edit variant: ${variant}`);
   }

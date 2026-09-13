@@ -46,7 +46,9 @@ export type EditableTransaction = {
     animalIds: number[];
     grossSalePrice: number;
     deliveryCost: number;
+    netReceived: number;
     receivedBy: "Monis" | "Saad";
+    receiptAmount: number;
   } | null;
 };
 
@@ -214,6 +216,9 @@ export function TransactionEditor({
               )}
               {editing.variant === "livestock_sale" && (
                 <SaleForm tx={editing} animals={allAnimals} />
+              )}
+              {editing.variant === "livestock_sale_receipt" && (
+                <SaleReceiptForm tx={editing} />
               )}
 
               <SubmitButton label="Save changes" />
@@ -470,6 +475,46 @@ function PalaiForm({
       <p className="text-xs text-stone-500">
         Total {formatPkr(palai?.totalAmount ?? Math.abs(tx.amount) * 2)} · splits 50/50
         automatically.
+      </p>
+    </>
+  );
+}
+
+function SaleReceiptForm({ tx }: { tx: EditableTransaction }) {
+  const sale = tx.sale;
+  const receiptAmount = sale?.receiptAmount ?? Math.abs(tx.amount) * 2;
+  const receivedBy =
+    tx.amount < 0 ? "Monis" : sale?.receivedBy ?? "Saad";
+  return (
+    <>
+      {sale && (
+        <p className="mb-3 rounded-xl bg-stone-100 px-3 py-2 text-sm text-stone-600">
+          Sale contract: gross {formatPkr(sale.grossSalePrice)}
+          {sale.deliveryCost > 0 ? ` · delivery ${formatPkr(sale.deliveryCost)}` : ""}
+          {" · "}net {formatPkr(sale.netReceived)}
+        </p>
+      )}
+      <Field label="Receipt date" name="date" type="date" defaultValue={tx.date} required />
+      <Field
+        label="Amount received (PKR)"
+        name="receiptAmount"
+        type="number"
+        defaultValue={receiptAmount}
+        required
+        min={NON_NEGATIVE_NUMBER_INPUT_PROPS.min}
+        step={NON_NEGATIVE_NUMBER_INPUT_PROPS.step}
+      />
+      <div>
+        <label className={labelCls}>Cash received by</label>
+        <select name="receivedBy" className={field} required defaultValue={receivedBy}>
+          <option value="Monis">Monis</option>
+          <option value="Saad">Saad</option>
+        </select>
+      </div>
+      <Field label="Notes" name="notes" defaultValue={tx.notes ?? ""} />
+      <p className="text-xs text-stone-500">
+        This edits one installment receipt only. To change gross sale price or delivery, use the
+        goat profile.
       </p>
     </>
   );
