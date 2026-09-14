@@ -23,9 +23,12 @@ import {
   validatePurchasePaymentAmount,
 } from "./livestock/purchase-agreement";
 import {
+  activeBreedingEventsForFemale,
   assertFemaleAvailableForBreeding,
+  closeBreedingForNewCrossing,
   expectedDueDate,
   findActiveBreedingForDam,
+  warningForClosedBreedingRecords,
   resolveBreedingAfterBirth,
   resolveBreedingAfterUltrasound,
 } from "./livestock/breeding";
@@ -736,7 +739,7 @@ export async function recordBreeding(input: {
   maleAnimalId?: number | null;
   dateCrossed: string;
   notes?: string;
-}) {
+}): Promise<{ warning?: string }> {
   const before = await fetchDb();
   const femaleId = input.femaleId;
   if (!Number.isFinite(femaleId) || femaleId <= 0) {
@@ -757,7 +760,11 @@ export async function recordBreeding(input: {
     throw new Error("Date crossed must be a valid date");
   }
 
-  assertFemaleAvailableForBreeding(before.breeding_events, femaleId);
+  const closed = activeBreedingEventsForFemale(before.breeding_events, femaleId).map(
+    closeBreedingForNewCrossing
+  );
+  const warning = warningForClosedBreedingRecords(closed);
+  const closedById = new Map(closed.map((event) => [event.id, event]));
 
   let maleAnimalId: number | null = input.maleAnimalId ?? null;
   let buckName = input.buckName.trim();
@@ -788,13 +795,17 @@ export async function recordBreeding(input: {
   };
   const after = {
     ...before,
-    breeding_events: [...before.breeding_events, event],
+    breeding_events: [
+      ...before.breeding_events.map((row) => closedById.get(row.id) ?? row),
+      event,
+    ],
   };
   if (isSupabaseDb()) {
-    await applyWritePlan({ upsertBreeding: [event] });
-    return after;
+    await applyWritePlan({ upsertBreeding: [...closed, event] });
+    return { warning };
   }
-  return persistMutation(before, after);
+  await persistMutation(before, after);
+  return { warning };
 }
 
 export async function updateBreeding(input: {

@@ -281,3 +281,34 @@ export function assertFemaleAvailableForBreeding(
     );
   }
 }
+
+/** Open pipeline records for a doe (used when logging a new crossing). */
+export function activeBreedingEventsForFemale(
+  events: BreedingEvent[],
+  femaleId: number
+): BreedingEvent[] {
+  return events.filter((e) => e.female_animal_id === femaleId && isBreedingInPipeline(e));
+}
+
+/** A new crossing means the prior attempt did not carry — close it out, don't block. */
+export function closeBreedingForNewCrossing(existing: BreedingEvent): BreedingEvent {
+  return {
+    ...existing,
+    outcome: "Miscarriage",
+    status: "Ready",
+    fetus_count:
+      existing.fetus_count != null && existing.fetus_count > 0
+        ? existing.fetus_count
+        : existing.fetus_count ?? (existing.ultrasound_date ? 0 : null),
+  };
+}
+
+export function warningForClosedBreedingRecords(closed: BreedingEvent[]): string | undefined {
+  if (closed.length === 0) return undefined;
+  const summary = closed
+    .map((e) => `${e.buck_name || "Unknown buck"} (crossed ${e.date_crossed ?? "?"})`)
+    .join(", ");
+  return closed.length === 1
+    ? `Previous open breeding for this doe (${summary}) was marked not pregnant because you logged a new crossing.`
+    : `Previous open breeding records for this doe (${summary}) were marked not pregnant because you logged a new crossing.`;
+}

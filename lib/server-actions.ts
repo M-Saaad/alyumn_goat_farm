@@ -73,7 +73,9 @@ async function resolveExpenseCategory(formData: FormData): Promise<string> {
 }
 
 export type UltrasoundActionResult = { ok: true } | { ok: false; error: string };
-export type BreedingActionResult = { ok: true } | { ok: false; error: string };
+export type BreedingActionResult =
+  | { ok: true; warning?: string }
+  | { ok: false; error: string };
 export type PalaiActionResult = { ok: true } | { ok: false; error: string };
 
 function friendlyMedicalError(err: unknown): string {
@@ -422,7 +424,7 @@ export async function actionRecordBreeding(
     const dateCrossed = String(formData.get("dateCrossed") || "").trim();
     if (!dateCrossed) throw new Error("Date crossed is required");
 
-    await recordBreeding({
+    const { warning } = await recordBreeding({
       femaleId,
       buckName: String(formData.get("buckName") || ""),
       maleAnimalId: maleRaw ? Number(maleRaw) : null,
@@ -431,7 +433,7 @@ export async function actionRecordBreeding(
     });
     revalidatePath(`/animals/${femaleId}`);
     revalidateTxnPaths();
-    return { ok: true };
+    return warning ? { ok: true, warning } : { ok: true };
   } catch (err) {
     return { ok: false, error: friendlyBreedingError(err) };
   }
