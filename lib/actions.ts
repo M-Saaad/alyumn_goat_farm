@@ -738,6 +738,27 @@ export async function recordBreeding(input: {
   notes?: string;
 }) {
   const before = await fetchDb();
+  const femaleId = input.femaleId;
+  if (!Number.isFinite(femaleId) || femaleId <= 0) {
+    throw new Error("Select a doe");
+  }
+  const female = before.animals.find((a) => a.id === femaleId);
+  if (!female) throw new Error("Doe not found");
+  if (female.status !== "Active") {
+    throw new Error("Cannot record breeding for an inactive doe");
+  }
+  if (female.sex !== "Female") {
+    throw new Error("Breeding can only be recorded for females");
+  }
+
+  const dateCrossed = input.dateCrossed.trim().slice(0, 10);
+  if (!dateCrossed) throw new Error("Date crossed is required");
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateCrossed)) {
+    throw new Error("Date crossed must be a valid date");
+  }
+
+  assertFemaleAvailableForBreeding(before.breeding_events, femaleId);
+
   let maleAnimalId: number | null = input.maleAnimalId ?? null;
   let buckName = input.buckName.trim();
   if (maleAnimalId != null) {
@@ -747,19 +768,23 @@ export async function recordBreeding(input: {
   } else {
     maleAnimalId = null;
   }
+  if (!buckName) {
+    throw new Error("Select or enter a buck");
+  }
+
   const event = {
     id: crypto.randomUUID(),
-    female_animal_id: input.femaleId,
+    female_animal_id: femaleId,
     male_animal_id: maleAnimalId,
     buck_name: buckName || null,
-    date_crossed: input.dateCrossed,
-    expected_due_date: expectedDueDate(input.dateCrossed),
+    date_crossed: dateCrossed,
+    expected_due_date: expectedDueDate(dateCrossed),
     delivered_date: null,
     ultrasound_date: null,
     fetus_count: null,
     outcome: "Pending" as const,
     status: "Doubt" as const,
-    notes: input.notes || null,
+    notes: input.notes?.trim() || null,
   };
   const after = {
     ...before,

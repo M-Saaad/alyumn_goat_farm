@@ -49,6 +49,7 @@ export function BreedingEventEditor({
   const [editing, setEditing] = useState(false);
   const [outcome, setOutcome] = useState<BreedingOutcome>(event.outcome);
   const [pending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
 
   function onDelete() {
     const label = event.buck_name || "this breeding record";
@@ -57,8 +58,13 @@ export function BreedingEventEditor({
     const fd = new FormData();
     fd.set("id", event.id);
     fd.set("femaleId", String(event.femaleId));
+    setError(null);
     startTransition(async () => {
-      await actionDeleteBreeding(fd);
+      const result = await actionDeleteBreeding(fd);
+      if (result.ok === false) {
+        setError(result.error);
+        return;
+      }
       router.refresh();
       setEditing(false);
     });
@@ -78,6 +84,11 @@ export function BreedingEventEditor({
 
   return (
     <div className="mt-2 rounded-xl bg-stone-50 p-3 ring-1 ring-stone-100">
+      {error && (
+        <p className="mb-2 rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700 ring-1 ring-red-200">
+          {error}
+        </p>
+      )}
       <ActionForm action={actionUpdateBreeding} onSuccess={() => setEditing(false)}>
         <input type="hidden" name="id" value={event.id} />
         <input type="hidden" name="femaleId" value={event.femaleId} />

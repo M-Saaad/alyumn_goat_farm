@@ -73,6 +73,7 @@ async function resolveExpenseCategory(formData: FormData): Promise<string> {
 }
 
 export type UltrasoundActionResult = { ok: true } | { ok: false; error: string };
+export type BreedingActionResult = { ok: true } | { ok: false; error: string };
 export type PalaiActionResult = { ok: true } | { ok: false; error: string };
 
 function friendlyMedicalError(err: unknown): string {
@@ -83,20 +84,39 @@ function friendlyMedicalError(err: unknown): string {
   return message;
 }
 
-function friendlyUltrasoundError(err: unknown): string {
-  const message = err instanceof Error ? err.message : "Could not save ultrasound";
+function friendlyBreedingSchemaError(message: string): string | null {
   const lower = message.toLowerCase();
   if (lower.includes("ultrasound_date") || lower.includes("fetus_count")) {
     return "Database is missing ultrasound columns. In Supabase SQL Editor, run migrations 006_breeding_ultrasound_date.sql and 009_breeding_fetus_count.sql (see DEPLOY.md).";
   }
-  if (lower.includes("supabase_service_role_key")) {
+  return null;
+}
+
+function friendlyUltrasoundError(err: unknown): string {
+  const message = err instanceof Error ? err.message : "Could not save ultrasound";
+  const schema = friendlyBreedingSchemaError(message);
+  if (schema) return schema;
+  if (message.toLowerCase().includes("supabase_service_role_key")) {
     return "Server is missing SUPABASE_SERVICE_ROLE_KEY. Add it in Vercel environment variables.";
   }
-  if (lower.includes("upload failed") || lower.includes("bucket")) {
+  if (message.toLowerCase().includes("upload failed") || message.toLowerCase().includes("bucket")) {
     return message;
   }
-  if (lower.includes("only image and video uploads are supported")) {
+  if (message.toLowerCase().includes("only image and video uploads are supported")) {
     return "Could not upload that file. Use MP4, WebM, or MOV video.";
+  }
+  return message;
+}
+
+function friendlyBreedingError(err: unknown): string {
+  const message = err instanceof Error ? err.message : "Could not save breeding record";
+  const schema = friendlyBreedingSchemaError(message);
+  if (schema) return schema;
+  if (message.toLowerCase().includes("supabase_service_role_key")) {
+    return "Server is missing SUPABASE_SERVICE_ROLE_KEY. Add it in Vercel environment variables.";
+  }
+  if (message.toLowerCase().includes("view-only access")) {
+    return message;
   }
   return message;
 }
@@ -387,43 +407,67 @@ export async function actionLogWeight(formData: FormData) {
   revalidateTxnPaths();
 }
 
-export async function actionRecordBreeding(formData: FormData) {
+export async function actionRecordBreeding(
+  formData: FormData
+): Promise<BreedingActionResult> {
   await guardWrite();
-  const maleRaw = String(formData.get("maleAnimalId") || "").trim();
-  await recordBreeding({
-    femaleId: Number(formData.get("femaleId")),
-    buckName: String(formData.get("buckName")),
-    maleAnimalId: maleRaw ? Number(maleRaw) : null,
-    dateCrossed: String(formData.get("dateCrossed")),
-    notes: String(formData.get("notes") || ""),
-  });
-  revalidateTxnPaths();
+  try {
+    const femaleRaw = String(formData.get("femaleId") || "").trim();
+    const femaleId = Number(femaleRaw);
+    if (!femaleRaw || !Number.isFinite(femaleId) || femaleId <= 0) {
+      throw new Error("Select a doe");
+    }
+
+    const maleRaw = String(formData.get("maleAnimalId") || "").trim();
+    const dateCrossed = String(formData.get("dateCrossed") || "").trim();
+    if (!dateCrossed) throw new Error("Date crossed is required");
+
+    await recordBreeding({
+      femaleId,
+      buckName: String(formData.get("buckName") || ""),
+      maleAnimalId: maleRaw ? Number(maleRaw) : null,
+      dateCrossed,
+      notes: String(formData.get("notes") || ""),
+    });
+    revalidatePath(`/animals/${femaleId}`);
+    revalidateTxnPaths();
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: friendlyBreedingError(err) };
+  }
 }
 
-export async function actionUpdateBreeding(formData: FormData) {
+export async function actionUpdateBreeding(
+  formData: FormData
+): Promise<BreedingActionResult> {
   await guardWrite();
-  const maleRaw = String(formData.get("maleAnimalId") || "").trim();
-  const statusRaw = String(formData.get("status") || "").trim();
-  const deliveredRaw = String(formData.get("deliveredDate") || "").trim();
-  const ultrasoundRaw = String(formData.get("ultrasoundDate") || "").trim();
-  const fetusRaw = String(formData.get("fetusCount") || "").trim();
-  await updateBreeding({
-    id: String(formData.get("id")),
-    buckName: String(formData.get("buckName") || ""),
-    maleAnimalId: maleRaw ? Number(maleRaw) : null,
-    dateCrossed: String(formData.get("dateCrossed")),
-    outcome: String(formData.get("outcome")) as import("@/lib/types").BreedingOutcome,
-    status: statusRaw as import("@/lib/types").BreedingStatus | "",
-    deliveredDate: deliveredRaw || null,
-    ultrasoundDate: ultrasoundRaw || null,
-    fetusCount: parseOptionalNonNegativeInteger(fetusRaw, "Kids on ultrasound"),
-    notes: String(formData.get("notes") || "") || null,
-  });
-  const femaleId = Number(formData.get("femaleId"));
-  if (femaleId && !Number.isNaN(femaleId)) {
-    revalidatePath(`/animals/${femaleId}`);
+  try {
+    const maleRaw = String(formData.get("maleAnimalId") || "").trim();
+    const statusRaw = String(formData.get("status") || "").trim();
+    const deliveredRaw = String(formData.get("deliveredDate") || "").trim();
+    const ultrasoundRaw = String(formData.get("ultrasoundDate") || "").trim();
+    const fetusRaw = String(formData.get("fetusCount") || "").trim();
+    await updateBreeding({
+      id: String(formData.get("id")),
+      buckName: String(formData.get("buckName") || ""),
+      maleAnimalId: maleRaw ? Number(maleRaw) : null,
+      dateCrossed: String(formData.get("dateCrossed")),
+      outcome: String(formData.get("outcome")) as import("@/lib/types").BreedingOutcome,
+      status: statusRaw as import("@/lib/types").BreedingStatus | "",
+      deliveredDate: deliveredRaw || null,
+      ultrasoundDate: ultrasoundRaw || null,
+      fetusCount: parseOptionalNonNegativeInteger(fetusRaw, "Kids on ultrasound"),
+      notes: String(formData.get("notes") || "") || null,
+    });
+    const femaleId = Number(formData.get("femaleId"));
+    if (femaleId && !Number.isNaN(femaleId)) {
+      revalidatePath(`/animals/${femaleId}`);
+    }
+    revalidateTxnPaths();
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: friendlyBreedingError(err) };
   }
-  revalidateTxnPaths();
 }
 
 export async function actionRecordBreedingUltrasound(
@@ -465,15 +509,22 @@ export async function actionRecordBreedingUltrasound(
   }
 }
 
-export async function actionDeleteBreeding(formData: FormData) {
+export async function actionDeleteBreeding(
+  formData: FormData
+): Promise<BreedingActionResult> {
   await guardWrite();
-  const id = String(formData.get("id"));
-  const femaleId = Number(formData.get("femaleId"));
-  await deleteBreeding(id);
-  if (femaleId && !Number.isNaN(femaleId)) {
-    revalidatePath(`/animals/${femaleId}`);
+  try {
+    const id = String(formData.get("id"));
+    const femaleId = Number(formData.get("femaleId"));
+    await deleteBreeding(id);
+    if (femaleId && !Number.isNaN(femaleId)) {
+      revalidatePath(`/animals/${femaleId}`);
+    }
+    revalidateTxnPaths();
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: friendlyBreedingError(err) };
   }
-  revalidateTxnPaths();
 }
 
 export async function actionChangeStatus(formData: FormData) {
