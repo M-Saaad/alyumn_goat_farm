@@ -26,7 +26,7 @@ export function ActionForm({
   className,
   children,
 }: {
-  action: (formData: FormData) => Promise<void | { ok?: boolean; error?: string }>;
+  action: (formData: FormData) => Promise<void | { ok?: boolean; error?: string; warning?: string }>;
   onSuccess?: () => void;
   className?: string;
   children: ReactNode;
@@ -34,12 +34,14 @@ export function ActionForm({
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [warning, setWarning] = useState<string | null>(null);
 
   function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const form = e.currentTarget;
     const fd = new FormData(form);
     setError(null);
+    setWarning(null);
     startTransition(async () => {
       try {
         const result = await action(fd);
@@ -52,6 +54,10 @@ export function ActionForm({
           return;
         }
         router.refresh();
+        if (result && typeof result === "object" && "warning" in result && result.warning) {
+          setWarning(result.warning);
+          return;
+        }
         onSuccess?.();
       } catch (err) {
         setError(err instanceof Error ? err.message : "Something went wrong");
@@ -65,6 +71,11 @@ export function ActionForm({
         {error && (
           <p className="mb-2 rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700 ring-1 ring-red-200">
             {error}
+          </p>
+        )}
+        {warning && (
+          <p className="mb-2 rounded-xl bg-amber-50 px-3 py-2 text-sm text-amber-900 ring-1 ring-amber-200">
+            {warning}
           </p>
         )}
         <fieldset disabled={pending} className="min-w-0 space-y-3 border-0 p-0">
