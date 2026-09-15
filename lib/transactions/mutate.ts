@@ -215,7 +215,7 @@ export function applyUpdateTransaction(
         if (tx.animal_id == null || a.id !== tx.animal_id) return a;
         return {
           ...a,
-          price: input.amount,
+          // Payment amount ≠ agreed purchase price; keep animal.price / agreement total.
           date_of_purchase: input.date,
           purchased_from: vendorId,
         };
