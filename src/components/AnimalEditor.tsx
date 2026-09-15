@@ -260,7 +260,7 @@ export function AnimalEditor({
                   type="number"
                   min={NON_NEGATIVE_NUMBER_INPUT_PROPS.min}
                   step={NON_NEGATIVE_NUMBER_INPUT_PROPS.step}
-                  defaultValue={animal.purchase_paid || ""}
+                  defaultValue={animal.purchase_paid ?? ""}
                 />
               </div>
               <p className="text-xs text-stone-500">

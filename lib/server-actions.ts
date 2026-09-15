@@ -77,6 +77,7 @@ export type BreedingActionResult =
   | { ok: true; warning?: string }
   | { ok: false; error: string };
 export type PalaiActionResult = { ok: true } | { ok: false; error: string };
+export type AnimalActionResult = { ok: true } | { ok: false; error: string };
 
 function friendlyMedicalError(err: unknown): string {
   const message = err instanceof Error ? err.message : "Could not save medical record";
@@ -114,6 +115,17 @@ function friendlyBreedingError(err: unknown): string {
   const message = err instanceof Error ? err.message : "Could not save breeding record";
   const schema = friendlyBreedingSchemaError(message);
   if (schema) return schema;
+  if (message.toLowerCase().includes("supabase_service_role_key")) {
+    return "Server is missing SUPABASE_SERVICE_ROLE_KEY. Add it in Vercel environment variables.";
+  }
+  if (message.toLowerCase().includes("view-only access")) {
+    return message;
+  }
+  return message;
+}
+
+function friendlyAnimalError(err: unknown): string {
+  const message = err instanceof Error ? err.message : "Could not save goat details";
   if (message.toLowerCase().includes("supabase_service_role_key")) {
     return "Server is missing SUPABASE_SERVICE_ROLE_KEY. Add it in Vercel environment variables.";
   }
@@ -766,57 +778,74 @@ export async function actionDeleteTransaction(formData: FormData) {
   revalidateTxnPaths();
 }
 
-export async function actionUpdateAnimal(formData: FormData) {
-  await guardWrite();
-  const id = Number(formData.get("id"));
-  const palaiRaw = String(formData.get("palaiRate") || "").trim();
-  const breedRaw = String(formData.get("breed") || "").trim();
-  const sexRaw = String(formData.get("sex") || "").trim();
-  const statusRaw = String(formData.get("status") || "").trim();
-  const purchasePriceRaw = String(formData.get("purchasePrice") || "").trim();
-  const purchasePaidRaw = String(formData.get("purchasePaid") || "").trim();
-  const soldPriceRaw = String(formData.get("soldPrice") || "").trim();
-  const saleDateRaw = String(formData.get("saleDate") || "").trim();
-  const deliveryRaw = String(formData.get("deliveryCost") || "").trim();
-  const receivedRaw = String(formData.get("amountReceived") || "").trim();
-  const purchaseDateRaw = String(formData.get("purchaseDate") || "").trim();
-  const outDateRaw = String(formData.get("outDate") || "").trim();
-  const damRaw = String(formData.get("damId") || "").trim();
-  const sireAnimalRaw = String(formData.get("sireAnimalId") || "").trim();
-  const sireNameRaw = String(formData.get("sireName") || "").trim();
-  const isBorn =
-    formData.get("acquisitionType") === "born" ||
-    formData.get("homeBred") === "on" ||
-    formData.get("homeBred") === "true";
+export async function actionUpdateAnimal(
+  formData: FormData
+): Promise<AnimalActionResult> {
+  try {
+    await guardWrite();
+    const id = Number(formData.get("id"));
+    if (!id || Number.isNaN(id)) {
+      return { ok: false, error: "Animal id is required" };
+    }
+    const ownerName = String(formData.get("ownerName") || "").trim();
+    if (!ownerName) {
+      return { ok: false, error: "Owner is required" };
+    }
+    const palaiRaw = String(formData.get("palaiRate") || "").trim();
+    const breedRaw = String(formData.get("breed") || "").trim();
+    const sexRaw = String(formData.get("sex") || "").trim();
+    const statusRaw = String(formData.get("status") || "").trim();
+    const purchasePriceRaw = String(formData.get("purchasePrice") || "").trim();
+    const purchasePaidRaw = String(formData.get("purchasePaid") || "").trim();
+    const soldPriceRaw = String(formData.get("soldPrice") || "").trim();
+    const saleDateRaw = String(formData.get("saleDate") || "").trim();
+    const deliveryRaw = String(formData.get("deliveryCost") || "").trim();
+    const receivedRaw = String(formData.get("amountReceived") || "").trim();
+    const purchaseDateRaw = String(formData.get("purchaseDate") || "").trim();
+    const outDateRaw = String(formData.get("outDate") || "").trim();
+    const damRaw = String(formData.get("damId") || "").trim();
+    const sireAnimalRaw = String(formData.get("sireAnimalId") || "").trim();
+    const sireNameRaw = String(formData.get("sireName") || "").trim();
+    const isBorn =
+      formData.get("acquisitionType") === "born" ||
+      formData.get("homeBred") === "on" ||
+      formData.get("homeBred") === "true";
 
-  await updateAnimal({
-    id,
-    name: String(formData.get("name") || "") || null,
-    breed: breedRaw ? (breedRaw as AnimalBreed) : null,
-    sex: sexRaw ? (sexRaw as AnimalSex) : null,
-    description: String(formData.get("description") || "") || null,
-    comment: String(formData.get("comment") || "") || null,
-    ownerName: String(formData.get("ownerName")),
-    vendorName: String(formData.get("vendorName") || "") || null,
-    palai_rate: parseOptionalPositiveAmount(palaiRaw, "Palai rate"),
-    age_at_purchase: String(formData.get("ageAtPurchase") || "") || null,
-    home_bred: isBorn,
-    dam_id: isBorn && damRaw ? Number(damRaw) : isBorn ? null : null,
-    sire_id: isBorn && sireAnimalRaw ? Number(sireAnimalRaw) : isBorn ? null : null,
-    sire_name: isBorn && sireNameRaw ? sireNameRaw : isBorn ? null : null,
-    status: statusRaw ? (statusRaw as AnimalStatus) : undefined,
-    date_of_purchase: purchaseDateRaw || null,
-    purchase_price: parseOptionalNonNegativeAmount(purchasePriceRaw, "Purchase price"),
-    purchase_paid: parseOptionalNonNegativeAmount(purchasePaidRaw, "Amount paid"),
-    out_date: outDateRaw || null,
-    sold_price: parseOptionalNonNegativeAmount(soldPriceRaw, "Sold price"),
-    sale_date: saleDateRaw || null,
-    gross_sale_price: parseOptionalNonNegativeAmount(soldPriceRaw, "Sale price"),
-    delivery_cost: parseOptionalNonNegativeAmount(deliveryRaw, "Delivery cost"),
-    amount_received: parseOptionalNonNegativeAmount(receivedRaw, "Amount received"),
-  });
-  revalidatePath(`/animals/${id}`);
-  revalidateTxnPaths();
+    await updateAnimal({
+      id,
+      name: String(formData.get("name") || "") || null,
+      breed: breedRaw ? (breedRaw as AnimalBreed) : null,
+      sex: sexRaw ? (sexRaw as AnimalSex) : null,
+      description: String(formData.get("description") || "") || null,
+      comment: String(formData.get("comment") || "") || null,
+      ownerName,
+      vendorName: String(formData.get("vendorName") || "") || null,
+      palai_rate: parseOptionalPositiveAmount(palaiRaw, "Palai rate"),
+      age_at_purchase: String(formData.get("ageAtPurchase") || "") || null,
+      home_bred: isBorn,
+      dam_id: isBorn && damRaw ? Number(damRaw) : isBorn ? null : null,
+      sire_id: isBorn && sireAnimalRaw ? Number(sireAnimalRaw) : isBorn ? null : null,
+      sire_name: isBorn && sireNameRaw ? sireNameRaw : isBorn ? null : null,
+      status: statusRaw ? (statusRaw as AnimalStatus) : undefined,
+      date_of_purchase: purchaseDateRaw || null,
+      purchase_price: parseOptionalNonNegativeAmount(purchasePriceRaw, "Purchase price"),
+      purchase_paid: parseOptionalNonNegativeAmount(purchasePaidRaw, "Amount paid"),
+      out_date: outDateRaw || null,
+      sold_price: parseOptionalNonNegativeAmount(soldPriceRaw, "Sold price"),
+      sale_date: saleDateRaw || null,
+      gross_sale_price: parseOptionalNonNegativeAmount(soldPriceRaw, "Sale price"),
+      delivery_cost: parseOptionalNonNegativeAmount(deliveryRaw, "Delivery cost"),
+      amount_received: parseOptionalNonNegativeAmount(receivedRaw, "Amount received"),
+    });
+    revalidatePath(`/animals/${id}`);
+    revalidateTxnPaths();
+    return { ok: true };
+  } catch (err) {
+    return {
+      ok: false,
+      error: friendlyAnimalError(err),
+    };
+  }
 }
 
 export async function actionDeleteAnimal(formData: FormData) {
