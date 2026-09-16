@@ -1,7 +1,15 @@
-import type { AgreementStatus, FarmDatabase, PurchaseAgreement, Transaction } from "../types";
+import type { AgreementStatus, Animal, FarmDatabase, PurchaseAgreement, Transaction } from "../types";
 
 export function purchaseBalance(agreement: PurchaseAgreement): number {
   return Math.max(0, agreement.total_amount - agreement.amount_paid);
+}
+
+/** Agreed purchase price — prefer installment agreement total over animal.price. */
+export function canonicalPurchasePrice(
+  animal: Pick<Animal, "price">,
+  agreement: PurchaseAgreement | null | undefined
+): number {
+  return agreement?.total_amount ?? animal.price;
 }
 
 export function agreementStatus(amount: number, total: number): AgreementStatus {

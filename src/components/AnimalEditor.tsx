@@ -32,7 +32,8 @@ export type AnimalEditorData = {
   sire_name: string | null;
   status: AnimalStatus;
   date_of_purchase: string | null;
-  price: number;
+  /** Agreed purchase price (from installment agreement when present). */
+  purchase_price: number;
   purchase_paid: number;
   out_date: string | null;
   sold_price: number | null;
@@ -249,7 +250,7 @@ export function AnimalEditor({
                   type="number"
                   min={NON_NEGATIVE_NUMBER_INPUT_PROPS.min}
                   step={NON_NEGATIVE_NUMBER_INPUT_PROPS.step}
-                  defaultValue={animal.price || ""}
+                  defaultValue={animal.purchase_price ?? ""}
                 />
               </div>
               <div>
