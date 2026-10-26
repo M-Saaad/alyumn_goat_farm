@@ -18,8 +18,11 @@ import {
   resolveBreedingAfterUltrasound,
   breedingRecordStatusLabel,
   breedingTimeline,
+  breedingToReopenAfterDelete,
+  closeBreedingForNewCrossing,
   findActiveBreedingForDam,
   isBreedingInPipeline,
+  isDoeBreedingReady,
   isRecentDelivery,
   resolveBreedingAfterBirth,
   breedingUpdatesFromBirths,
@@ -340,7 +343,10 @@ assert(breedingRecordStatusLabel({ ...pending, ultrasound_date: "2026-06-10", fe
 
 const delivered = resolveBreedingAfterBirth(pending, "2026-08-15");
 assert(delivered.outcome === "Delivered" && delivered.status === "Delivered", "birth closes breeding");
-assert(breedingRecordStatusLabel({ ...pending, ...delivered }) === "Delivered", "delivered label within 60 days");
+assert(
+  breedingRecordStatusLabel({ ...pending, ...delivered }, "2026-08-17") === "Delivered",
+  "delivered label within 60 days"
+);
 assert(
   breedingRecordStatusLabel({ ...pending, ...delivered, delivered_date: "2026-04-01" }, "2026-08-17") === "Ready",
   "delivered label after 60 days becomes ready"
@@ -354,10 +360,11 @@ assert(
   "old delivery not recent"
 );
 
-const deliveredTimeline = breedingTimeline({ ...pending, ...delivered });
+const deliveredTimeline = breedingTimeline({ ...pending, ...delivered }, null, "2026-08-17");
 assert(deliveredTimeline?.type === "delivered" && deliveredTimeline.date === "2026-08-15", "delivered timeline uses birth date");
 assert(
-  breedingTimeline({ ...pending, ...delivered, expected_due_date: "2026-09-03" })?.type === "delivered",
+  breedingTimeline({ ...pending, ...delivered, expected_due_date: "2026-09-03" }, null, "2026-08-17")?.type ===
+    "delivered",
   "delivered timeline ignores expected due date"
 );
 
@@ -473,7 +480,80 @@ assert(
   "active doe in breeding roster"
 );
 
+// Deleting the latest crossing should restore a soft-closed prior breeding (Gurdya case).
+const gurdyaPrior = breedingEvent({
+  id: "br-gurdya-prior",
+  female_animal_id: 6,
+  buck_name: "Shelby",
+  date_crossed: "2026-06-18",
+  expected_due_date: "2026-11-15",
+  ultrasound_date: "2026-08-07",
+  fetus_count: null,
+  outcome: "Doubt",
+  status: "Doubt",
+  notes: "Stillbirth note",
+});
+const gurdyaLatest = breedingEvent({
+  id: "br-gurdya-latest",
+  female_animal_id: 6,
+  buck_name: "Chatni",
+  date_crossed: "2026-10-01",
+  expected_due_date: "2027-02-28",
+  outcome: "Pending",
+  status: "Doubt",
+});
+const gurdyaClosed = closeBreedingForNewCrossing(gurdyaPrior);
+assert(gurdyaClosed.outcome === "Miscarriage" && gurdyaClosed.status === "Ready", "new crossing soft-closes prior");
+assert(!isBreedingInPipeline(gurdyaClosed), "soft-closed prior leaves pipeline");
+const gurdyaRestored = breedingToReopenAfterDelete(
+  [gurdyaClosed, gurdyaLatest],
+  gurdyaLatest
+);
+assert(gurdyaRestored != null, "delete latest finds prior to reopen");
+assert(gurdyaRestored!.id === "br-gurdya-prior", "reopens prior breeding id");
+assert(gurdyaRestored!.outcome === "Doubt" && gurdyaRestored!.status === "Doubt", "restores doubt state");
+assert(gurdyaRestored!.fetus_count == null, "restores unknown fetus count");
+assert(gurdyaRestored!.expected_due_date === "2026-11-15", "keeps prior due date");
+assert(gurdyaRestored!.ultrasound_date === "2026-08-07", "keeps prior ultrasound date");
+assert(gurdyaRestored!.notes === "Stillbirth note", "strips close marker from notes");
+assert(isBreedingInPipeline(gurdyaRestored!), "restored prior is in pipeline");
+assert(!isDoeBreedingReady(gurdyaRestored!, "2026-10-20"), "restored prior is not ready");
+assert(
+  breedingTimeline(gurdyaRestored!, null, "2026-10-20")?.type === "due",
+  "restored prior shows due timeline"
+);
+
+const legacyClosed: BreedingEvent = {
+  ...gurdyaPrior,
+  id: "br-legacy-closed",
+  outcome: "Miscarriage",
+  status: "Ready",
+  fetus_count: 0,
+  notes: "legacy close without marker",
+};
+const legacyLatest = breedingEvent({
+  id: "br-legacy-latest",
+  female_animal_id: 6,
+  date_crossed: "2026-10-01",
+  outcome: "Pending",
+  status: "Doubt",
+});
+const legacyRestored = breedingToReopenAfterDelete([legacyClosed, legacyLatest], legacyLatest);
+assert(legacyRestored != null, "legacy soft-close reopens without marker");
+assert(legacyRestored!.status === "Doubt", "legacy restore returns doubt");
+assert(legacyRestored!.fetus_count == null, "legacy restore clears artificial zero fetus count");
+
+assert(
+  breedingToReopenAfterDelete([gurdyaClosed], gurdyaLatest)?.status === "Doubt",
+  "reopen works when deleted id is absent from list"
+);
+assert(
+  breedingToReopenAfterDelete([gurdyaLatest, gurdyaPrior], gurdyaLatest) == null,
+  "does not reopen an already-active prior"
+);
+
 console.log(
   "PASS herd health intervals (built-in & custom vaccines, ETV & internal deworm twice yearly, external 2d after internal)"
 );
 console.log("PASS breeding ultrasound window (day 40–75)");
+console.log("PASS delete latest breeding restores soft-closed prior (doubt + dates)");
