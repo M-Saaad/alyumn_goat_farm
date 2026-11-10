@@ -263,9 +263,7 @@ export async function applyWritePlan(plan: WritePlan): Promise<void> {
 
   if (plan.upsertAnimals?.length) {
     const parentCols = await hasAnimalParentColumns(client);
-    const animalsToWrite = parentCols
-      ? plan.upsertAnimals
-      : animalsWithEncodedParentComments(plan.upsertAnimals);
+    const animalsToWrite = animalsWithEncodedParentComments(plan.upsertAnimals);
     await upsertRows(
       client,
       "animals",
