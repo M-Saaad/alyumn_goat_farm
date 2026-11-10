@@ -5,6 +5,7 @@ import { actionUpdateAnimal } from "@/lib/server-actions";
 import { ActionForm, SubmitButton } from "@/components/ActionForm";
 import { BuckSelect, ContactSelect, type ContactOption } from "@/components/ContactSelect";
 import type { AnimalBreed, AnimalSex, AnimalStatus } from "@/lib/types";
+import { formatPkr } from "@/lib/format";
 import { NON_NEGATIVE_NUMBER_INPUT_PROPS } from "@/lib/form-numbers";
 
 const field =
@@ -31,7 +32,8 @@ export type AnimalEditorData = {
   sire_name: string | null;
   status: AnimalStatus;
   date_of_purchase: string | null;
-  price: number;
+  /** Agreed purchase price (from installment agreement when present). */
+  purchase_price: number;
   purchase_paid: number;
   out_date: string | null;
   sold_price: number | null;
@@ -248,7 +250,7 @@ export function AnimalEditor({
                   type="number"
                   min={NON_NEGATIVE_NUMBER_INPUT_PROPS.min}
                   step={NON_NEGATIVE_NUMBER_INPUT_PROPS.step}
-                  defaultValue={animal.price || ""}
+                  defaultValue={animal.purchase_price ?? ""}
                 />
               </div>
               <div>
@@ -259,7 +261,7 @@ export function AnimalEditor({
                   type="number"
                   min={NON_NEGATIVE_NUMBER_INPUT_PROPS.min}
                   step={NON_NEGATIVE_NUMBER_INPUT_PROPS.step}
-                  defaultValue={animal.purchase_paid || ""}
+                  defaultValue={animal.purchase_paid ?? ""}
                 />
               </div>
               <p className="text-xs text-stone-500">
@@ -275,12 +277,12 @@ export function AnimalEditor({
                 <select
                   name="damId"
                   className={field}
-                  defaultValue={animal.dam_id ?? ""}
+                  defaultValue={animal.dam_id != null ? String(animal.dam_id) : ""}
                   required
                 >
                   <option value="">—</option>
                   {damAnimals.map((a) => (
-                    <option key={a.id} value={a.id}>
+                    <option key={a.id} value={String(a.id)}>
                       {a.label}
                     </option>
                   ))}
@@ -361,14 +363,12 @@ export function AnimalEditor({
                     </div>
                     <div>
                       <label className={labelCls}>Amount received so far (PKR)</label>
-                      <input
-                        className={field}
-                        name="amountReceived"
-                        type="number"
-                    min={NON_NEGATIVE_NUMBER_INPUT_PROPS.min}
-                    step={NON_NEGATIVE_NUMBER_INPUT_PROPS.step}
-                        defaultValue={animal.sale.amount_received || ""}
-                      />
+                      <p className="mt-1 text-base font-semibold text-stone-900">
+                        {formatPkr(animal.sale.amount_received)}
+                      </p>
+                      <p className="mt-0.5 text-xs text-stone-500">
+                        Sum of sale receipts — edit via Sale installments below or Transactions.
+                      </p>
                     </div>
                   </>
                 )}

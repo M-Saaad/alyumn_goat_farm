@@ -5,6 +5,7 @@ import {
   findPurchaseAgreement,
   legacyPurchasePaid,
 } from "../livestock/purchase-agreement";
+import { sumSaleReceiptAmounts, allSaleReceiptTxIds } from "../livestock/cancel-sale";
 import { computeSaleSplit, findSaleForAnimal } from "../livestock/record-sale";
 
 export type UpdateAnimalInput = {
@@ -146,10 +147,9 @@ function updateLivestockSale(
       ? input.delivery_cost
       : sale.delivery_cost;
   const { netReceived, partnerShare } = computeSaleSplit(gross, delivery);
+  const receiptIds = allSaleReceiptTxIds(db, sale);
   const received =
-    input.amount_received != null && !Number.isNaN(input.amount_received)
-      ? input.amount_received
-      : sale.amount_received;
+    receiptIds.length > 0 ? sumSaleReceiptAmounts(db, sale) : sale.amount_received;
 
   if (received < 0) throw new Error("Amount received cannot be negative");
   if (received > netReceived + 0.005) {

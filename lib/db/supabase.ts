@@ -483,7 +483,7 @@ export async function saveToSupabase(client: SupabaseClient, db: FarmDatabase): 
   await syncTable(
     client,
     "animals",
-    (parentCols ? db.animals : animalsWithEncodedParentComments(db.animals)).map((a) => {
+    animalsWithEncodedParentComments(db.animals).map((a) => {
       const row: Record<string, unknown> = {
         id: a.id,
         name: a.name,

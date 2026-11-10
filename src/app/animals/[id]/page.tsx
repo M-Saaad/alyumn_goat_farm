@@ -5,6 +5,7 @@ import { formatPkr, formatDate, todayIso } from "@/lib/format";
 import { animalParentLabel, sireLabel } from "@/lib/livestock/animal-parents";
 import { isSupabaseDb } from "@/lib/db";
 import { isSoldOnPalaiSale, saleReceiptAmount } from "@/lib/livestock/cancel-sale";
+import { canonicalPurchasePrice } from "@/lib/livestock/purchase-agreement";
 import { loadAnimalProfileData, contactNameFrom } from "@/lib/db/queries";
 import { BottomNav } from "@/components/BottomNav";
 import { QuickEntryLoader } from "@/components/QuickEntryLoader";
@@ -23,8 +24,18 @@ import { similarVaccineEvents } from "@/lib/livestock/vaccine-schedule";
 import { backFromAnimalProfile } from "@/lib/livestock/health-nav";
 import { computeUltrasoundStatus, daysSinceCrossed, breedingRecordStatusLabel, breedingTimeline } from "@/lib/livestock/breeding";
 import { estimateAnimalAge } from "@/lib/livestock/age";
+import type { Animal } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
+
+function withRecordedParent(
+  options: { id: number; label: string }[],
+  parentId: number | null,
+  animals: Animal[]
+): { id: number; label: string }[] {
+  if (parentId == null || options.some((option) => option.id === parentId)) return options;
+  return [...options, { id: parentId, label: animalParentLabel(animals, parentId) }];
+}
 
 export default async function AnimalProfilePage({
   params,
@@ -75,6 +86,7 @@ export default async function AnimalProfilePage({
           t.animal_id === animalId
       )
       .reduce((sum, t) => sum + t.amount, 0);
+  const purchasePrice = canonicalPurchasePrice(animal, data.purchase_agreement);
 
   const saleReceipts = sale
     ? txs
@@ -132,7 +144,7 @@ export default async function AnimalProfilePage({
           sire_name: animal.sire_name,
           status: animal.status,
           date_of_purchase: animal.date_of_purchase,
-          price: animal.price,
+          purchase_price: purchasePrice,
           purchase_paid: purchasePaid,
           out_date: animal.out_date,
           sold_price: animal.sold_price,
@@ -145,11 +157,19 @@ export default async function AnimalProfilePage({
               }
             : null,
         }}
-        vendors={data.quickEntry.vendors}
-        ownerOptions={data.quickEntry.ownerOptions}
-        damAnimals={data.quickEntry.damAnimals ?? data.quickEntry.femaleAnimals ?? []}
-        maleAnimals={data.quickEntry.maleAnimals}
-        pastBuckNames={data.quickEntry.pastBuckNames}
+        vendors={data.editorProps.vendors}
+        ownerOptions={data.editorProps.ownerOptions}
+        damAnimals={withRecordedParent(
+          data.editorProps.damAnimals ?? data.editorProps.femaleAnimals ?? [],
+          animal.dam_id,
+          data.animals
+        )}
+        maleAnimals={withRecordedParent(
+          data.editorProps.maleAnimals,
+          animal.sire_id,
+          data.animals
+        )}
+        pastBuckNames={data.editorProps.pastBuckNames}
         canWrite={canWrite}
       />
 
@@ -171,7 +191,7 @@ export default async function AnimalProfilePage({
       ) : data.purchase_balance > 0 && !animal.home_bred ? (
         <section className="mb-3 rounded-2xl bg-amber-50 p-4 text-sm text-amber-900 ring-1 ring-amber-200">
           <p className="font-semibold">Outstanding purchase balance</p>
-          <p>{formatPkr(data.purchase_balance)} remaining on agreed price {formatPkr(animal.price)}</p>
+          <p>{formatPkr(data.purchase_balance)} remaining on agreed price {formatPkr(purchasePrice)}</p>
           <p className="mt-1 text-xs text-amber-800">
             Log further livestock purchase payments from Transactions or Quick Entry.
           </p>
@@ -197,7 +217,7 @@ export default async function AnimalProfilePage({
               <div>
                 <dt className="text-stone-500">Price</dt>
                 <dd className="font-semibold">
-                  {animal.price ? formatPkr(animal.price) : "—"}
+                  {purchasePrice ? formatPkr(purchasePrice) : "—"}
                 </dd>
               </div>
               <div>
@@ -322,7 +342,7 @@ export default async function AnimalProfilePage({
                     <VaccineRecordEditor
                       event={m}
                       similarGoats={similarGoats}
-                      vaccineSchedules={data.quickEntry.vaccineSchedules}
+                      vaccineSchedules={data.editorProps.vaccineSchedules}
                       canWrite={canWrite}
                     />
                   )}
@@ -385,8 +405,8 @@ export default async function AnimalProfilePage({
                   }}
                   ultrasoundStatus={ultrasoundStatus}
                   daysSinceCrossed={crossedDays}
-                  maleAnimals={data.quickEntry.maleAnimals}
-                  pastBuckNames={data.quickEntry.pastBuckNames}
+                  maleAnimals={data.editorProps.maleAnimals}
+                  pastBuckNames={data.editorProps.pastBuckNames}
                   supabaseEnabled={supabaseEnabled}
                   canWrite={canWrite}
                 />
@@ -444,7 +464,7 @@ export default async function AnimalProfilePage({
         )}
       </section>
 
-      <QuickEntryLoader {...data.quickEntry} canWrite={canWrite} />
+      <QuickEntryLoader canWrite={canWrite} />
       <BottomNav active={sp.from === "health" ? "health" : "goats"} />
     </main>
   );

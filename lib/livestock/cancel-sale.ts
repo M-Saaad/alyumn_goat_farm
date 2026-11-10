@@ -15,6 +15,36 @@ export function allSaleReceiptTxIds(db: FarmDatabase, sale: LivestockSale): stri
   return [...ids];
 }
 
+export function sumSaleReceiptAmounts(db: FarmDatabase, sale: LivestockSale): number {
+  return allSaleReceiptTxIds(db, sale).reduce((sum, id) => {
+    const receiptTx = db.transactions.find((t) => t.id === id);
+    if (!receiptTx) return sum;
+    return sum + saleReceiptAmount(receiptTx.amount);
+  }, 0);
+}
+
+/** Map every sale receipt transaction id → its livestock sale row. */
+export function buildSaleByTxId(db: FarmDatabase): Map<string, LivestockSale> {
+  const map = new Map<string, LivestockSale>();
+  for (const sale of db.livestock_sales ?? []) {
+    for (const txId of allSaleReceiptTxIds(db, sale)) {
+      map.set(txId, sale);
+    }
+  }
+  return map;
+}
+
+/** Partial-sale receipts must not rewrite gross/net via the full-sale transaction editor. */
+export function isInstallmentReceipt(
+  db: FarmDatabase,
+  tx: { id: string; livestock_sale_id: string | null },
+  sale: LivestockSale
+): boolean {
+  if (tx.livestock_sale_id) return true;
+  if (allSaleReceiptTxIds(db, sale).length > 1) return true;
+  return sale.amount_received < sale.net_received - 0.005;
+}
+
 export function findSaleForReceipt(
   db: FarmDatabase,
   txId: string

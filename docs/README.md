@@ -11,6 +11,7 @@ Detailed reference for developers and AI agents working on the **Monis & Saad Go
 | Learn entities and sample data | [DATA-MODEL.md](DATA-MODEL.md) |
 | Change financial logic safely | [BUSINESS-RULES.md](BUSINESS-RULES.md) |
 | Navigate the codebase | [ARCHITECTURE.md](ARCHITECTURE.md) |
+| Improve speed / apply perf patterns | [PERFORMANCE.md](PERFORMANCE.md) |
 | Run imports, seeds, verification | [OPERATIONS.md](OPERATIONS.md) |
 | Deploy to production | [../DEPLOY.md](../DEPLOY.md) |
 

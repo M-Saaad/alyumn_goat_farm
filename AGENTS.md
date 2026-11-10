@@ -114,6 +114,7 @@ npm run build
 | [docs/DATA-MODEL.md](docs/DATA-MODEL.md) | Entities, fields, relationships, sample IDs |
 | [docs/BUSINESS-RULES.md](docs/BUSINESS-RULES.md) | Settlement, Palai, sales, breeding rules |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Code layers, auth, DB access patterns |
+| [docs/PERFORMANCE.md](docs/PERFORMANCE.md) | Speed optimizations and reusable patterns |
 | [docs/OPERATIONS.md](docs/OPERATIONS.md) | Import pipeline, scripts, verification |
 
 ## Conventions for agents

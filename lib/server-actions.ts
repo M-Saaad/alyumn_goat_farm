@@ -73,7 +73,11 @@ async function resolveExpenseCategory(formData: FormData): Promise<string> {
 }
 
 export type UltrasoundActionResult = { ok: true } | { ok: false; error: string };
+export type BreedingActionResult =
+  | { ok: true; warning?: string }
+  | { ok: false; error: string };
 export type PalaiActionResult = { ok: true } | { ok: false; error: string };
+export type AnimalActionResult = { ok: true } | { ok: false; error: string };
 
 function friendlyMedicalError(err: unknown): string {
   const message = err instanceof Error ? err.message : "Could not save medical record";
@@ -83,20 +87,50 @@ function friendlyMedicalError(err: unknown): string {
   return message;
 }
 
-function friendlyUltrasoundError(err: unknown): string {
-  const message = err instanceof Error ? err.message : "Could not save ultrasound";
+function friendlyBreedingSchemaError(message: string): string | null {
   const lower = message.toLowerCase();
   if (lower.includes("ultrasound_date") || lower.includes("fetus_count")) {
     return "Database is missing ultrasound columns. In Supabase SQL Editor, run migrations 006_breeding_ultrasound_date.sql and 009_breeding_fetus_count.sql (see DEPLOY.md).";
   }
-  if (lower.includes("supabase_service_role_key")) {
+  return null;
+}
+
+function friendlyUltrasoundError(err: unknown): string {
+  const message = err instanceof Error ? err.message : "Could not save ultrasound";
+  const schema = friendlyBreedingSchemaError(message);
+  if (schema) return schema;
+  if (message.toLowerCase().includes("supabase_service_role_key")) {
     return "Server is missing SUPABASE_SERVICE_ROLE_KEY. Add it in Vercel environment variables.";
   }
-  if (lower.includes("upload failed") || lower.includes("bucket")) {
+  if (message.toLowerCase().includes("upload failed") || message.toLowerCase().includes("bucket")) {
     return message;
   }
-  if (lower.includes("only image and video uploads are supported")) {
+  if (message.toLowerCase().includes("only image and video uploads are supported")) {
     return "Could not upload that file. Use MP4, WebM, or MOV video.";
+  }
+  return message;
+}
+
+function friendlyBreedingError(err: unknown): string {
+  const message = err instanceof Error ? err.message : "Could not save breeding record";
+  const schema = friendlyBreedingSchemaError(message);
+  if (schema) return schema;
+  if (message.toLowerCase().includes("supabase_service_role_key")) {
+    return "Server is missing SUPABASE_SERVICE_ROLE_KEY. Add it in Vercel environment variables.";
+  }
+  if (message.toLowerCase().includes("view-only access")) {
+    return message;
+  }
+  return message;
+}
+
+function friendlyAnimalError(err: unknown): string {
+  const message = err instanceof Error ? err.message : "Could not save goat details";
+  if (message.toLowerCase().includes("supabase_service_role_key")) {
+    return "Server is missing SUPABASE_SERVICE_ROLE_KEY. Add it in Vercel environment variables.";
+  }
+  if (message.toLowerCase().includes("view-only access")) {
+    return message;
   }
   return message;
 }
@@ -387,43 +421,67 @@ export async function actionLogWeight(formData: FormData) {
   revalidateTxnPaths();
 }
 
-export async function actionRecordBreeding(formData: FormData) {
+export async function actionRecordBreeding(
+  formData: FormData
+): Promise<BreedingActionResult> {
   await guardWrite();
-  const maleRaw = String(formData.get("maleAnimalId") || "").trim();
-  await recordBreeding({
-    femaleId: Number(formData.get("femaleId")),
-    buckName: String(formData.get("buckName")),
-    maleAnimalId: maleRaw ? Number(maleRaw) : null,
-    dateCrossed: String(formData.get("dateCrossed")),
-    notes: String(formData.get("notes") || ""),
-  });
-  revalidateTxnPaths();
+  try {
+    const femaleRaw = String(formData.get("femaleId") || "").trim();
+    const femaleId = Number(femaleRaw);
+    if (!femaleRaw || !Number.isFinite(femaleId) || femaleId <= 0) {
+      throw new Error("Select a doe");
+    }
+
+    const maleRaw = String(formData.get("maleAnimalId") || "").trim();
+    const dateCrossed = String(formData.get("dateCrossed") || "").trim();
+    if (!dateCrossed) throw new Error("Date crossed is required");
+
+    const { warning } = await recordBreeding({
+      femaleId,
+      buckName: String(formData.get("buckName") || ""),
+      maleAnimalId: maleRaw ? Number(maleRaw) : null,
+      dateCrossed,
+      notes: String(formData.get("notes") || ""),
+    });
+    revalidatePath(`/animals/${femaleId}`);
+    revalidateTxnPaths();
+    return warning ? { ok: true, warning } : { ok: true };
+  } catch (err) {
+    return { ok: false, error: friendlyBreedingError(err) };
+  }
 }
 
-export async function actionUpdateBreeding(formData: FormData) {
+export async function actionUpdateBreeding(
+  formData: FormData
+): Promise<BreedingActionResult> {
   await guardWrite();
-  const maleRaw = String(formData.get("maleAnimalId") || "").trim();
-  const statusRaw = String(formData.get("status") || "").trim();
-  const deliveredRaw = String(formData.get("deliveredDate") || "").trim();
-  const ultrasoundRaw = String(formData.get("ultrasoundDate") || "").trim();
-  const fetusRaw = String(formData.get("fetusCount") || "").trim();
-  await updateBreeding({
-    id: String(formData.get("id")),
-    buckName: String(formData.get("buckName") || ""),
-    maleAnimalId: maleRaw ? Number(maleRaw) : null,
-    dateCrossed: String(formData.get("dateCrossed")),
-    outcome: String(formData.get("outcome")) as import("@/lib/types").BreedingOutcome,
-    status: statusRaw as import("@/lib/types").BreedingStatus | "",
-    deliveredDate: deliveredRaw || null,
-    ultrasoundDate: ultrasoundRaw || null,
-    fetusCount: parseOptionalNonNegativeInteger(fetusRaw, "Kids on ultrasound"),
-    notes: String(formData.get("notes") || "") || null,
-  });
-  const femaleId = Number(formData.get("femaleId"));
-  if (femaleId && !Number.isNaN(femaleId)) {
-    revalidatePath(`/animals/${femaleId}`);
+  try {
+    const maleRaw = String(formData.get("maleAnimalId") || "").trim();
+    const statusRaw = String(formData.get("status") || "").trim();
+    const deliveredRaw = String(formData.get("deliveredDate") || "").trim();
+    const ultrasoundRaw = String(formData.get("ultrasoundDate") || "").trim();
+    const fetusRaw = String(formData.get("fetusCount") || "").trim();
+    await updateBreeding({
+      id: String(formData.get("id")),
+      buckName: String(formData.get("buckName") || ""),
+      maleAnimalId: maleRaw ? Number(maleRaw) : null,
+      dateCrossed: String(formData.get("dateCrossed")),
+      outcome: String(formData.get("outcome")) as import("@/lib/types").BreedingOutcome,
+      status: statusRaw as import("@/lib/types").BreedingStatus | "",
+      deliveredDate: deliveredRaw || null,
+      ultrasoundDate: ultrasoundRaw || null,
+      fetusCount: parseOptionalNonNegativeInteger(fetusRaw, "Kids on ultrasound"),
+      notes: String(formData.get("notes") || "") || null,
+    });
+    const femaleId = Number(formData.get("femaleId"));
+    if (femaleId && !Number.isNaN(femaleId)) {
+      revalidatePath(`/animals/${femaleId}`);
+    }
+    revalidateTxnPaths();
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: friendlyBreedingError(err) };
   }
-  revalidateTxnPaths();
 }
 
 export async function actionRecordBreedingUltrasound(
@@ -465,15 +523,22 @@ export async function actionRecordBreedingUltrasound(
   }
 }
 
-export async function actionDeleteBreeding(formData: FormData) {
+export async function actionDeleteBreeding(
+  formData: FormData
+): Promise<BreedingActionResult> {
   await guardWrite();
-  const id = String(formData.get("id"));
-  const femaleId = Number(formData.get("femaleId"));
-  await deleteBreeding(id);
-  if (femaleId && !Number.isNaN(femaleId)) {
-    revalidatePath(`/animals/${femaleId}`);
+  try {
+    const id = String(formData.get("id"));
+    const femaleId = Number(formData.get("femaleId"));
+    await deleteBreeding(id);
+    if (femaleId && !Number.isNaN(femaleId)) {
+      revalidatePath(`/animals/${femaleId}`);
+    }
+    revalidateTxnPaths();
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: friendlyBreedingError(err) };
   }
-  revalidateTxnPaths();
 }
 
 export async function actionChangeStatus(formData: FormData) {
@@ -687,6 +752,18 @@ export async function actionUpdateTransaction(formData: FormData) {
       receivedBy: String(formData.get("receivedBy")) as "Monis" | "Saad",
       notes: String(formData.get("notes") || "") || null,
     });
+  } else if (variant === "livestock_sale_receipt") {
+    await updateTransaction({
+      id,
+      variant: "livestock_sale_receipt",
+      date: String(formData.get("date")),
+      receiptAmount: parsePositiveAmount(
+        String(formData.get("receiptAmount") ?? ""),
+        "Amount received"
+      ),
+      receivedBy: String(formData.get("receivedBy")) as "Monis" | "Saad",
+      notes: String(formData.get("notes") || "") || null,
+    });
   } else {
     throw new Error(`Unknown edit variant: ${variant}`);
   }
@@ -701,57 +778,74 @@ export async function actionDeleteTransaction(formData: FormData) {
   revalidateTxnPaths();
 }
 
-export async function actionUpdateAnimal(formData: FormData) {
-  await guardWrite();
-  const id = Number(formData.get("id"));
-  const palaiRaw = String(formData.get("palaiRate") || "").trim();
-  const breedRaw = String(formData.get("breed") || "").trim();
-  const sexRaw = String(formData.get("sex") || "").trim();
-  const statusRaw = String(formData.get("status") || "").trim();
-  const purchasePriceRaw = String(formData.get("purchasePrice") || "").trim();
-  const purchasePaidRaw = String(formData.get("purchasePaid") || "").trim();
-  const soldPriceRaw = String(formData.get("soldPrice") || "").trim();
-  const saleDateRaw = String(formData.get("saleDate") || "").trim();
-  const deliveryRaw = String(formData.get("deliveryCost") || "").trim();
-  const receivedRaw = String(formData.get("amountReceived") || "").trim();
-  const purchaseDateRaw = String(formData.get("purchaseDate") || "").trim();
-  const outDateRaw = String(formData.get("outDate") || "").trim();
-  const damRaw = String(formData.get("damId") || "").trim();
-  const sireAnimalRaw = String(formData.get("sireAnimalId") || "").trim();
-  const sireNameRaw = String(formData.get("sireName") || "").trim();
-  const isBorn =
-    formData.get("acquisitionType") === "born" ||
-    formData.get("homeBred") === "on" ||
-    formData.get("homeBred") === "true";
+export async function actionUpdateAnimal(
+  formData: FormData
+): Promise<AnimalActionResult> {
+  try {
+    await guardWrite();
+    const id = Number(formData.get("id"));
+    if (!id || Number.isNaN(id)) {
+      return { ok: false, error: "Animal id is required" };
+    }
+    const ownerName = String(formData.get("ownerName") || "").trim();
+    if (!ownerName) {
+      return { ok: false, error: "Owner is required" };
+    }
+    const palaiRaw = String(formData.get("palaiRate") || "").trim();
+    const breedRaw = String(formData.get("breed") || "").trim();
+    const sexRaw = String(formData.get("sex") || "").trim();
+    const statusRaw = String(formData.get("status") || "").trim();
+    const purchasePriceRaw = String(formData.get("purchasePrice") || "").trim();
+    const purchasePaidRaw = String(formData.get("purchasePaid") || "").trim();
+    const soldPriceRaw = String(formData.get("soldPrice") || "").trim();
+    const saleDateRaw = String(formData.get("saleDate") || "").trim();
+    const deliveryRaw = String(formData.get("deliveryCost") || "").trim();
+    const receivedRaw = String(formData.get("amountReceived") || "").trim();
+    const purchaseDateRaw = String(formData.get("purchaseDate") || "").trim();
+    const outDateRaw = String(formData.get("outDate") || "").trim();
+    const damRaw = String(formData.get("damId") || "").trim();
+    const sireAnimalRaw = String(formData.get("sireAnimalId") || "").trim();
+    const sireNameRaw = String(formData.get("sireName") || "").trim();
+    const isBorn =
+      formData.get("acquisitionType") === "born" ||
+      formData.get("homeBred") === "on" ||
+      formData.get("homeBred") === "true";
 
-  await updateAnimal({
-    id,
-    name: String(formData.get("name") || "") || null,
-    breed: breedRaw ? (breedRaw as AnimalBreed) : null,
-    sex: sexRaw ? (sexRaw as AnimalSex) : null,
-    description: String(formData.get("description") || "") || null,
-    comment: String(formData.get("comment") || "") || null,
-    ownerName: String(formData.get("ownerName")),
-    vendorName: String(formData.get("vendorName") || "") || null,
-    palai_rate: parseOptionalPositiveAmount(palaiRaw, "Palai rate"),
-    age_at_purchase: String(formData.get("ageAtPurchase") || "") || null,
-    home_bred: isBorn,
-    dam_id: isBorn && damRaw ? Number(damRaw) : isBorn ? null : null,
-    sire_id: isBorn && sireAnimalRaw ? Number(sireAnimalRaw) : isBorn ? null : null,
-    sire_name: isBorn && sireNameRaw ? sireNameRaw : isBorn ? null : null,
-    status: statusRaw ? (statusRaw as AnimalStatus) : undefined,
-    date_of_purchase: purchaseDateRaw || null,
-    purchase_price: parseOptionalNonNegativeAmount(purchasePriceRaw, "Purchase price"),
-    purchase_paid: parseOptionalNonNegativeAmount(purchasePaidRaw, "Amount paid"),
-    out_date: outDateRaw || null,
-    sold_price: parseOptionalNonNegativeAmount(soldPriceRaw, "Sold price"),
-    sale_date: saleDateRaw || null,
-    gross_sale_price: parseOptionalNonNegativeAmount(soldPriceRaw, "Sale price"),
-    delivery_cost: parseOptionalNonNegativeAmount(deliveryRaw, "Delivery cost"),
-    amount_received: parseOptionalNonNegativeAmount(receivedRaw, "Amount received"),
-  });
-  revalidatePath(`/animals/${id}`);
-  revalidateTxnPaths();
+    await updateAnimal({
+      id,
+      name: String(formData.get("name") || "") || null,
+      breed: breedRaw ? (breedRaw as AnimalBreed) : null,
+      sex: sexRaw ? (sexRaw as AnimalSex) : null,
+      description: String(formData.get("description") || "") || null,
+      comment: String(formData.get("comment") || "") || null,
+      ownerName,
+      vendorName: String(formData.get("vendorName") || "") || null,
+      palai_rate: parseOptionalPositiveAmount(palaiRaw, "Palai rate"),
+      age_at_purchase: String(formData.get("ageAtPurchase") || "") || null,
+      home_bred: isBorn,
+      dam_id: isBorn && damRaw ? Number(damRaw) : isBorn ? null : null,
+      sire_id: isBorn && sireAnimalRaw ? Number(sireAnimalRaw) : isBorn ? null : null,
+      sire_name: isBorn && sireNameRaw ? sireNameRaw : isBorn ? null : null,
+      status: statusRaw ? (statusRaw as AnimalStatus) : undefined,
+      date_of_purchase: purchaseDateRaw || null,
+      purchase_price: parseOptionalNonNegativeAmount(purchasePriceRaw, "Purchase price"),
+      purchase_paid: parseOptionalNonNegativeAmount(purchasePaidRaw, "Amount paid"),
+      out_date: outDateRaw || null,
+      sold_price: parseOptionalNonNegativeAmount(soldPriceRaw, "Sold price"),
+      sale_date: saleDateRaw || null,
+      gross_sale_price: parseOptionalNonNegativeAmount(soldPriceRaw, "Sale price"),
+      delivery_cost: parseOptionalNonNegativeAmount(deliveryRaw, "Delivery cost"),
+      amount_received: parseOptionalNonNegativeAmount(receivedRaw, "Amount received"),
+    });
+    revalidatePath(`/animals/${id}`);
+    revalidateTxnPaths();
+    return { ok: true };
+  } catch (err) {
+    return {
+      ok: false,
+      error: friendlyAnimalError(err),
+    };
+  }
 }
 
 export async function actionDeleteAnimal(formData: FormData) {

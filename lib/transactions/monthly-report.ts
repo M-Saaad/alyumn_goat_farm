@@ -180,6 +180,10 @@ export function computeMonthlyCategoryReport(input: {
   to?: string;
   mode?: FinanceReportMode;
   periodLabel?: string;
+  /** Cap ledger rows returned (totals still use full period). */
+  ledgerRowLimit?: number;
+  /** Cap palai rows returned (totals still use full period). */
+  palaiRowLimit?: number;
 }): MonthlyCategoryReport {
   const filter: DateRangeFilter | undefined =
     input.mode === "alltime"
@@ -229,7 +233,7 @@ export function computeMonthlyCategoryReport(input: {
     transactionCount += palaiInPeriod.length;
   }
 
-  const ledgerRows = input.transactions
+  const ledgerRowsAll = input.transactions
     .filter(
       (tx) =>
         tx.category !== "Palai Income" && (!filter || transactionInFilter(tx.date, filter))
@@ -244,8 +248,12 @@ export function computeMonthlyCategoryReport(input: {
       notes: tx.notes,
     }))
     .sort((a, b) => b.date.localeCompare(a.date));
+  const ledgerRows =
+    input.ledgerRowLimit != null
+      ? ledgerRowsAll.slice(0, input.ledgerRowLimit)
+      : ledgerRowsAll;
 
-  const palaiRows = palaiInPeriod
+  const palaiRowsAll = palaiInPeriod
     .map((p) => ({
       id: p.id,
       date: p.date,
@@ -255,6 +263,8 @@ export function computeMonthlyCategoryReport(input: {
       notes: p.notes,
     }))
     .sort((a, b) => b.date.localeCompare(a.date));
+  const palaiRows =
+    input.palaiRowLimit != null ? palaiRowsAll.slice(0, input.palaiRowLimit) : palaiRowsAll;
 
   const total = Object.values(byCategory).reduce((sum, n) => sum + (n || 0), 0);
 

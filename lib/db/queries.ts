@@ -36,6 +36,7 @@ import {
 } from "./supabase";
 import { getPartnerIds } from "../partner-equity/settlement";
 import { quickEntryPropsFromDb } from "../quick-entry-props";
+import { mergeExpenseCategories } from "../transactions/expense-categories";
 import { mapAnimalsWithParents } from "../livestock/animal-parents-store";
 import { computeHerdHealth, type HerdHealthData } from "../livestock/herd-health";
 import { mergeVaccineSchedules, type VaccineScheduleEntry } from "../livestock/vaccine-schedule";
@@ -111,7 +112,6 @@ export type HomeData = {
   palai_payments: PalaiPayment[];
   animals: Animal[];
   meta: FarmDatabase["meta"];
-  quickEntry: QuickEntryProps;
 };
 
 export const loadHomeData = cache(async (): Promise<HomeData> => {
@@ -123,20 +123,17 @@ export const loadHomeData = cache(async (): Promise<HomeData> => {
       palai_payments: db.palai_payments,
       animals: db.animals,
       meta: db.meta,
-      quickEntry: quickEntryPropsFromDb(db),
     };
   }
 
   const client = createServiceClient();
-  const [contacts, transactions, palai, metaRows, animalRows, quickEntry] =
-    await Promise.all([
-      selectAll(client, "contacts"),
-      selectAll(client, "transactions"),
-      selectAll(client, "palai_payments"),
-      selectAll(client, "app_meta"),
-      selectAll(client, "animals"),
-      getQuickEntryData(),
-    ]);
+  const [contacts, transactions, palai, metaRows, animalRows] = await Promise.all([
+    selectAll(client, "contacts"),
+    selectAll(client, "transactions"),
+    selectAll(client, "palai_payments"),
+    selectAll(client, "app_meta"),
+    selectAll(client, "animals"),
+  ]);
 
   return {
     contacts: contacts.map(mapContact),
@@ -144,7 +141,6 @@ export const loadHomeData = cache(async (): Promise<HomeData> => {
     palai_payments: palai.map(mapPalai),
     animals: animalRows.map(mapAnimal),
     meta: mapMeta(metaRows[0]),
-    quickEntry,
   };
 });
 
@@ -152,7 +148,6 @@ export type AnimalsListData = {
   animals: Animal[];
   contacts: Contact[];
   breeding_events: BreedingEvent[];
-  quickEntry: QuickEntryProps;
 };
 
 export const loadAnimalsListData = cache(async (): Promise<AnimalsListData> => {
@@ -162,7 +157,6 @@ export const loadAnimalsListData = cache(async (): Promise<AnimalsListData> => {
       animals: db.animals,
       contacts: db.contacts,
       breeding_events: db.breeding_events,
-      quickEntry: quickEntryPropsFromDb(db),
     };
   }
 
@@ -174,18 +168,11 @@ export const loadAnimalsListData = cache(async (): Promise<AnimalsListData> => {
   ]);
 
   const mappedAnimals = await mapAnimalsWithParents(client, animals);
-  const mappedContacts = contacts.map(mapContact);
-  const mappedBreeding = breeding.map(mapBreeding);
-  const db = emptyDb();
-  db.animals = mappedAnimals;
-  db.contacts = mappedContacts;
-  db.breeding_events = mappedBreeding;
 
   return {
     animals: mappedAnimals,
-    contacts: mappedContacts,
-    breeding_events: mappedBreeding,
-    quickEntry: quickEntryPropsFromDb(db),
+    contacts: contacts.map(mapContact),
+    breeding_events: breeding.map(mapBreeding),
   };
 });
 
@@ -203,7 +190,17 @@ export type AnimalProfileData = {
   sale_balance: number | null;
   weight_logs: WeightLog[];
   animal_media: AnimalMedia[];
-  quickEntry: QuickEntryProps;
+  /** Inline editors on the profile page need contact/animal pickers. */
+  editorProps: Pick<
+    QuickEntryProps,
+    | "vendors"
+    | "ownerOptions"
+    | "damAnimals"
+    | "femaleAnimals"
+    | "maleAnimals"
+    | "pastBuckNames"
+    | "vaccineSchedules"
+  >;
 };
 
 function profileTransactions(
@@ -274,12 +271,23 @@ export const loadAnimalProfileData = cache(
         sale_balance: sale ? Math.max(0, sale.net_received - sale.amount_received) : null,
         weight_logs: db.weight_logs.filter((w) => w.animal_id === animalId),
         animal_media: (db.animal_media ?? []).filter((m) => m.animal_id === animalId),
-        quickEntry: quickEntryPropsFromDb(db),
+        editorProps: (() => {
+          const qe = quickEntryPropsFromDb(db);
+          return {
+            vendors: qe.vendors,
+            ownerOptions: qe.ownerOptions,
+            damAnimals: qe.damAnimals,
+            femaleAnimals: qe.femaleAnimals,
+            maleAnimals: qe.maleAnimals,
+            pastBuckNames: qe.pastBuckNames,
+            vaccineSchedules: qe.vaccineSchedules,
+          };
+        })(),
       };
     }
 
     const client = createServiceClient();
-    const [animalRow, contacts, allAnimals, medical, herdVaccines, breeding, sales, purchaseRows, weights, media, quickEntry] =
+    const [animalRow, contacts, allAnimals, medical, herdVaccines, breeding, sales, purchaseRows, weights, media, editorProps] =
       await Promise.all([
         selectOne(client, "animals", "id", animalId),
         selectAll(client, "contacts"),
@@ -382,7 +390,15 @@ export const loadAnimalProfileData = cache(
       sale_balance: sale ? Math.max(0, sale.net_received - sale.amount_received) : null,
       weight_logs: weights.map(mapWeight),
       animal_media: media.map(mapMedia),
-      quickEntry,
+      editorProps: {
+        vendors: editorProps.vendors,
+        ownerOptions: editorProps.ownerOptions,
+        damAnimals: editorProps.damAnimals,
+        femaleAnimals: editorProps.femaleAnimals,
+        maleAnimals: editorProps.maleAnimals,
+        pastBuckNames: editorProps.pastBuckNames,
+        vaccineSchedules: editorProps.vaccineSchedules,
+      },
     };
   }
 );
@@ -393,7 +409,7 @@ export type TransactionsData = {
   animals: Animal[];
   palai_payments: PalaiPayment[];
   livestock_sales: LivestockSale[];
-  quickEntry: QuickEntryProps;
+  expenseCategories: string[];
 };
 
 export const loadTransactionsData = cache(async (): Promise<TransactionsData> => {
@@ -405,44 +421,34 @@ export const loadTransactionsData = cache(async (): Promise<TransactionsData> =>
       animals: db.animals,
       palai_payments: db.palai_payments,
       livestock_sales: db.livestock_sales,
-      quickEntry: quickEntryPropsFromDb(db),
+      expenseCategories: mergeExpenseCategories(db.transactions.map((t) => t.category)),
     };
   }
 
   const client = createServiceClient();
-  const [transactions, contacts, animals, palai, sales, breeding, medical] =
-    await Promise.all([
-      selectAll(client, "transactions"),
-      selectAll(client, "contacts"),
-      selectAll(client, "animals"),
-      selectAll(client, "palai_payments"),
-      selectAll(client, "livestock_sales"),
-      selectAll(client, "breeding_events"),
-      selectAllOptional(client, "medical_events"),
-    ]);
+  const [transactions, contacts, animals, palai, sales] = await Promise.all([
+    selectAll(client, "transactions"),
+    selectAll(client, "contacts"),
+    selectAll(client, "animals"),
+    selectAll(client, "palai_payments"),
+    selectAll(client, "livestock_sales"),
+  ]);
 
   const mappedAnimals = await mapAnimalsWithParents(client, animals);
-  const mappedContacts = contacts.map(mapContact);
-  const db = emptyDb();
-  db.animals = mappedAnimals;
-  db.contacts = mappedContacts;
-  db.breeding_events = breeding.map(mapBreeding);
-  db.medical_events = medical.map(mapMedical);
-  db.transactions = filterLedgerTxs(transactions);
+  const ledgerTxs = filterLedgerTxs(transactions);
 
   return {
-    transactions: db.transactions,
-    contacts: mappedContacts,
+    transactions: ledgerTxs,
+    contacts: contacts.map(mapContact),
     animals: mappedAnimals,
     palai_payments: palai.map(mapPalai),
     livestock_sales: sales.map(mapSale),
-    quickEntry: quickEntryPropsFromDb(db),
+    expenseCategories: mergeExpenseCategories(ledgerTxs.map((t) => t.category)),
   };
 });
 
 export type HerdHealthPageData = {
   herd: HerdHealthData;
-  quickEntry: QuickEntryProps;
   vaccineSchedules: VaccineScheduleEntry[];
 };
 
@@ -457,18 +463,16 @@ export const loadHerdHealthData = cache(async (): Promise<HerdHealthPageData> =>
         breeding_events: db.breeding_events ?? [],
         weight_logs: db.weight_logs ?? [],
       }),
-      quickEntry: quickEntryPropsFromDb(db),
       vaccineSchedules: mergeVaccineSchedules(medicalEvents),
     };
   }
 
   const client = createServiceClient();
-  const [animals, medical, breeding, weights, quickEntry] = await Promise.all([
+  const [animals, medical, breeding, weights] = await Promise.all([
     selectAll(client, "animals"),
     selectAllOptional(client, "medical_events"),
     selectAllOptional(client, "breeding_events"),
     selectAllOptional(client, "weight_logs"),
-    getQuickEntryData(),
   ]);
 
   const mappedAnimals = await mapAnimalsWithParents(client, animals);
@@ -481,7 +485,6 @@ export const loadHerdHealthData = cache(async (): Promise<HerdHealthPageData> =>
       breeding_events: breeding.map(mapBreeding),
       weight_logs: weights.map(mapWeight),
     }),
-    quickEntry,
     vaccineSchedules: mergeVaccineSchedules(medicalEvents),
   };
 });

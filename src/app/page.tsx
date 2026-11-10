@@ -13,7 +13,10 @@ import {
 import { AppHeader } from "@/components/AppHeader";
 import { BottomNav } from "@/components/BottomNav";
 import { FinanceCategoryBreakdown } from "@/components/FinanceCategoryBreakdown";
-import { FinanceMonthlyTransactions } from "@/components/FinanceMonthlyTransactions";
+import {
+  FINANCE_TRANSACTION_PREVIEW_LIMIT,
+  FinanceMonthlyTransactions,
+} from "@/components/FinanceMonthlyTransactions";
 import { FinanceReportPicker } from "@/components/FinanceReportPicker";
 import { FinancePeriodHeadcount } from "@/components/FinancePeriodHeadcount";
 import { QuickEntryLoader } from "@/components/QuickEntryLoader";
@@ -77,6 +80,8 @@ async function HomePageContent({
     month: reportRange.mode === "month" ? reportRange.month : undefined,
     from: reportRange.mode === "custom" ? reportRange.from : undefined,
     to: reportRange.mode === "custom" ? reportRange.to : undefined,
+    ledgerRowLimit: FINANCE_TRANSACTION_PREVIEW_LIMIT,
+    palaiRowLimit: FINANCE_TRANSACTION_PREVIEW_LIMIT,
   });
 
   const headcount = computePeriodHeadcount(data.animals, headcountStart, headcountEnd);
@@ -181,7 +186,7 @@ async function HomePageContent({
         )}
       </section>
 
-      <QuickEntryLoader {...data.quickEntry} canWrite={canWrite} />
+      <QuickEntryLoader canWrite={canWrite} />
       <BottomNav active="finance" />
     </main>
   );

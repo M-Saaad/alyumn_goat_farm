@@ -12,12 +12,22 @@ export { emptyDb };
 const DATA_DIR = path.join(process.cwd(), "data");
 const DB_PATH = path.join(DATA_DIR, "farm.db.json");
 
+let jsonDbCache: { mtimeMs: number; db: FarmDatabase } | null = null;
+
+function invalidateJsonDbCache(): void {
+  jsonDbCache = null;
+}
+
 export function isSupabaseDb(): boolean {
   return isSupabaseConfigured() && Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY);
 }
 
 function loadJsonDb(): FarmDatabase {
   if (!fs.existsSync(DB_PATH)) return emptyDb();
+  const mtimeMs = fs.statSync(DB_PATH).mtimeMs;
+  if (jsonDbCache && jsonDbCache.mtimeMs === mtimeMs) {
+    return jsonDbCache.db;
+  }
   const db = JSON.parse(fs.readFileSync(DB_PATH, "utf8")) as FarmDatabase & {
     custom_vaccines?: unknown;
     custom_dewormers?: unknown;
@@ -41,12 +51,14 @@ function loadJsonDb(): FarmDatabase {
   for (const p of db.palai_payments ?? []) {
     if (!p.service_month) p.service_month = p.date.slice(0, 7);
   }
+  jsonDbCache = { mtimeMs, db };
   return db;
 }
 
 function saveJsonDb(db: FarmDatabase): void {
   if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
   fs.writeFileSync(DB_PATH, JSON.stringify(db, null, 2));
+  invalidateJsonDbCache();
 }
 
 /** Sync JSON load — used by local verify scripts when Supabase is not configured. */

@@ -29,6 +29,11 @@ import {
   ULTRASOUND_WINDOW_START_DAYS,
 } from "../lib/livestock/breeding.ts";
 import type { Animal, BreedingEvent, MedicalEvent } from "../lib/types";
+import {
+  encodeParentsComment,
+  parseParentsFromComment,
+  stripParentsComment,
+} from "../lib/livestock/animal-parents-store";
 
 function assert(cond: boolean, msg: string) {
   if (!cond) throw new Error(msg);
@@ -369,11 +374,10 @@ assert(
   "old delivery not recent"
 );
 
-const verifyToday = "2026-08-17";
-const deliveredTimeline = breedingTimeline({ ...pending, ...delivered }, undefined, verifyToday);
+const deliveredTimeline = breedingTimeline({ ...pending, ...delivered }, null, "2026-08-17");
 assert(deliveredTimeline?.type === "delivered" && deliveredTimeline.date === "2026-08-15", "delivered timeline uses birth date");
 assert(
-  breedingTimeline({ ...pending, ...delivered, expected_due_date: "2026-09-03" }, undefined, verifyToday)?.type === "delivered",
+  breedingTimeline({ ...pending, ...delivered, expected_due_date: "2026-09-03" }, null, "2026-08-17")?.type === "delivered",
   "delivered timeline ignores expected due date"
 );
 
@@ -529,6 +533,18 @@ assert(herdActiveOnly.breeding.length === 1, "only active adult female in breedi
 assert(
   herdActiveOnly.breeding[0]?.femaleId === 1,
   "active doe in breeding roster"
+);
+
+const link = { dam_id: 16, sire_id: 47, sire_name: null };
+const encodedAlone = encodeParentsComment(null, link);
+assert(parseParentsFromComment(encodedAlone)?.dam_id === 16, "parents parse with no other comment");
+assert(parseParentsFromComment(encodedAlone)?.sire_id === 47, "sire parses with no other comment");
+assert(stripParentsComment(encodedAlone) === "", "parent marker hidden when it is the whole comment");
+const encodedNote = encodeParentsComment("yellow eyes", link);
+assert(stripParentsComment(encodedNote) === "yellow eyes", "parent marker hidden after a note");
+assert(
+  parseParentsFromComment('__parents__:{"dam_id":20,"sire_id":9,"sire_name":null}')?.dam_id === 20,
+  "legacy parent marker without a leading newline still parses"
 );
 
 console.log(

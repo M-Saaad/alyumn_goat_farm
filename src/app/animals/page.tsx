@@ -104,7 +104,7 @@ export default async function AnimalsPage({
         })}
       </ul>
 
-      <QuickEntryLoader {...data.quickEntry} canWrite={canWrite} />
+      <QuickEntryLoader canWrite={canWrite} />
       <BottomNav active="goats" />
     </main>
   );
