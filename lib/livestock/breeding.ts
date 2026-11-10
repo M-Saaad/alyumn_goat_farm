@@ -171,6 +171,78 @@ export function resolveBreedingAfterBirth(
   };
 }
 
+/** Open a closed kidding again. Ultrasound details stay so a confirmed doe shows Confirmed. */
+export function reopenBreedingRecord(event: BreedingEvent): BreedingEvent {
+  return {
+    ...event,
+    outcome: "Pending",
+    status: "Ready",
+    delivered_date: null,
+  };
+}
+
+function isoDay(value: string | null | undefined): string | null {
+  const day = value?.trim().slice(0, 10);
+  return day || null;
+}
+
+/** This kid is one of the births that closed the breeding record. */
+export function kidClosesDelivery(event: BreedingEvent, kid: Animal): boolean {
+  if (event.outcome !== "Delivered" || !kid.home_bred || kid.dam_id !== event.female_animal_id) {
+    return false;
+  }
+  const born = isoDay(kid.date_of_purchase);
+  const delivered = isoDay(event.delivered_date);
+  if (!born || !delivered) return false;
+  const crossed = isoDay(event.date_crossed);
+  if (crossed && born < crossed) return false;
+  if (born === delivered) return true;
+  return born > delivered && daysBetween(delivered, born) <= 14;
+}
+
+/**
+ * Deleting the last kid from a kidding puts the doe back on that pregnancy.
+ * A sibling born in the same kidding leaves the record delivered.
+ */
+export function breedingEventsAfterKidRemoved(
+  events: BreedingEvent[],
+  remainingAnimals: Animal[],
+  removed: Animal
+): BreedingEvent[] {
+  if (!removed.home_bred || removed.dam_id == null) return events;
+  return events.map((event) => {
+    if (!kidClosesDelivery(event, removed)) return event;
+    const siblingRemains = remainingAnimals.some(
+      (animal) => animal.id !== removed.id && kidClosesDelivery(event, animal)
+    );
+    if (siblingRemains) return event;
+    return reopenBreedingRecord(event);
+  });
+}
+
+/**
+ * A confirmed pregnancy marked delivered in the last few days, with no kid
+ * left from that kidding, is an undone birth. Reopen it.
+ */
+export function reopenRecentDeliveriesWithoutKids(
+  events: BreedingEvent[],
+  animals: Animal[],
+  today: string
+): BreedingEvent[] {
+  const day = isoDay(today);
+  if (!day) return events;
+  return events.map((event) => {
+    if (event.outcome !== "Delivered") return event;
+    if (event.fetus_count == null || event.fetus_count <= 0) return event;
+    const delivered = isoDay(event.delivered_date);
+    if (!delivered) return event;
+    const ageDays = daysBetween(delivered, day);
+    if (ageDays < 0 || ageDays > 2) return event;
+    if (animals.some((animal) => kidClosesDelivery(event, animal))) return event;
+    return reopenBreedingRecord(event);
+  });
+}
+
 /** Backfill breeding deliveries from existing farm-born kid records. */
 export function breedingUpdatesFromBirths(
   animals: Animal[],

@@ -29,6 +29,7 @@ import {
   expectedDueDate,
   findActiveBreedingForDam,
   warningForClosedBreedingRecords,
+  reopenRecentDeliveriesWithoutKids,
   resolveBreedingAfterBirth,
   resolveBreedingAfterUltrasound,
 } from "./livestock/breeding";
@@ -59,6 +60,7 @@ import type {
   MedicalEvent,
 } from "./types";
 import { animalLabel } from "./labels";
+import { todayIso } from "./format";
 import { uploadAnimalMedia } from "./media/upload";
 import { similarVaccineEvents } from "./livestock/vaccine-schedule";
 
@@ -476,6 +478,16 @@ export async function registerBornGoat(input: {
     sire_name: input.sireName?.trim() || null,
     out_date: null,
     palai_rate: palaiRate,
+  };
+
+  const birthDay = input.date.trim().slice(0, 10);
+  db = {
+    ...db,
+    breeding_events: reopenRecentDeliveriesWithoutKids(
+      db.breeding_events,
+      db.animals,
+      birthDay || todayIso()
+    ),
   };
 
   const activeBreeding = findActiveBreedingForDam(db.breeding_events, input.damId, {
@@ -1182,4 +1194,16 @@ export async function deleteAnimal(animalId: number) {
   const before = await fetchDb();
   const after = applyDeleteAnimal(before, animalId);
   return persistMutation(before, after);
+}
+
+/** Put a recent confirmed kidding back to pregnant when its kid records are gone. */
+export async function repairOrphanedRecentDeliveries(): Promise<void> {
+  const before = await fetchDb();
+  const repaired = reopenRecentDeliveriesWithoutKids(
+    before.breeding_events ?? [],
+    before.animals,
+    todayIso()
+  );
+  if (repaired.every((event, index) => event === before.breeding_events[index])) return;
+  await persistMutation(before, { ...before, breeding_events: repaired });
 }
