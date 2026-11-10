@@ -149,9 +149,11 @@ export function BreedingEventEditor({
             ))}
           </select>
         </div>
-        {outcome === "Delivered" && (
+        {(outcome === "Delivered" || outcome === "Stillbirth") && (
           <div>
-            <label className={labelCls}>Delivered date</label>
+            <label className={labelCls}>
+              {outcome === "Stillbirth" ? "Stillbirth date" : "Delivered date"}
+            </label>
             <input
               className={field}
               name="deliveredDate"

@@ -282,12 +282,12 @@ function buildBreedingRow(
   today: string
 ): BreedingRow {
   const femaleLabel = animalLabel(female);
-  if (!event || isDoeBreedingReady(event, today)) {
+  if (!event || (isDoeBreedingReady(event, today) && !isBreedingInPipeline(event))) {
     return {
       femaleId: female.id,
       femaleLabel,
       event,
-      statusLabel: "Ready",
+      statusLabel: event ? breedingRecordStatusLabel(event, today) : "Ready",
       daysUntilDue: null,
       status: "ready",
       daysSinceCrossed: null,

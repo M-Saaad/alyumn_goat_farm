@@ -20,6 +20,7 @@ import {
   breedingTimeline,
   findActiveBreedingForDam,
   isBreedingInPipeline,
+  isDoeBreedingReady,
   isRecentDelivery,
   resolveBreedingAfterBirth,
   breedingUpdatesFromBirths,
@@ -336,11 +337,25 @@ assert(breedingRecordStatusLabel({ ...pending, ultrasound_date: "2026-06-10", fe
 
 const confirmedEmpty = resolveBreedingAfterUltrasound(pending, 0);
 assert(confirmedEmpty.outcome === "Miscarriage" && confirmedEmpty.status === "Ready", "empty ultrasound → Ready / Miscarriage");
+
+const doubtPending = breedingEvent({
+  id: "br-doubt-unknown",
+  female_animal_id: 9,
+  outcome: "Doubt",
+  status: "Doubt",
+  ultrasound_date: "2026-10-27",
+  fetus_count: null,
+});
+const unknownUs = resolveBreedingAfterUltrasound(doubtPending, undefined);
+assert(unknownUs.outcome === "Doubt" && unknownUs.status === "Doubt", "unknown ultrasound keeps doubt");
 assert(breedingRecordStatusLabel({ ...pending, ultrasound_date: "2026-06-10", fetus_count: 0, ...confirmedEmpty }) === "Ready", "ready label");
 
 const delivered = resolveBreedingAfterBirth(pending, "2026-08-15");
 assert(delivered.outcome === "Delivered" && delivered.status === "Delivered", "birth closes breeding");
-assert(breedingRecordStatusLabel({ ...pending, ...delivered }) === "Delivered", "delivered label within 60 days");
+assert(
+  breedingRecordStatusLabel({ ...pending, ...delivered }, "2026-08-17") === "Delivered",
+  "delivered label within 60 days"
+);
 assert(
   breedingRecordStatusLabel({ ...pending, ...delivered, delivered_date: "2026-04-01" }, "2026-08-17") === "Ready",
   "delivered label after 60 days becomes ready"
@@ -354,10 +369,11 @@ assert(
   "old delivery not recent"
 );
 
-const deliveredTimeline = breedingTimeline({ ...pending, ...delivered });
+const verifyToday = "2026-08-17";
+const deliveredTimeline = breedingTimeline({ ...pending, ...delivered }, undefined, verifyToday);
 assert(deliveredTimeline?.type === "delivered" && deliveredTimeline.date === "2026-08-15", "delivered timeline uses birth date");
 assert(
-  breedingTimeline({ ...pending, ...delivered, expected_due_date: "2026-09-03" })?.type === "delivered",
+  breedingTimeline({ ...pending, ...delivered, expected_due_date: "2026-09-03" }, undefined, verifyToday)?.type === "delivered",
   "delivered timeline ignores expected due date"
 );
 
@@ -388,6 +404,48 @@ const readyHerd = computeHerdHealth({
 });
 assert(readyHerd.breeding[0]?.status === "ready", "not pregnant doe shows ready badge tone");
 assert(readyHerd.breeding[0]?.statusLabel === "Ready", "not pregnant doe shows ready label");
+
+const stillbirthDoe = breedingEvent({
+  id: "br-stillbirth",
+  female_animal_id: 61,
+  buck_name: "Shelby",
+  date_crossed: "2026-06-17",
+  ultrasound_date: "2026-08-15",
+  fetus_count: 0,
+  outcome: "Stillbirth",
+  status: "Doubt",
+  delivered_date: "2025-11-10",
+});
+assert(!isDoeBreedingReady(stillbirthDoe), "stillbirth doe is not breeding-ready");
+const stillbirthHerd = computeHerdHealth({
+  animals: [{ ...animal, id: 61, name: "Guriya", sex: "Female" }],
+  medical_events: [],
+  breeding_events: [stillbirthDoe],
+  weight_logs: [],
+  today: "2026-08-17",
+});
+assert(stillbirthHerd.breeding[0]?.statusLabel === "Stillbirth", "stillbirth doe shows stillbirth label");
+assert(stillbirthHerd.breeding[0]?.status !== "ready", "stillbirth doe is not ready badge");
+
+const doubtWithEmptyUs = breedingEvent({
+  id: "br-doubt-empty-us",
+  female_animal_id: 62,
+  outcome: "Pending",
+  status: "Doubt",
+  ultrasound_date: "2026-08-15",
+  fetus_count: 0,
+  date_crossed: "2026-06-17",
+  expected_due_date: "2026-11-14",
+});
+const doubtHerd = computeHerdHealth({
+  animals: [{ ...animal, id: 62, name: "Guriya", sex: "Female" }],
+  medical_events: [],
+  breeding_events: [doubtWithEmptyUs],
+  weight_logs: [],
+  today: "2026-11-11",
+});
+assert(doubtHerd.breeding[0]?.statusLabel === "Doubt", "doubt doe stays doubt despite 0-kid ultrasound");
+assert(doubtHerd.breeding[0]?.status !== "ready", "doubt doe is not ready badge");
 
 const cadburyBreeding = breedingEvent({
   id: "br-cadbury",

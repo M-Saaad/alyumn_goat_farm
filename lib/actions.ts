@@ -819,12 +819,29 @@ export async function updateBreeding(input: {
       : existing.ultrasound_date;
   const fetusCount =
     input.fetusCount !== undefined ? input.fetusCount : existing.fetus_count;
-  if (ultrasoundDate && (resolvedStatus === "Doubt" || !resolvedStatus)) {
-    resolvedStatus = "Ready";
-  }
+  const terminalOutcome =
+    nextOutcome === "Delivered" ||
+    nextOutcome === "Stillbirth" ||
+    nextOutcome === "Miscarriage";
   let resolvedOutcome: BreedingOutcome = nextOutcome;
-  if (ultrasoundDate && resolvedOutcome === "Doubt") {
-    resolvedOutcome = "Pending";
+  if (!terminalOutcome && ultrasoundDate) {
+    const userChoseDoubt = input.outcome === "Doubt" || input.status === "Doubt";
+    if (
+      !userChoseDoubt &&
+      fetusCount != null &&
+      fetusCount > 0 &&
+      (resolvedStatus === "Doubt" || !resolvedStatus)
+    ) {
+      resolvedStatus = "Ready";
+    }
+    if (
+      !userChoseDoubt &&
+      resolvedOutcome === "Doubt" &&
+      fetusCount != null &&
+      fetusCount > 0
+    ) {
+      resolvedOutcome = "Pending";
+    }
   }
 
   const updated = {
@@ -833,7 +850,10 @@ export async function updateBreeding(input: {
     buck_name: buckName || null,
     date_crossed: input.dateCrossed,
     expected_due_date: expectedDueDate(input.dateCrossed),
-    delivered_date: nextOutcome === "Delivered" ? deliveredDate : null,
+    delivered_date:
+      nextOutcome === "Delivered" || nextOutcome === "Stillbirth"
+        ? deliveredDate ?? existing.delivered_date
+        : null,
     ultrasound_date: ultrasoundDate,
     fetus_count: fetusCount,
     outcome: resolvedOutcome,

@@ -99,6 +99,7 @@ export function breedingRecordStatusLabel(
   }
   if (event.outcome === "Stillbirth") return "Stillbirth";
   if (event.outcome === "Miscarriage") return "Ready";
+  if (event.status === "Doubt" || event.outcome === "Doubt") return "Doubt";
   if (event.ultrasound_date) {
     if (event.fetus_count != null && event.fetus_count > 0) return "Confirmed";
     if (event.fetus_count === 0) return "Ready";
@@ -118,9 +119,13 @@ export function resolveBreedingAfterUltrasound(
     return { status: "Ready", outcome: "Pending" };
   }
 
+  if (existing.outcome === "Doubt" || existing.status === "Doubt") {
+    return { status: "Doubt", outcome: "Doubt" };
+  }
+
   let outcome: BreedingOutcome = existing.outcome;
-  if (outcome === "Doubt") outcome = "Pending";
   let status: BreedingStatus | null = existing.status;
+  if (outcome === "Doubt") outcome = "Pending";
   if (!status || status === "Doubt") status = "Ready";
   return { status, outcome };
 }
@@ -208,6 +213,8 @@ export function isDoeBreedingReady(
   today: string = todayIso()
 ): boolean {
   if (!event) return true;
+  if (event.outcome === "Stillbirth") return false;
+  if (event.outcome === "Doubt" || event.status === "Doubt") return false;
   if (event.outcome === "Miscarriage") return true;
   if (event.ultrasound_date && event.fetus_count === 0) return true;
   if (event.outcome === "Delivered" && !isRecentDelivery(event, today)) return true;
@@ -219,6 +226,7 @@ export function isBreedingInPipeline(event: BreedingEvent): boolean {
   if (event.outcome === "Delivered" || event.outcome === "Stillbirth" || event.outcome === "Miscarriage") {
     return false;
   }
+  if (event.outcome === "Doubt" || event.status === "Doubt") return true;
   if (event.ultrasound_date && event.fetus_count === 0) return false;
   return event.outcome === "Pending" || event.outcome === "Doubt" || event.status === "Doubt";
 }
