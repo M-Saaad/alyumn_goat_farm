@@ -166,6 +166,8 @@ Direct cash moves between partners. Creates `partner_adjustment` with category `
 | Ultrasound | Updates `fetus_count`, `ultrasound_date`, may set outcome |
 | Delivery | Creates kid via `registerBornGoat()`, resolves breeding outcome |
 | Buck | In-herd sire (`male_animal_id`) or external (`buck_name`) |
+| New crossing | Soft-closes any open prior breeding as Miscarriage/Ready (snapshot marker in notes) |
+| Delete latest | If a soft-closed prior exists, reopen it (Doubt/pipeline + prior due & ultrasound dates) |
 
 ## Herd health
 

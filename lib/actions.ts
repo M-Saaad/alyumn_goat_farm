@@ -25,6 +25,7 @@ import {
 import {
   activeBreedingEventsForFemale,
   assertFemaleAvailableForBreeding,
+  breedingToReopenAfterDelete,
   closeBreedingForNewCrossing,
   expectedDueDate,
   findActiveBreedingForDam,
@@ -893,12 +894,18 @@ export async function deleteBreeding(id: string) {
   const existing = before.breeding_events.find((b) => b.id === id);
   if (!existing) throw new Error("Breeding record not found");
 
+  const reopened = breedingToReopenAfterDelete(before.breeding_events, existing);
   const after = {
     ...before,
-    breeding_events: before.breeding_events.filter((b) => b.id !== id),
+    breeding_events: before.breeding_events
+      .filter((b) => b.id !== id)
+      .map((b) => (reopened && b.id === reopened.id ? reopened : b)),
   };
   if (isSupabaseDb()) {
-    await applyWritePlan({ deleteBreedingIds: [id] });
+    await applyWritePlan({
+      deleteBreedingIds: [id],
+      upsertBreeding: reopened ? [reopened] : undefined,
+    });
     return after;
   }
   return persistMutation(before, after);

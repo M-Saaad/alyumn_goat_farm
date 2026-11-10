@@ -290,8 +290,80 @@ export function activeBreedingEventsForFemale(
   return events.filter((e) => e.female_animal_id === femaleId && isBreedingInPipeline(e));
 }
 
+/** Marker so delete can restore a breeding that was soft-closed for a newer crossing. */
+const CLOSED_FOR_NEW_CROSSING_RE =
+  /<!--\s*farm:closed-for-new-crossing\s+(\{.*?\})\s*-->\s*/;
+
+type ClosedForCrossingSnapshot = {
+  outcome: BreedingOutcome;
+  status: BreedingStatus | null;
+  fetus_count: number | null;
+};
+
+function closedForCrossingMarker(snapshot: ClosedForCrossingSnapshot): string {
+  return `<!-- farm:closed-for-new-crossing ${JSON.stringify(snapshot)} -->`;
+}
+
+function parseClosedForCrossingSnapshot(
+  notes: string | null
+): ClosedForCrossingSnapshot | null {
+  if (!notes) return null;
+  const match = notes.match(CLOSED_FOR_NEW_CROSSING_RE);
+  if (!match?.[1]) return null;
+  try {
+    const parsed = JSON.parse(match[1]) as Partial<ClosedForCrossingSnapshot>;
+    if (
+      parsed.outcome !== "Pending" &&
+      parsed.outcome !== "Delivered" &&
+      parsed.outcome !== "Stillbirth" &&
+      parsed.outcome !== "Miscarriage" &&
+      parsed.outcome !== "Doubt"
+    ) {
+      return null;
+    }
+    const status: BreedingStatus | null =
+      parsed.status === "Ready" ||
+      parsed.status === "Doubt" ||
+      parsed.status === "Delivered" ||
+      parsed.status === "Kid" ||
+      parsed.status === null ||
+      parsed.status === undefined
+        ? (parsed.status ?? null)
+        : null;
+    const fetus_count =
+      parsed.fetus_count === null || parsed.fetus_count === undefined
+        ? null
+        : Number(parsed.fetus_count);
+    if (fetus_count != null && (!Number.isFinite(fetus_count) || fetus_count < 0)) {
+      return null;
+    }
+    return { outcome: parsed.outcome, status, fetus_count };
+  } catch {
+    return null;
+  }
+}
+
+function stripClosedForCrossingMarker(notes: string | null): string | null {
+  if (!notes) return null;
+  const stripped = notes.replace(CLOSED_FOR_NEW_CROSSING_RE, "").trim();
+  return stripped || null;
+}
+
+function wasClosedForNewCrossing(event: BreedingEvent): boolean {
+  return parseClosedForCrossingSnapshot(event.notes) != null;
+}
+
 /** A new crossing means the prior attempt did not carry — close it out, don't block. */
 export function closeBreedingForNewCrossing(existing: BreedingEvent): BreedingEvent {
+  const snapshot: ClosedForCrossingSnapshot = {
+    outcome: existing.outcome,
+    status: existing.status,
+    fetus_count: existing.fetus_count,
+  };
+  const marker = closedForCrossingMarker(snapshot);
+  const notes = existing.notes?.trim()
+    ? `${existing.notes.trim()}\n${marker}`
+    : marker;
   return {
     ...existing,
     outcome: "Miscarriage",
@@ -300,7 +372,77 @@ export function closeBreedingForNewCrossing(existing: BreedingEvent): BreedingEv
       existing.fetus_count != null && existing.fetus_count > 0
         ? existing.fetus_count
         : existing.fetus_count ?? (existing.ultrasound_date ? 0 : null),
+    notes,
   };
+}
+
+/**
+ * Restore a breeding that was soft-closed when a newer crossing was logged.
+ * Prefer the snapshot marker; fall back for legacy closes without a marker.
+ */
+export function reopenBreedingClosedForNewCrossing(closed: BreedingEvent): BreedingEvent {
+  const snapshot = parseClosedForCrossingSnapshot(closed.notes);
+  if (snapshot) {
+    return {
+      ...closed,
+      outcome: snapshot.outcome,
+      status: snapshot.status,
+      fetus_count: snapshot.fetus_count,
+      notes: stripClosedForCrossingMarker(closed.notes),
+    };
+  }
+
+  // Legacy auto-close (no marker): return to Doubt pipeline so due/ultrasound dates show again.
+  if (closed.outcome === "Miscarriage" && (closed.status === "Ready" || !closed.status)) {
+    const fetus_count =
+      closed.fetus_count != null && closed.fetus_count > 0
+        ? closed.fetus_count
+        : closed.ultrasound_date && closed.fetus_count === 0
+          ? null
+          : closed.fetus_count;
+    return {
+      ...closed,
+      outcome: "Pending",
+      status: fetus_count != null && fetus_count > 0 ? "Ready" : "Doubt",
+      fetus_count,
+    };
+  }
+
+  return closed;
+}
+
+/**
+ * After deleting a breeding, reopen the prior soft-closed record if the doe
+ * would otherwise fall back to Ready with no active pregnancy dates.
+ */
+export function breedingToReopenAfterDelete(
+  events: BreedingEvent[],
+  deleted: BreedingEvent
+): BreedingEvent | null {
+  const remaining = events.filter(
+    (e) => e.id !== deleted.id && e.female_animal_id === deleted.female_animal_id
+  );
+  if (remaining.some(isBreedingInPipeline)) return null;
+
+  const prior = [...remaining].sort((a, b) =>
+    (b.date_crossed ?? "").localeCompare(a.date_crossed ?? "")
+  )[0];
+  if (!prior) return null;
+
+  if (wasClosedForNewCrossing(prior)) {
+    return reopenBreedingClosedForNewCrossing(prior);
+  }
+
+  // Legacy: most recent prior was Miscarriage/Ready (auto-closed without marker).
+  if (
+    prior.outcome === "Miscarriage" &&
+    (prior.status === "Ready" || !prior.status) &&
+    prior.delivered_date == null
+  ) {
+    return reopenBreedingClosedForNewCrossing(prior);
+  }
+
+  return null;
 }
 
 export function warningForClosedBreedingRecords(closed: BreedingEvent[]): string | undefined {
