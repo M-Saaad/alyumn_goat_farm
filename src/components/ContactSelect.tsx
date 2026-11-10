@@ -10,6 +10,39 @@ export type ContactOption = { id: string; name: string };
 
 const NEW = "__new__";
 
+export function initialBuckSelection({
+  optional,
+  maleAnimals,
+  pastNames,
+  defaultBuckName,
+  defaultMaleAnimalId,
+}: {
+  optional: boolean;
+  maleAnimals: { id: number; label: string }[];
+  pastNames: string[];
+  defaultBuckName?: string;
+  defaultMaleAnimalId?: number | null;
+}): string {
+  if (defaultMaleAnimalId != null && maleAnimals.some((a) => a.id === defaultMaleAnimalId)) {
+    return `animal:${defaultMaleAnimalId}`;
+  }
+  const name = defaultBuckName?.trim() ?? "";
+  if (name) {
+    const byAnimal = maleAnimals.find((a) => a.label.toLowerCase() === name.toLowerCase());
+    if (byAnimal) return `animal:${byAnimal.id}`;
+    const past = pastNames.find((n) => n.trim() && n.toLowerCase() === name.toLowerCase());
+    if (past) return `name:${past}`;
+    return NEW;
+  }
+  // A saved sire that is missing from the list must not be replaced by another goat.
+  if (defaultMaleAnimalId != null || optional) return "";
+  const first = maleAnimals[0];
+  if (first) return `animal:${first.id}`;
+  const firstName = pastNames.find((n) => n.trim());
+  if (firstName) return `name:${firstName}`;
+  return NEW;
+}
+
 /**
  * Dropdown of existing contacts with an "add new" option that reveals a text input.
  * Submits the resolved name via a hidden field (backend findOrCreate stays unchanged).
@@ -136,26 +169,13 @@ export function BuckSelect({
     )
     .map((n) => ({ value: `name:${n}`, label: n }));
 
-  let initial = optional ? "" : NEW;
-  if (defaultMaleAnimalId != null && maleAnimals.some((a) => a.id === defaultMaleAnimalId)) {
-    initial = `animal:${defaultMaleAnimalId}`;
-  } else if (defaultBuckName) {
-    const byAnimal = maleAnimals.find(
-      (a) => a.label.toLowerCase() === defaultBuckName.toLowerCase()
-    );
-    if (byAnimal) initial = `animal:${byAnimal.id}`;
-    else if (pastNames.some((n) => n.toLowerCase() === defaultBuckName.toLowerCase())) {
-      initial = `name:${defaultBuckName}`;
-    } else {
-      initial = NEW;
-    }
-  } else if (animalOpts[0]) {
-    initial = animalOpts[0].value;
-  } else if (nameOpts[0]) {
-    initial = nameOpts[0].value;
-  } else if (!optional) {
-    initial = NEW;
-  }
+  const initial = initialBuckSelection({
+    optional,
+    maleAnimals,
+    pastNames,
+    defaultBuckName,
+    defaultMaleAnimalId,
+  });
 
   const [selected, setSelected] = useState(initial);
   const [otherName, setOtherName] = useState(

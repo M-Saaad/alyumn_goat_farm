@@ -24,8 +24,18 @@ import { similarVaccineEvents } from "@/lib/livestock/vaccine-schedule";
 import { backFromAnimalProfile } from "@/lib/livestock/health-nav";
 import { computeUltrasoundStatus, daysSinceCrossed, breedingRecordStatusLabel, breedingTimeline } from "@/lib/livestock/breeding";
 import { estimateAnimalAge } from "@/lib/livestock/age";
+import type { Animal } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
+
+function withRecordedParent(
+  options: { id: number; label: string }[],
+  parentId: number | null,
+  animals: Animal[]
+): { id: number; label: string }[] {
+  if (parentId == null || options.some((option) => option.id === parentId)) return options;
+  return [...options, { id: parentId, label: animalParentLabel(animals, parentId) }];
+}
 
 export default async function AnimalProfilePage({
   params,
@@ -149,8 +159,16 @@ export default async function AnimalProfilePage({
         }}
         vendors={data.editorProps.vendors}
         ownerOptions={data.editorProps.ownerOptions}
-        damAnimals={data.editorProps.damAnimals ?? data.editorProps.femaleAnimals ?? []}
-        maleAnimals={data.editorProps.maleAnimals}
+        damAnimals={withRecordedParent(
+          data.editorProps.damAnimals ?? data.editorProps.femaleAnimals ?? [],
+          animal.dam_id,
+          data.animals
+        )}
+        maleAnimals={withRecordedParent(
+          data.editorProps.maleAnimals,
+          animal.sire_id,
+          data.animals
+        )}
         pastBuckNames={data.editorProps.pastBuckNames}
         canWrite={canWrite}
       />

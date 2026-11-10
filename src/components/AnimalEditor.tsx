@@ -277,12 +277,12 @@ export function AnimalEditor({
                 <select
                   name="damId"
                   className={field}
-                  defaultValue={animal.dam_id ?? ""}
+                  defaultValue={animal.dam_id != null ? String(animal.dam_id) : ""}
                   required
                 >
                   <option value="">—</option>
                   {damAnimals.map((a) => (
-                    <option key={a.id} value={a.id}>
+                    <option key={a.id} value={String(a.id)}>
                       {a.label}
                     </option>
                   ))}
