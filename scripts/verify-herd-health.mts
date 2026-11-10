@@ -22,6 +22,8 @@ import {
   isBreedingInPipeline,
   isRecentDelivery,
   resolveBreedingAfterBirth,
+  breedingEventsAfterKidRemoved,
+  reopenRecentDeliveriesWithoutKids,
   breedingUpdatesFromBirths,
   canRecordOrEditUltrasound,
   ULTRASOUND_WINDOW_END_DAYS,
@@ -340,7 +342,10 @@ assert(breedingRecordStatusLabel({ ...pending, ultrasound_date: "2026-06-10", fe
 
 const delivered = resolveBreedingAfterBirth(pending, "2026-08-15");
 assert(delivered.outcome === "Delivered" && delivered.status === "Delivered", "birth closes breeding");
-assert(breedingRecordStatusLabel({ ...pending, ...delivered }) === "Delivered", "delivered label within 60 days");
+assert(
+  breedingRecordStatusLabel({ ...pending, ...delivered }, "2026-08-17") === "Delivered",
+  "delivered label within 60 days"
+);
 assert(
   breedingRecordStatusLabel({ ...pending, ...delivered, delivered_date: "2026-04-01" }, "2026-08-17") === "Ready",
   "delivered label after 60 days becomes ready"
@@ -354,10 +359,10 @@ assert(
   "old delivery not recent"
 );
 
-const deliveredTimeline = breedingTimeline({ ...pending, ...delivered });
+const deliveredTimeline = breedingTimeline({ ...pending, ...delivered }, null, "2026-08-17");
 assert(deliveredTimeline?.type === "delivered" && deliveredTimeline.date === "2026-08-15", "delivered timeline uses birth date");
 assert(
-  breedingTimeline({ ...pending, ...delivered, expected_due_date: "2026-09-03" })?.type === "delivered",
+  breedingTimeline({ ...pending, ...delivered, expected_due_date: "2026-09-03" }, null, "2026-08-17")?.type === "delivered",
   "delivered timeline ignores expected due date"
 );
 
@@ -410,6 +415,58 @@ const herdAfterBirth = computeHerdHealth({
 });
 assert(herdAfterBirth.breeding[0]?.status === "completed", "delivered breeding not pending in herd");
 assert(herdAfterBirth.breeding[0]?.statusLabel === "Delivered", "delivered doe shows delivered label");
+
+const chocolateDam = breedingEvent({
+  id: "br-chocolate-dam",
+  female_animal_id: 16,
+  outcome: "Pending",
+  status: "Ready",
+  ultrasound_date: "2026-08-01",
+  fetus_count: 2,
+  date_crossed: "2026-06-16",
+  expected_due_date: "2026-11-13",
+});
+const chocolateDelivery = resolveBreedingAfterBirth(chocolateDam, "2026-11-10");
+const chocolateKid: Animal = {
+  ...animal,
+  id: 50,
+  name: "Chocolate",
+  sex: "Male",
+  home_bred: true,
+  dam_id: 16,
+  date_of_purchase: "2026-11-10",
+  age_at_purchase: "0",
+  price: 0,
+};
+const reopened = breedingEventsAfterKidRemoved(
+  [chocolateDelivery],
+  [{ ...animal, id: 16, name: "Paro", sex: "Female" }],
+  chocolateKid
+);
+assert(reopened[0]?.outcome === "Pending" && reopened[0]?.delivered_date == null, "deleting only kid reopens kidding");
+assert(
+  breedingRecordStatusLabel({ ...reopened[0]!, ultrasound_date: "2026-08-01", fetus_count: 2 }) === "Confirmed",
+  "reopened confirmed doe shows Confirmed"
+);
+const twin: Animal = { ...chocolateKid, id: 51, name: "Twin" };
+const kept = breedingEventsAfterKidRemoved(
+  [chocolateDelivery],
+  [{ ...animal, id: 16, sex: "Female" }, twin],
+  chocolateKid
+);
+assert(kept[0]?.outcome === "Delivered", "sibling kid keeps the kidding delivered");
+const orphan = reopenRecentDeliveriesWithoutKids(
+  [chocolateDelivery],
+  [{ ...animal, id: 16, sex: "Female" }],
+  "2026-11-10"
+);
+assert(orphan[0]?.outcome === "Pending", "recent delivery with no kid reopens");
+const oldOrphan = reopenRecentDeliveriesWithoutKids(
+  [{ ...chocolateDelivery, delivered_date: "2026-08-01" }],
+  [{ ...animal, id: 16, sex: "Female" }],
+  "2026-11-10"
+);
+assert(oldOrphan[0]?.outcome === "Delivered", "older delivery without a kid stays delivered");
 
 const oldDelivery = resolveBreedingAfterBirth(cadburyBreeding, "2026-04-01");
 const herdOldDelivery = computeHerdHealth({
