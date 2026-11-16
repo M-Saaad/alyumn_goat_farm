@@ -7,6 +7,7 @@ import { isSupabaseDb } from "@/lib/db";
 import { isSoldOnPalaiSale, saleReceiptAmount } from "@/lib/livestock/cancel-sale";
 import { canonicalPurchasePrice } from "@/lib/livestock/purchase-agreement";
 import { loadAnimalProfileData, contactNameFrom } from "@/lib/db/queries";
+import { repairOrphanedRecentDeliveries } from "@/lib/actions";
 import { BottomNav } from "@/components/BottomNav";
 import { QuickEntryLoader } from "@/components/QuickEntryLoader";
 import { AnimalEditor } from "@/components/AnimalEditor";
@@ -49,6 +50,7 @@ export default async function AnimalProfilePage({
   const back = backFromAnimalProfile(sp);
   const animalId = Number(id);
   const canWrite = await getWriteAccess();
+  if (canWrite) await repairOrphanedRecentDeliveries();
   const data = await loadAnimalProfileData(animalId);
   if (!data) notFound();
 

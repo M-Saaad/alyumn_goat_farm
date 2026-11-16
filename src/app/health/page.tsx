@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Suspense } from "react";
 import { loadHerdHealthData } from "@/lib/db/queries";
+import { repairOrphanedRecentDeliveries } from "@/lib/actions";
 import { formatDate } from "@/lib/format";
 import { parseHealthTab, type DueStatus, type HerdHealthData, type HerdHealthSummary } from "@/lib/livestock/herd-health";
 import type { VaccineScheduleEntry } from "@/lib/livestock/vaccine-schedule";
@@ -91,6 +92,7 @@ async function HealthPageContent({
   const sp = await searchParams;
   const tab = parseHealthTab(sp.tab);
   const canWrite = await getWriteAccess();
+  if (canWrite) await repairOrphanedRecentDeliveries();
   const data = await loadHerdHealthData();
   const { herd } = data;
   const { summary } = herd;

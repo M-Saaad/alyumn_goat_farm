@@ -165,6 +165,7 @@ Direct cash moves between partners. Creates `partner_adjustment` with category `
 | Expected due | `date_crossed + 150 days` (approximate gestation) |
 | Ultrasound | Updates `fetus_count`, `ultrasound_date`, may set outcome |
 | Delivery | Creates kid via `registerBornGoat()`, resolves breeding outcome |
+| Delete last kid of that kidding | Reopens the doe’s breeding record (Confirmed, if an ultrasound count remains) |
 | Buck | In-herd sire (`male_animal_id`) or external (`buck_name`) |
 
 ## Herd health
