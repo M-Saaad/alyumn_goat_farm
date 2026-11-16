@@ -123,11 +123,8 @@ export function resolveBreedingAfterUltrasound(
     return { status: "Doubt", outcome: "Doubt" };
   }
 
-  let outcome: BreedingOutcome = existing.outcome;
-  let status: BreedingStatus | null = existing.status;
-  if (outcome === "Doubt") outcome = "Pending";
-  if (!status || status === "Doubt") status = "Ready";
-  return { status, outcome };
+  // "Doubt" was handled by the early return above, so only a missing status needs a default.
+  return { status: existing.status ?? "Ready", outcome: existing.outcome };
 }
 
 /** Record a new ultrasound or edit an existing one (until kidding is logged). */
@@ -228,7 +225,7 @@ export function isBreedingInPipeline(event: BreedingEvent): boolean {
   }
   if (event.outcome === "Doubt" || event.status === "Doubt") return true;
   if (event.ultrasound_date && event.fetus_count === 0) return false;
-  return event.outcome === "Pending" || event.outcome === "Doubt" || event.status === "Doubt";
+  return event.outcome === "Pending";
 }
 
 export function femalesInBreedingPipeline(events: BreedingEvent[]): Set<number> {
