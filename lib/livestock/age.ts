@@ -149,6 +149,73 @@ export function estimateAnimalAge(
   };
 }
 
+export const AGE_AT_PURCHASE_UNITS = ["months", "days", "teeth"] as const;
+
+export type AgeAtPurchaseUnit = (typeof AGE_AT_PURCHASE_UNITS)[number];
+
+function roundAgeQuantity(amount: number): number {
+  return Math.round(amount * 1000) / 1000;
+}
+
+/** Turn a Buy Goat age entry into the free-text `age_at_purchase` the estimator parses. */
+export function formatAgeAtPurchase(amount: number, unit: AgeAtPurchaseUnit): string {
+  if (!Number.isFinite(amount) || amount < 0) {
+    throw new Error("Age at purchase cannot be negative");
+  }
+
+  const rounded = roundAgeQuantity(amount);
+
+  switch (unit) {
+    case "months": {
+      if (rounded === 0) return "0";
+      const label = rounded === 1 ? "month" : "months";
+      return `${rounded} ${label}`;
+    }
+    case "days": {
+      if (rounded === 0) return "0";
+      const label = rounded === 1 ? "day" : "days";
+      return `${rounded} ${label}`;
+    }
+    case "teeth": {
+      if (!Number.isInteger(rounded) || rounded > 8) {
+        throw new Error("Teeth must be a whole number from 0 to 8");
+      }
+      return `${rounded} teeth`;
+    }
+    default: {
+      const unknown: never = unit;
+      throw new Error(`Unknown age unit: ${String(unknown)}`);
+    }
+  }
+}
+
+/** Blank amount means age unknown. A filled amount is stored as months, days, or teeth. */
+export function parseAgeAtPurchaseForm(
+  amountRaw: string | null | undefined,
+  unitRaw: string | null | undefined
+): string | null {
+  const trimmed = String(amountRaw ?? "").trim();
+  if (!trimmed) return null;
+
+  const amount = Number(trimmed);
+  if (!Number.isFinite(amount) || amount < 0) {
+    throw new Error("Age at purchase cannot be negative");
+  }
+
+  const unit = String(unitRaw ?? "")
+    .trim()
+    .toLowerCase();
+  if (!isAgeAtPurchaseUnit(unit)) {
+    throw new Error("Age at purchase unit must be months, days, or teeth");
+  }
+
+  return formatAgeAtPurchase(amount, unit);
+}
+
+function isAgeAtPurchaseUnit(value: string): value is AgeAtPurchaseUnit {
+  return (AGE_AT_PURCHASE_UNITS as readonly string[]).includes(value);
+}
+
 export function isKidAnimal(
   animal: Pick<Animal, "date_of_purchase" | "age_at_purchase" | "out_date" | "status" | "sex">,
   asOf: string

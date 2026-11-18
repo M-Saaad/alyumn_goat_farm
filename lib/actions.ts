@@ -255,6 +255,7 @@ export async function buyGoat(input: {
   vendorName?: string;
   paidBy: "Monis" | "Saad" | "Customer";
   palaiRate?: number | null;
+  ageAtPurchase?: string | null;
 }) {
   const before = await fetchDb();
   let db = before;
@@ -299,7 +300,7 @@ export async function buyGoat(input: {
     breed: input.breed,
     sex: input.sex,
     date_of_purchase: input.date,
-    age_at_purchase: null,
+    age_at_purchase: input.ageAtPurchase?.trim() || null,
     description: input.description,
     comment: null,
     status: "Active" as const,
