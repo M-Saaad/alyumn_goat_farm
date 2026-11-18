@@ -31,6 +31,7 @@ import {
 } from "@/lib/actions";
 import { revalidatePath } from "next/cache";
 import type { AnimalBreed, AnimalSex, AnimalStatus, LedgerCategory, MedicalEventType } from "@/lib/types";
+import { parseAgeAtPurchaseForm } from "@/lib/livestock/age";
 import { formatDewormNotes, formatVaccineNotes, type DewormType } from "@/lib/livestock/medical-notes";
 import { NEW_VACCINE_VALUE, builtinVaccineByName, parseVaccineIntervalDays } from "@/lib/livestock/vaccine-schedule";
 import {
@@ -237,6 +238,10 @@ export async function actionBuyGoat(formData: FormData) {
       vendorName: String(formData.get("vendorName") || "") || undefined,
       paidBy,
       palaiRate: palaiRaw ? parseOptionalPositiveAmount(palaiRaw, "Palai rate") : null,
+      ageAtPurchase: parseAgeAtPurchaseForm(
+        String(formData.get("ageAmount") || ""),
+        String(formData.get("ageUnit") || "")
+      ),
     });
     revalidateTxnPaths();
     return { ok: true };

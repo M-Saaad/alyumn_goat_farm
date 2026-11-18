@@ -668,6 +668,7 @@ function BuyGoatForm({
           <option>Male</option>
         </select>
       </div>
+      <AgeAtPurchaseField />
       <ContactSelect
         label="Owner"
         name="ownerName"
@@ -723,6 +724,52 @@ function BuyGoatForm({
         installments (add payments from the goat profile).
       </p>
     </ActionForm>
+  );
+}
+
+function AgeAtPurchaseField() {
+  const [unit, setUnit] = useState<"months" | "days" | "teeth">("months");
+  const teeth = unit === "teeth";
+
+  return (
+    <div>
+      <label className={label} htmlFor="ageAmount">
+        Age at purchase (optional)
+      </label>
+      <div className="mt-1 flex gap-2">
+        <input
+          id="ageAmount"
+          className="min-w-0 flex-1 rounded-xl border border-stone-300 bg-white px-3 py-2 text-base text-stone-900 outline-none focus:border-emerald-600"
+          name="ageAmount"
+          type="number"
+          min={0}
+          max={teeth ? 8 : undefined}
+          step={teeth ? 1 : "any"}
+          inputMode={teeth ? "numeric" : "decimal"}
+          placeholder={teeth ? "4" : unit === "days" ? "10" : "6"}
+          aria-label="Age at purchase"
+        />
+        <select
+          name="ageUnit"
+          aria-label="Age unit"
+          className="w-32 shrink-0 rounded-xl border border-stone-300 bg-white px-3 py-2 text-base text-stone-900 outline-none focus:border-emerald-600"
+          value={unit}
+          onChange={(e) => {
+            const next = e.target.value;
+            if (next === "months" || next === "days" || next === "teeth") setUnit(next);
+          }}
+        >
+          <option value="months">Months</option>
+          <option value="days">Days</option>
+          <option value="teeth">Teeth</option>
+        </select>
+      </div>
+      <p className="mt-1 text-xs text-stone-500">
+        {teeth
+          ? "Permanent incisors, usually 0, 2, 4, 6, or 8. Leave blank if unknown."
+          : "Leave blank if you do not know the age."}
+      </p>
+    </div>
   );
 }
 
